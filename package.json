@@ -21,7 +21,8 @@
     "provenance:check": "node scripts/provenance.mjs",
     "benchmark": "node scripts/benchmark-production.ts",
     "mcp": "node mcp/main.ts",
-    "migrate": "node cli/migrate.ts"
+    "migrate": "node cli/migrate.ts",
+    "build:native": "cargo build --release --manifest-path native/procd/Cargo.toml"
   },
   "dependencies": {
     "react": "18.3.1",

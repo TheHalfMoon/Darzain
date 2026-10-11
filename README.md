@@ -8,9 +8,12 @@ Yamakan is an AI-native creative production platform. Canonical repository: [The
 
 ```bash
 npm ci
+npm run build:native
 npm run build
 npm start
 ```
+
+`build:native` builds the Windows process owner (Rust toolchain with MSVC); media workers run only through it on Windows.
 
 Open http://127.0.0.1:4318. Agents use `npm run cli -- yamakan.project.list {}` or the MCP stdio server (`npm run mcp`) against the running service; both authenticate with the workspace client token, separately from the browser session.
 

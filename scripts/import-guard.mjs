@@ -14,8 +14,9 @@ const REQUIRED = [
 // evaluation. Allowlisted spawn modules may only use the named imports below.
 const PROCESS_ACCESS =
   /child_process|spawn_sync|getBuiltinModule|process\.binding|createRequire|["'](?:node:)?(?:vm|worker_threads|cluster)["']/;
+// Named spawn/execFile imports, or type-only imports (erased at runtime).
 const ALLOWED_PROCESS_IMPORT =
-  /^import\s*\{\s*((?:spawn|execFile)(?:\s*,\s*(?:spawn|execFile))*)\s*,?\s*\}\s*from\s*["']node:child_process["'];?$/;
+  /^import\s*(?:\{\s*((?:spawn|execFile)(?:\s*,\s*(?:spawn|execFile))*)\s*,?\s*\}|type\s*\{\s*\w+(?:\s*,\s*\w+)*\s*,?\s*\})\s*from\s*["']node:child_process["'];?$/;
 const FORBIDDEN = [
   [
     /\bexecSync\b|\bspawnSync\b|\bexecFileSync\b/,

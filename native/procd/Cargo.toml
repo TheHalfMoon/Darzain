@@ -1,0 +1,16 @@
+[package]
+name = "yamakan-procd"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+description = "Yamakan process owner: launches media workers inside kill-on-close Windows Job Objects"
+publish = false
+
+# Deliberately dependency-free: only the Windows API through hand-declared FFI.
+[dependencies]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"

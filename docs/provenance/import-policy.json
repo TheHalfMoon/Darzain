@@ -59,6 +59,6 @@
       "reason": "Unqualified provider submit/poll proxy with ambiguous billing retries."
     }
   ],
-  "processSpawnAllowlist": ["core/media.ts", "core/render.ts"],
+  "processSpawnAllowlist": ["core/process/owner.ts", "core/render.ts"],
   "productionRoots": ["core", "server", "cli", "sdk", "mcp", "src"]
 }

@@ -19,6 +19,10 @@ export const RESOURCE_POLICY = Object.freeze({
     renderJobsPerSession: 100,
     renderThreads: 2,
     mediaDimension: 4096,
+    probeStreams: 10,
+    probeWallSeconds: 10,
+    // Job Object memory ceiling for each media worker.
+    workerMemoryBytes: 1 * GiB,
   }),
   candidate: Object.freeze({
     queuedJobs: 128,
