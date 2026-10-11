@@ -218,10 +218,25 @@ const server = createServer(async (req, res) => {
             "VALIDATION",
             "Uploads require a Content-Length header.",
           );
-        return json(
-          200,
-          await store.importAsset(upload[1], name, req, Number(length)),
+        const staged = await store.stageAsset(
+          upload[1],
+          name,
+          req,
+          Number(length),
         );
+        // Variable-frame-rate video is edited only through a constant-rate
+        // derivative; the asset joins the project when that job succeeds.
+        if (staged.probe.variableFrameRate && staged.asset.kind === "video")
+          return json(202, {
+            project: await store.load(upload[1]),
+            asset: null,
+            job: await api.queue.submitDerivative(upload[1], staged),
+          });
+        return json(200, {
+          project: await store.attachAsset(upload[1], staged.asset),
+          asset: staged.asset,
+          probe: staged.probe,
+        });
       }
       const asset = /^\/api\/v1\/projects\/([^/]+)\/assets\/([^/]+)$/.exec(
         url.pathname,

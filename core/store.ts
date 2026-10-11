@@ -847,7 +847,22 @@ export class ProjectStore {
   // publishes it to the content-addressed store, and only then commits a
   // snapshot that references it, together with its object/version rows.
   // Memory use is independent of the media size.
+  // Stage + attach in one call: the common import path.
   async importAsset(
+    id: string,
+    name: string,
+    source: Buffer | AsyncIterable<Uint8Array>,
+    declaredBytes?: number,
+  ) {
+    const staged = await this.stageAsset(id, name, source, declaredBytes);
+    const project = await this.attachAsset(id, staged.asset);
+    return { project, asset: staged.asset, probe: staged.probe };
+  }
+  // Streams, probes, publishes and registers an asset's object and version,
+  // without changing any snapshot. A staged asset can be attached later
+  // (after a revision conflict, or once a derivative job has finished)
+  // without re-uploading it.
+  async stageAsset(
     id: string,
     name: string,
     source: Buffer | AsyncIterable<Uint8Array>,
@@ -963,28 +978,75 @@ export class ProjectStore {
         frameRate: metadata.frameRate,
         variableFrameRate: metadata.variableFrameRate,
       });
-      // The append commutes with concurrent edits, so it applies to whichever
-      // head is current; the object/version rows commit in the same transaction.
-      const project = this.#commit({
-        operation: "asset.import",
-        projectId: id,
-        expectedRevision: null,
-        effects: (db) => registerAsset(db, id, asset, probeRecord),
-        next: (current, revision) => {
-          const head = current();
-          if (head.assets.length >= RESOURCE_POLICY.enforced.assetsPerProject)
-            throw new Error("Asset limit reached.");
-          return {
-            ...head,
-            revision,
-            assets: [...head.assets, asset],
-          };
+      this.transaction((db) => registerAsset(db, id, asset, probeRecord));
+      return {
+        asset,
+        probe: JSON.parse(probeRecord) as Record<string, unknown> & {
+          variableFrameRate: boolean;
+          frameRate: { num: number; den: number } | null;
         },
-      });
-      return { project, asset, probe: JSON.parse(probeRecord) };
+      };
     } finally {
       await unlink(temp).catch(() => {});
     }
+  }
+  // Adds an asset whose object is published and ready. The append commutes
+  // with concurrent edits, so it applies to whichever head is current.
+  // `effects` run in the same transaction (a job's success, for example), and
+  // an exception there commits nothing.
+  async attachAsset(
+    id: string,
+    asset: Asset,
+    effects?: (db: DatabaseSync) => void,
+  ) {
+    return this.#commit({
+      operation: "asset.import",
+      projectId: id,
+      expectedRevision: null,
+      effects: (db) => {
+        effects?.(db);
+        const object = db
+          .prepare(
+            "SELECT state, byte_length FROM asset_objects WHERE project_id = ? AND digest = ?",
+          )
+          .get(id, asset.hash) as
+          { state: string; byte_length: number } | undefined;
+        if (object?.state !== "ready" || object.byte_length !== asset.bytes)
+          throw new CommandError(
+            "RECOVERY_REQUIRED",
+            "Only a published, ready media object can be attached.",
+          );
+      },
+      next: (current, revision) => {
+        const head = current();
+        if (head.assets.length >= RESOURCE_POLICY.enforced.assetsPerProject)
+          throw new Error("Asset limit reached.");
+        if (head.assets.some((a) => a.id === asset.id))
+          throw new CommandError("VALIDATION", "Asset is already attached.");
+        return { ...head, revision, assets: [...head.assets, asset] };
+      },
+    });
+  }
+  // Path of a verified media object, for workers that read it.
+  async objectFile(id: string, asset: Asset) {
+    return this.#verifiedAsset(id, asset);
+  }
+  // Records a derivative version (for example a constant-rate mezzanine) of a
+  // logical asset, with its probe and lineage. Runs inside a transaction.
+  static registerDerivative(
+    db: DatabaseSync,
+    projectId: string,
+    derivative: { hash: string; bytes: number },
+    probe: Record<string, unknown>,
+  ) {
+    const versionId = randomUUID();
+    registerAsset(
+      db,
+      projectId,
+      { id: versionId, hash: derivative.hash, bytes: derivative.bytes },
+      JSON.stringify(probe),
+    );
+    return versionId;
   }
   // Recorded probe and object state for one asset version.
   assetVersion(versionId: string) {

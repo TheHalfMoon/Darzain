@@ -315,11 +315,41 @@ function App() {
                       body: file,
                     });
                     const v = await r.json();
-                    if (!r.ok) throw new Error(v.error);
-                    accept(v.project);
-                    setMessage(
-                      `Imported ${v.asset.name}. Click it to add it to the timeline.`,
-                    );
+                    if (!r.ok)
+                      throw new Error(v.error?.message || "Import failed.");
+                    if (v.job) {
+                      // Variable-frame-rate video: wait for its constant-rate version.
+                      setMessage(
+                        `Converting ${file.name} to a constant frame rate before editing…`,
+                      );
+                      let job = v.job;
+                      while (
+                        job.state === "QUEUED" ||
+                        job.state === "RUNNING"
+                      ) {
+                        await new Promise((resolve) =>
+                          setTimeout(resolve, 500),
+                        );
+                        job = await call("yamakan.job.status", {
+                          jobId: job.id,
+                        });
+                      }
+                      if (job.state !== "COMPLETED")
+                        throw new Error(
+                          job.error || "Conversion did not complete.",
+                        );
+                      accept(
+                        await call("yamakan.project.open", { projectId: p.id }),
+                      );
+                      setMessage(
+                        `Imported ${file.name} at a constant frame rate. Click it to add it to the timeline.`,
+                      );
+                    } else {
+                      accept(v.project);
+                      setMessage(
+                        `Imported ${v.asset.name}. Click it to add it to the timeline.`,
+                      );
+                    }
                     await refresh();
                   });
                 }}

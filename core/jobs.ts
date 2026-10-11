@@ -6,11 +6,17 @@
 // from an earlier generation: their Job Object workers died with that service,
 // so they are marked failed and their jobs re-queued (local work only, never
 // a paid resubmission). Partial outputs are never registered.
-import { rename, rm, unlink } from "node:fs/promises";
+import { mkdir, rename, rm, unlink } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { DatabaseSync } from "node:sqlite";
-import type { ProjectStore } from "./store.ts";
+import { ProjectStore } from "./store.ts";
+import { AssetSchema } from "./project.ts";
+import type { Asset } from "./project.ts";
+import { probe } from "./media.ts";
+import { mediaTools, workers } from "./process/workers.ts";
 import { renderProject } from "./render.ts";
 import type { RenderJob } from "./render.ts";
 import { CommandError, toCommandError } from "./command/errors.ts";
@@ -45,6 +51,18 @@ type Row = {
 
 // The only payload this build executes; anything else is quarantined.
 const ExportPayload = z.object({ format: z.literal("export/1") }).strict();
+const DerivativePayload = z
+  .object({
+    format: z.literal("cfr/1"),
+    asset: AssetSchema,
+    frameRate: z
+      .object({
+        num: z.number().int().positive().max(1_000_000),
+        den: z.number().int().positive().max(1_000_000),
+      })
+      .strict(),
+  })
+  .strict();
 
 export type JobFault =
   "after-claim" | "before-publish" | "after-publish" | "before-succeed";
@@ -309,84 +327,91 @@ export class JobSupervisor {
     ).catch(() => {});
   }
 
+  // The worker's identity is durable before it may run.
+  #markRunning(jobId: string, attempt: number, pid: number) {
+    this.#fenced(jobId, attempt, (db) => {
+      const moved = db
+        .prepare(
+          "UPDATE jobs SET state = 'running' WHERE job_id = ? AND state = 'preparing' AND cancel_requested = 0",
+        )
+        .run(jobId);
+      if (moved.changes !== 1) throw new Error("Cancelled.");
+      db.prepare(
+        "UPDATE attempts SET state = 'running', pid = ? WHERE job_id = ? AND attempt_no = ?",
+      ).run(pid, jobId, attempt);
+    });
+  }
+  #markValidating(jobId: string, attempt: number) {
+    this.#fenced(jobId, attempt, (db) => {
+      db.prepare(
+        "UPDATE jobs SET state = 'validating' WHERE job_id = ? AND state = 'running'",
+      ).run(jobId);
+      db.prepare(
+        "UPDATE attempts SET state = 'validating' WHERE job_id = ? AND attempt_no = ?",
+      ).run(jobId, attempt);
+    });
+  }
+  // Success inside a caller's transaction: fenced, and decided by the
+  // database, so a cancellation that won stays won (the caller's whole
+  // transaction then rolls back).
+  #succeedIn(
+    db: DatabaseSync,
+    jobId: string,
+    attempt: number,
+    artifact: string,
+  ) {
+    const current = (
+      db.prepare("SELECT generation FROM supervisor WHERE id = 1").get() as {
+        generation: number;
+      }
+    ).generation;
+    const own = db
+      .prepare(
+        "SELECT generation FROM attempts WHERE job_id = ? AND attempt_no = ?",
+      )
+      .get(jobId, attempt) as { generation: number } | undefined;
+    if (current !== this.#generation || own?.generation !== this.#generation)
+      throw new CommandError(
+        "RECOVERY_REQUIRED",
+        "This attempt belongs to an earlier service run.",
+      );
+    const moved = db
+      .prepare(
+        "UPDATE jobs SET state = 'succeeded', artifact = ?, progress = 1, error = NULL WHERE job_id = ? AND state = 'validating' AND cancel_requested = 0",
+      )
+      .run(artifact, jobId);
+    if (moved.changes !== 1) throw new Error("Cancelled.");
+    db.prepare(
+      "UPDATE attempts SET state = 'succeeded' WHERE job_id = ? AND attempt_no = ?",
+    ).run(jobId, attempt);
+  }
+
   async #execute(row: Row, attempt: number) {
     const jobId = row.job_id;
     const controller = new AbortController();
     this.#controllers.set(jobId, controller);
-    let published: string | null = null;
+    const output = { published: null as string | null };
     try {
       await this.#options.fault?.("after-claim", jobId);
-      if (!ExportPayload.safeParse(safeJson(row.payload)).success) {
-        // A bad payload never blocks other jobs: it is quarantined as failed.
+      const payload = safeJson(row.payload);
+      const derivative = DerivativePayload.safeParse(payload);
+      if (row.kind === "export" && ExportPayload.safeParse(payload).success)
+        await this.#runExport(row, attempt, controller.signal, output);
+      else if (row.kind === "cfr-derivative" && derivative.success)
+        await this.#runDerivative(
+          row,
+          attempt,
+          derivative.data,
+          controller.signal,
+        );
+      // A bad payload never blocks other jobs: it is quarantined as failed.
+      else
         this.#finish(
           jobId,
           attempt,
           "failed",
           "Job payload is invalid and was quarantined.",
         );
-        return;
-      }
-      const project = await this.store.loadRevision(
-        row.project_id,
-        row.frozen_revision,
-      );
-      const partial = await renderProject(
-        this.store,
-        project,
-        ["exports", jobId, `attempt-${attempt}`],
-        controller.signal,
-        (value) => this.#progress.set(jobId, value),
-        // The worker's identity is durable before it may run.
-        (pid) =>
-          this.#fenced(jobId, attempt, (db) => {
-            const moved = db
-              .prepare(
-                "UPDATE jobs SET state = 'running' WHERE job_id = ? AND state = 'preparing' AND cancel_requested = 0",
-              )
-              .run(jobId);
-            if (moved.changes !== 1) throw new Error("Cancelled.");
-            db.prepare(
-              "UPDATE attempts SET state = 'running', pid = ? WHERE job_id = ? AND attempt_no = ?",
-            ).run(pid, jobId, attempt);
-          }),
-      );
-      this.#fenced(jobId, attempt, (db) => {
-        db.prepare(
-          "UPDATE jobs SET state = 'validating' WHERE job_id = ? AND state = 'running'",
-        ).run(jobId);
-        db.prepare(
-          "UPDATE attempts SET state = 'validating' WHERE job_id = ? AND attempt_no = ?",
-        ).run(jobId, attempt);
-      });
-      await this.#options.fault?.("before-publish", jobId);
-      const target = await this.store.file(
-        row.project_id,
-        "exports",
-        jobId,
-        "render.mp4",
-      );
-      await rename(partial, target);
-      published = target;
-      await this.#options.fault?.("after-publish", jobId);
-      await this.#options.fault?.("before-succeed", jobId);
-      // Success is decided by the database: a cancellation that won stays won.
-      let succeeded = false;
-      this.#fenced(jobId, attempt, (db) => {
-        const moved = db
-          .prepare(
-            "UPDATE jobs SET state = 'succeeded', artifact = ?, progress = 1, error = NULL WHERE job_id = ? AND state = 'validating' AND cancel_requested = 0",
-          )
-          .run(`exports/${jobId}/render.mp4`, jobId);
-        succeeded = moved.changes === 1;
-        db.prepare(
-          "UPDATE attempts SET state = ? WHERE job_id = ? AND attempt_no = ?",
-        ).run(succeeded ? "succeeded" : "cancelled", jobId, attempt);
-        if (!succeeded)
-          db.prepare(
-            "UPDATE jobs SET state = 'cancelled' WHERE job_id = ? AND state NOT IN ('succeeded')",
-          ).run(jobId);
-      });
-      if (succeeded) published = null;
     } catch (e) {
       const cancelled = this.store.read(
         (db) => this.#row(db, jobId)?.cancel_requested === 1,
@@ -411,11 +436,231 @@ export class JobSupervisor {
       }
     } finally {
       // An output that was not registered as the job's artifact is removed.
-      if (published) await unlink(published).catch(() => {});
+      if (output.published) await unlink(output.published).catch(() => {});
       this.#controllers.delete(jobId);
       this.#progress.delete(jobId);
       await this.#cleanup(row.project_id, jobId, attempt);
     }
+  }
+
+  async #runExport(
+    row: Row,
+    attempt: number,
+    signal: AbortSignal,
+    output: { published: string | null },
+  ) {
+    const jobId = row.job_id;
+    const project = await this.store.loadRevision(
+      row.project_id,
+      row.frozen_revision,
+    );
+    const partial = await renderProject(
+      this.store,
+      project,
+      ["exports", jobId, `attempt-${attempt}`],
+      signal,
+      (value) => this.#progress.set(jobId, value),
+      (pid) => this.#markRunning(jobId, attempt, pid),
+    );
+    this.#markValidating(jobId, attempt);
+    await this.#options.fault?.("before-publish", jobId);
+    const target = await this.store.file(
+      row.project_id,
+      "exports",
+      jobId,
+      "render.mp4",
+    );
+    await rename(partial, target);
+    output.published = target;
+    await this.#options.fault?.("after-publish", jobId);
+    await this.#options.fault?.("before-succeed", jobId);
+    this.store.transaction((db) =>
+      this.#succeedIn(db, jobId, attempt, `exports/${jobId}/render.mp4`),
+    );
+    output.published = null;
+  }
+
+  // Converts a variable-frame-rate source into a constant-rate mezzanine and
+  // attaches it as the asset's selected version. The original object stays
+  // retained; the derivative version records its lineage. Attachment and the
+  // job's success commit in one transaction.
+  async #runDerivative(
+    row: Row,
+    attempt: number,
+    payload: z.output<typeof DerivativePayload>,
+    signal: AbortSignal,
+  ) {
+    const jobId = row.job_id;
+    const asset = payload.asset;
+    const source = await this.store.objectFile(row.project_id, asset);
+    const dir = await this.store.file(
+      row.project_id,
+      "exports",
+      jobId,
+      `attempt-${attempt}`,
+    );
+    await mkdir(dir, { recursive: true });
+    const seconds = Math.max(1, asset.durationFrames / 30);
+    let progress = "";
+    const result = await workers().run({
+      executable: mediaTools().ffmpeg,
+      args: [
+        "-hide_banner",
+        "-nostdin",
+        "-y",
+        "-protocol_whitelist",
+        "file",
+        "-i",
+        source,
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a:0?",
+        "-fps_mode",
+        "cfr",
+        "-r",
+        `${payload.frameRate.num}/${payload.frameRate.den}`,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "18",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        "-movflags",
+        "+faststart",
+        "-progress",
+        "pipe:1",
+        "derivative.mp4",
+      ],
+      cwd: dir,
+      memoryBytes: RESOURCE_POLICY.enforced.renderMemoryBytes,
+      signal,
+      stderrLimit: 8000,
+      onCreated: (pid) => this.#markRunning(jobId, attempt, pid),
+      onStdout: (chunk) => {
+        progress += chunk.toString("utf8");
+        const lines = progress.split("\n");
+        progress = lines.pop() || "";
+        for (const line of lines) {
+          const match = /^out_time_us=(\d+)/.exec(line);
+          if (match)
+            this.#progress.set(
+              jobId,
+              Math.min(0.99, Number(match[1]) / 1e6 / seconds),
+            );
+        }
+      },
+    });
+    if (signal.aborted) throw new Error("Cancelled.");
+    if (result.code !== 0)
+      throw new Error(
+        `FFmpeg failed to convert the source (exit ${result.code}).`,
+        { cause: result.stderr },
+      );
+    const file = path.join(dir, "derivative.mp4");
+    const probed = await probe(file);
+    if (
+      !probed.hasVideo ||
+      probed.variableFrameRate ||
+      probed.width !== asset.width ||
+      probed.height !== asset.height ||
+      // Filling a VFR stream to constant rate can extend it to its nominal end.
+      Math.abs(probed.durationFrames - asset.durationFrames) >
+        Math.max(2, Math.ceil(asset.durationFrames * 0.05))
+    )
+      throw new Error("Converted output failed verification.");
+    this.#markValidating(jobId, attempt);
+    const stored = await this.store.importObject(
+      row.project_id,
+      createReadStream(file) as AsyncIterable<Uint8Array>,
+    );
+    const derived = AssetSchema.parse({
+      ...asset,
+      extension: "mp4",
+      hash: stored.sha256,
+      bytes: stored.byteLength,
+      durationFrames: probed.durationFrames,
+    });
+    await this.#options.fault?.("before-succeed", jobId);
+    await this.store.attachAsset(row.project_id, derived, (db) => {
+      ProjectStore.registerDerivative(
+        db,
+        row.project_id,
+        { hash: derived.hash, bytes: derived.bytes },
+        {
+          format: probed.format,
+          width: probed.width,
+          height: probed.height,
+          timebase: probed.timebase,
+          frameRate: probed.frameRate,
+          variableFrameRate: false,
+          derivedFrom: { versionId: asset.id, digest: asset.hash },
+          conversion: "cfr/1",
+        },
+      );
+      this.#succeedIn(db, jobId, attempt, `asset:${asset.id}`);
+    });
+  }
+
+  // Queues the constant-rate conversion of a staged variable-frame-rate
+  // source. The asset joins the project only when the conversion succeeds.
+  async submitDerivative(
+    projectId: string,
+    staged: {
+      asset: Asset;
+      probe: { frameRate: { num: number; den: number } | null };
+    },
+  ) {
+    if (this.#closing) throw new Error("Render queue is closing.");
+    if (!this.#generation) await this.start();
+    const project = await this.store.load(projectId);
+    const payload = DerivativePayload.parse({
+      format: "cfr/1",
+      asset: staged.asset,
+      frameRate: staged.probe.frameRate ?? { num: 30, den: 1 },
+    });
+    const key = `cfr-${staged.asset.hash}`;
+    const row = this.store.transaction((db) => {
+      const existing = db
+        .prepare(
+          "SELECT * FROM jobs WHERE project_id = ? AND kind = 'cfr-derivative' AND idempotency_key = ?",
+        )
+        .get(projectId, key) as Row | undefined;
+      if (
+        existing &&
+        existing.state !== "failed" &&
+        existing.state !== "cancelled"
+      )
+        return existing;
+      const active = (
+        db
+          .prepare(
+            `SELECT count(*) AS n FROM jobs WHERE state NOT IN (${terminalSql})`,
+          )
+          .get() as { n: number }
+      ).n;
+      if (active >= RESOURCE_POLICY.enforced.activeJobs)
+        throw new CommandError("LIMIT_EXCEEDED", "Too many active jobs.");
+      const jobId = randomUUID();
+      db.prepare(
+        "INSERT INTO jobs(job_id, kind, project_id, frozen_revision, idempotency_key, payload, state) VALUES (?, 'cfr-derivative', ?, ?, ?, ?, 'queued')",
+      ).run(
+        jobId,
+        projectId,
+        project.revision,
+        existing ? `${key}-${jobId.slice(0, 8)}` : key,
+        JSON.stringify(payload),
+      );
+      return this.#row(db, jobId)!;
+    });
+    this.#pump();
+    return this.#view(row);
   }
 
   // Stops claiming work, terminates running workers and waits for the loop.
