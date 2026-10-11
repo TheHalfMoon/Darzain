@@ -5,3 +5,5 @@ work/
 graft/
 *.log
 .env*
+.yamakan/
+native/procd/target/

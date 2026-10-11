@@ -234,7 +234,7 @@ test("import guard accepts the repository and rejects unsafe imports", () => {
     }) as string[];
   const clean = {
     "src/donors/x/a.ts": "export const a = /x/.exec('x');",
-    "core/media.ts": 'import { execFile } from "node:child_process";',
+    "core/process/owner.ts": 'import { execFile } from "node:child_process";',
   };
   assert.deepEqual(run(clean), []);
   const expectViolation = (
@@ -268,7 +268,7 @@ test("import guard accepts the repository and rejects unsafe imports", () => {
     /outside the allowlist/,
   );
   expectViolation(
-    { "core/media.ts": "exec(`ffmpeg ${x}`)" },
+    { "core/process/owner.ts": "exec(`ffmpeg ${x}`)" },
     /shell-interpreting exec/,
   );
   expectViolation(
@@ -293,7 +293,7 @@ test("import guard accepts the repository and rejects unsafe imports", () => {
   ]);
   // Bypass attempts reported by the independent T1 reviews.
   const bypasses: Record<string, string> = {
-    "core/media.ts":
+    "core/process/owner.ts":
       'import * as cp from "node:child_process"; cp.execSync(`ffmpeg ${x}`);',
     "core/render.ts": 'import { exec } from "node:child_process";',
     "server/a.ts": 'createRequire(import.meta.url)("child_process")',
@@ -327,7 +327,7 @@ test("import guard accepts the repository and rejects unsafe imports", () => {
     run({
       ...clean,
       "core/render.ts":
-        'import {\n  spawn,\n  execFile,\n} from "node:child_process";\nconst m = /x/.exec(line);',
+        'import {\n  spawn,\n  execFile,\n} from "node:child_process";\nimport type { ChildProcess } from "node:child_process";\nconst m = /x/.exec(line);',
       "server/ok.ts": 'const { readFile } = await import("node:fs/promises");',
     }),
     [],

@@ -37,7 +37,9 @@ const files = readdirSync(".", { recursive: true, withFileTypes: true })
   .map((d) =>
     `${d.parentPath}/${d.name}`.replaceAll("\\", "/").replace(/^\.\//, ""),
   )
-  .filter((f) => !skip.has(f.split("/")[0]));
+  .filter((f) => !skip.has(f.split("/")[0]))
+  // Native build outputs are not source.
+  .filter((f) => !f.startsWith("native/procd/target/"));
 const violations = checkImports({
   files,
   read: (f) => readFileSync(f, "utf8"),

@@ -1,9 +1,21 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-const execute = promisify(execFile);
+import path from "node:path";
 import { RESOURCE_POLICY } from "./command/policy.ts";
+import { CommandError } from "./command/errors.ts";
+import { mediaTools, workers } from "./process/workers.ts";
 export const MAX_ASSET_BYTES = RESOURCE_POLICY.enforced.assetImportBytes;
-const { mediaDimension } = RESOURCE_POLICY.enforced;
+const { mediaDimension, probeStreams, probeWallSeconds, workerMemoryBytes } =
+  RESOURCE_POLICY.enforced;
+const MAX_PROBE_OUTPUT = 1024 * 1024;
+
+// "num/den" from ffprobe, reduced to a positive rational, or null.
+function ratio(text: unknown) {
+  const m = /^(\d{1,10})\/(\d{1,10})$/.exec(String(text ?? ""));
+  if (!m || m[1] === "0" || m[2] === "0") return null;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  const g = (x: number, y: number): number => (y ? g(y, x % y) : x);
+  const d = g(a, b);
+  return { num: a / d, den: b / d };
+}
 export function mediaHeader(bytes: Buffer, ext: string) {
   const valid =
     ext === "png"
@@ -33,36 +45,51 @@ export function mediaHeader(bytes: Buffer, ext: string) {
   if (!valid)
     throw new Error("Media signature does not match a supported format.");
 }
+// Probes a staged file with an owned, bounded ffprobe: local files only (no
+// network, pipes or playlist subresources), a wall-clock and memory limit,
+// and bounded output. Failures never echo the command line or stderr.
 export async function probe(file: string) {
-  // execFile errors embed the command line and stderr, which contain host paths.
-  const { stdout } = await execute(
-    process.env.YAMAKAN_FFPROBE || process.env.DARZAIN_FFPROBE || "ffprobe",
-    [
-      "-v",
-      "error",
-      "-protocol_whitelist",
-      "file,pipe",
-      "-show_streams",
-      "-show_format",
-      "-of",
-      "json",
-      file,
-    ],
-    { timeout: 10000, maxBuffer: 1024 * 1024, windowsHide: true },
-  ).catch((cause: NodeJS.ErrnoException) => {
-    if (cause.code === "ENOENT") throw cause;
-    throw new Error(
-      "Media probe failed; the file is unreadable or unsupported.",
-      {
-        cause,
+  const chunks: Buffer[] = [];
+  let size = 0;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), probeWallSeconds * 1000);
+  let result;
+  try {
+    result = await workers().run({
+      executable: mediaTools().ffprobe,
+      args: [
+        "-v",
+        "error",
+        "-protocol_whitelist",
+        "file",
+        "-show_streams",
+        "-show_format",
+        "-of",
+        "json",
+        path.basename(file),
+      ],
+      cwd: path.dirname(file),
+      memoryBytes: workerMemoryBytes,
+      signal: controller.signal,
+      onStdout: (b) => {
+        size += b.length;
+        if (size > MAX_PROBE_OUTPUT) controller.abort();
+        else chunks.push(b);
       },
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+  if (controller.signal.aborted || result.code !== 0)
+    throw new CommandError(
+      "MEDIA_INVALID",
+      "Media probe failed; the file is unreadable or unsupported.",
     );
-  });
-  const info = JSON.parse(stdout);
+  const info = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   const streams = info.streams || [];
   const visual = streams.find((x: any) => x.codec_type === "video");
   const audio = streams.find((x: any) => x.codec_type === "audio");
-  if (streams.length > 10 || (!visual && !audio))
+  if (streams.length > probeStreams || (!visual && !audio))
     throw new Error("Unsupported media streams.");
   const width = Number(visual?.width || 0);
   const height = Number(visual?.height || 0);
@@ -73,6 +100,11 @@ export async function probe(file: string) {
   );
   if (!Number.isFinite(duration) || duration > 600)
     throw new Error("Media exceeds ten minutes.");
+  // A differing nominal and average rate marks variable frame rate; editing
+  // such sources waits for a constant-rate derivative (T5).
+  const nominal = ratio(visual?.r_frame_rate);
+  const average = ratio(visual?.avg_frame_rate);
+  const isStill = Number(visual?.nb_frames) === 1 || duration === 0;
   return {
     width,
     height,
@@ -80,5 +112,14 @@ export async function probe(file: string) {
     hasVideo: Boolean(visual),
     hasAudio: Boolean(audio),
     format: String(info.format?.format_name || ""),
+    timebase: ratio((visual ?? audio)?.time_base),
+    frameRate: nominal,
+    variableFrameRate: Boolean(
+      visual &&
+      !isStill &&
+      nominal &&
+      average &&
+      nominal.num * average.den !== average.num * nominal.den,
+    ),
   };
 }
