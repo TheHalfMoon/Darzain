@@ -11,7 +11,10 @@ export const RESOURCE_POLICY = Object.freeze({
   enforced: Object.freeze({
     requestBytes: 2 * MiB,
     snapshotBytes: 2 * MiB,
-    assetImportBytes: 50 * MiB,
+    // Streamed: memory use does not grow with this limit.
+    assetImportBytes: 4 * GiB,
+    // Free space kept after staging plus publication of an import.
+    diskReserveBytes: 256 * MiB,
     assetsPerProject: 200,
     timelineFrames: 18000,
     // The render queue is a single serial tail; this documents, not configures, it.

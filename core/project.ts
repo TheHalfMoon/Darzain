@@ -25,7 +25,7 @@ export const AssetSchema = z
       .number()
       .int()
       .positive()
-      .max(50 * 1024 * 1024),
+      .max(RESOURCE_POLICY.enforced.assetImportBytes),
     durationFrames: frame,
     width: z.number().int().min(0).max(mediaDimension),
     height: z.number().int().min(0).max(mediaDimension),

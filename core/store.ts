@@ -1,12 +1,6 @@
-import {
-  access,
-  mkdir,
-  readdir,
-  writeFile,
-  unlink,
-  statfs,
-} from "node:fs/promises";
-import { randomUUID } from "node:crypto";
+import { access, mkdir, open, readdir, unlink, statfs } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { canonicalJson, sha256Hex } from "./donors/ninerr/canonical.ts";
 import { ProjectSchema, Id, AssetSchema, createProject } from "./project.ts";
@@ -48,7 +42,7 @@ export type RequestReceipt = {
 };
 
 export type FaultPoint =
-  "after-snapshot-insert" | "before-commit" | "after-commit";
+  "stage-write" | "after-snapshot-insert" | "before-commit" | "after-commit";
 export type StoreOptions = {
   fault?: (point: FaultPoint) => void;
   // Test seam: can only lower the policy's snapshot byte limit.
@@ -61,9 +55,28 @@ export type StoreOptions = {
 export const SNAPSHOT_FORMAT = "yamakan.project/1";
 export const EDIT_VIEW_FORMAT = "yamakan.edit-view/1";
 const MAX_REVISION = 10000;
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const WORKSPACE_SCOPE = "";
 
+// Asset objects are content-addressed files under a project; a version is a
+// project's logical asset bound to one verified object plus its probe.
+const SCHEMA_V2 = `
+CREATE TABLE asset_objects(
+  project_id TEXT NOT NULL,
+  digest TEXT NOT NULL CHECK(length(digest) = 64),
+  byte_length INTEGER NOT NULL CHECK(byte_length > 0),
+  state TEXT NOT NULL CHECK(state IN ('ready', 'gcPending', 'quarantined')),
+  generation INTEGER NOT NULL CHECK(generation > 0),
+  PRIMARY KEY(project_id, digest)
+) STRICT;
+CREATE TABLE asset_versions(
+  version_id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  digest TEXT NOT NULL,
+  probe TEXT,
+  FOREIGN KEY(project_id, digest) REFERENCES asset_objects(project_id, digest)
+) STRICT;
+`;
 const SCHEMA = `
 CREATE TABLE snapshots(
   hash TEXT PRIMARY KEY CHECK(length(hash) = 64),
@@ -111,6 +124,8 @@ type Commit = {
   receipt?: RequestReceipt;
   // Precondition evaluated inside the transaction, before any write.
   check?: (head: Head) => void;
+  // Extra rows written in the same transaction, before the snapshot.
+  effects?: (db: DatabaseSync) => void;
   // Project language for the new snapshot; defaults to the current head's.
   language?: () => CanonicalProject["language"];
   next: (current: () => Project, revision: number) => Project;
@@ -148,6 +163,42 @@ function acceptable(db: DatabaseSync): number {
       "workspace.sqlite is not a Yamakan workspace database.",
     );
   return user_version;
+}
+
+// Registers a verified, published object and the asset version bound to it.
+// Called only inside a commit transaction, after publication.
+function registerAsset(
+  db: DatabaseSync,
+  projectId: string,
+  asset: { id: string; hash: string; bytes: number },
+  probe: string | null,
+) {
+  db.prepare(
+    "INSERT INTO asset_objects(project_id, digest, byte_length, state, generation) VALUES (?, ?, ?, 'ready', 1) ON CONFLICT(project_id, digest) DO NOTHING",
+  ).run(projectId, asset.hash, asset.bytes);
+  const object = db
+    .prepare(
+      "SELECT byte_length, state FROM asset_objects WHERE project_id = ? AND digest = ?",
+    )
+    .get(projectId, asset.hash) as { byte_length: number; state: string };
+  if (object.state !== "ready" || object.byte_length !== asset.bytes)
+    throw new CommandError(
+      "RECOVERY_REQUIRED",
+      "Asset object is not ready or does not match its size.",
+    );
+  db.prepare(
+    "INSERT INTO asset_versions(version_id, project_id, digest, probe) VALUES (?, ?, ?, ?) ON CONFLICT(version_id) DO NOTHING",
+  ).run(asset.id, projectId, asset.hash, probe);
+  const version = db
+    .prepare(
+      "SELECT project_id, digest FROM asset_versions WHERE version_id = ?",
+    )
+    .get(asset.id) as { project_id: string; digest: string };
+  if (version.project_id !== projectId || version.digest !== asset.hash)
+    throw new CommandError(
+      "VALIDATION",
+      "Asset version is already bound to different content.",
+    );
 }
 
 const isBusy = (e: unknown) =>
@@ -205,12 +256,13 @@ export class ProjectStore {
       db.exec(
         "PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;",
       );
-      const user_version = acceptable(db);
-      if (user_version === 0) {
+      // Versioned, transactional schema steps; each commits on its own.
+      const steps = [SCHEMA, SCHEMA_V2];
+      for (let v = acceptable(db); v < SCHEMA_VERSION; v++) {
         db.exec("BEGIN IMMEDIATE");
         try {
-          db.exec(SCHEMA);
-          db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+          db.exec(steps[v]);
+          db.exec(`PRAGMA user_version = ${v + 1}`);
           db.exec("COMMIT");
         } catch (e) {
           db.exec("ROLLBACK");
@@ -396,6 +448,7 @@ export class ProjectStore {
       db.prepare(
         "INSERT INTO snapshots(hash, format, bytes, byte_length) VALUES (?, ?, ?, ?) ON CONFLICT(hash) DO NOTHING",
       ).run(hash, SNAPSHOT_FORMAT, bytes, bytes.length);
+      c.effects?.(db);
       this.#options.fault?.("after-snapshot-insert");
       if (head) {
         const moved = db
@@ -500,6 +553,7 @@ export class ProjectStore {
             "Project snapshot exceeds its byte limit.",
           );
         headHash = sha256Hex(bytes);
+        for (const asset of p.assets) registerAsset(db, projectId, asset, null);
         db.prepare(
           "INSERT INTO snapshots(hash, format, bytes, byte_length) VALUES (?, ?, ?, ?) ON CONFLICT(hash) DO NOTHING",
         ).run(headHash, SNAPSHOT_FORMAT, bytes, bytes.length);
@@ -720,25 +774,89 @@ export class ProjectStore {
       return legacy;
     }
   }
-  async importAsset(id: string, name: string, bytes: Buffer) {
+  // Streams an upload to a private staging file (hashing as it writes, with
+  // a byte budget and a disk preflight), probes it with an owned worker,
+  // publishes it to the content-addressed store, and only then commits a
+  // snapshot that references it, together with its object/version rows.
+  // Memory use is independent of the media size.
+  async importAsset(
+    id: string,
+    name: string,
+    source: Buffer | AsyncIterable<Uint8Array>,
+    declaredBytes?: number,
+  ) {
     const p = await this.load(id);
     if (p.assets.length >= RESOURCE_POLICY.enforced.assetsPerProject)
       throw new Error("Asset limit reached.");
-    if (bytes.length === 0 || bytes.length > MAX_ASSET_BYTES)
-      throw new Error("Asset size exceeds limit.");
+    const expected = Buffer.isBuffer(source) ? source.length : declaredBytes;
+    if (
+      expected === undefined ||
+      !Number.isSafeInteger(expected) ||
+      expected <= 0 ||
+      expected > MAX_ASSET_BYTES
+    )
+      throw new CommandError(
+        "LIMIT_EXCEEDED",
+        "Asset size is missing or exceeds the limit.",
+      );
     const extension = name.split(".").pop()?.toLowerCase() || "";
-    mediaHeader(bytes, extension);
+    if (!/^[a-z0-9]{1,8}$/.test(extension))
+      throw new CommandError("MEDIA_INVALID", "Unsupported media extension.");
     await this.#ensureDirectories(id);
-    const assetId = randomUUID();
-    const temp = await this.file(id, "imports", `${assetId}.${extension}`);
+    // Staging plus the published object, with a reserve left for the system.
     const space = await statfs(this.root);
     if (
       Number(space.bavail) * Number(space.bsize) <
-      bytes.length + 100 * 1024 * 1024
+      2 * expected + RESOURCE_POLICY.enforced.diskReserveBytes
     )
       throw new Error("Insufficient free disk space.");
-    await writeFile(temp, bytes, { flag: "wx" });
+    const assetId = randomUUID();
+    const temp = await this.file(id, "imports", `${assetId}.${extension}`);
+    const hash = createHash("sha256");
+    let received = 0;
+    const header: Buffer[] = [];
+    let headerBytes = 0;
+    const chunks: AsyncIterable<Uint8Array> = Buffer.isBuffer(source)
+      ? (async function* () {
+          yield source;
+        })()
+      : source;
+    const file = await open(temp, "wx");
     try {
+      try {
+        for await (const chunk of chunks) {
+          const bytes = Buffer.from(
+            chunk.buffer,
+            chunk.byteOffset,
+            chunk.byteLength,
+          );
+          received += bytes.length;
+          if (received > expected)
+            throw new CommandError(
+              "LIMIT_EXCEEDED",
+              "Upload is larger than declared.",
+            );
+          if (headerBytes < 64) {
+            header.push(bytes.subarray(0, 64 - headerBytes));
+            headerBytes += Math.min(bytes.length, 64 - headerBytes);
+            // Reject non-media as soon as its signature is known.
+            if (headerBytes === 64)
+              mediaHeader(Buffer.concat(header), extension);
+          }
+          hash.update(bytes);
+          this.#options.fault?.("stage-write");
+          await file.write(bytes);
+        }
+        await file.sync();
+      } finally {
+        await file.close();
+      }
+      if (received !== expected)
+        throw new CommandError(
+          "VALIDATION",
+          "Upload ended before its declared size.",
+        );
+      if (headerBytes < 64) mediaHeader(Buffer.concat(header), extension);
       const metadata = await probe(temp);
       const kind = ["png", "jpg", "jpeg", "webp"].includes(extension)
         ? "image"
@@ -755,27 +873,35 @@ export class ProjectStore {
         name: name.slice(0, 120),
         kind,
         extension,
-        hash: sha256Hex(bytes),
-        bytes: bytes.length,
+        hash: hash.digest("hex"),
+        bytes: received,
         width: metadata.width,
         height: metadata.height,
         durationFrames: kind === "image" ? 0 : metadata.durationFrames,
       });
+      // Publish by streaming the staged bytes; the store re-hashes them.
       const stored = await (
         await this.#objects(id)
-      ).put(
-        (async function* () {
-          yield bytes;
-        })(),
-      );
+      ).put(createReadStream(temp) as AsyncIterable<Uint8Array>);
       if (stored.sha256 !== asset.hash || stored.byteLength !== asset.bytes)
         throw new Error("Asset integrity check failed.");
-      // The object is published before the reference; the append commutes with
-      // concurrent edits, so it applies to whichever head is current.
+      const probeRecord = JSON.stringify({
+        format: metadata.format,
+        width: metadata.width,
+        height: metadata.height,
+        hasVideo: metadata.hasVideo,
+        hasAudio: metadata.hasAudio,
+        timebase: metadata.timebase,
+        frameRate: metadata.frameRate,
+        variableFrameRate: metadata.variableFrameRate,
+      });
+      // The append commutes with concurrent edits, so it applies to whichever
+      // head is current; the object/version rows commit in the same transaction.
       const project = this.#commit({
         operation: "asset.import",
         projectId: id,
         expectedRevision: null,
+        effects: (db) => registerAsset(db, id, asset, probeRecord),
         next: (current, revision) => {
           const head = current();
           if (head.assets.length >= RESOURCE_POLICY.enforced.assetsPerProject)
@@ -787,10 +913,37 @@ export class ProjectStore {
           };
         },
       });
-      return { project, asset };
+      return { project, asset, probe: JSON.parse(probeRecord) };
     } finally {
       await unlink(temp).catch(() => {});
     }
+  }
+  // Recorded probe and object state for one asset version.
+  assetVersion(versionId: string) {
+    const row = this.#database
+      .prepare(
+        "SELECT v.version_id, v.project_id, v.digest, v.probe, o.byte_length, o.state FROM asset_versions v JOIN asset_objects o ON o.project_id = v.project_id AND o.digest = v.digest WHERE v.version_id = ?",
+      )
+      .get(versionId) as
+      | {
+          version_id: string;
+          project_id: string;
+          digest: string;
+          probe: string | null;
+          byte_length: number;
+          state: string;
+        }
+      | undefined;
+    return row
+      ? {
+          versionId: row.version_id,
+          projectId: row.project_id,
+          digest: row.digest,
+          bytes: row.byte_length,
+          state: row.state,
+          probe: row.probe === null ? null : JSON.parse(row.probe),
+        }
+      : null;
   }
   async assetFile(id: string, assetId: string) {
     const p = await this.load(id);

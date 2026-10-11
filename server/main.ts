@@ -1,4 +1,7 @@
 import { createServer } from "node:http";
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
+import { pipeline } from "node:stream/promises";
 import { readFile, writeFile } from "node:fs/promises";
 import { randomBytes, timingSafeEqual, randomUUID } from "node:crypto";
 import path from "node:path";
@@ -115,7 +118,9 @@ const server = createServer(async (req, res) => {
         retryable: error.retryable,
       },
     });
-  const media = (bytes: Buffer, type: string, attachment = false) => {
+  // Streams a file (or one byte range of it) without reading it into memory.
+  const media = async (file: string, type: string, attachment = false) => {
+    const size = (await stat(file)).size;
     res.setHeader("Accept-Ranges", "bytes");
     res.setHeader("Content-Type", type);
     if (attachment)
@@ -124,47 +129,40 @@ const server = createServer(async (req, res) => {
         'attachment; filename="yamakan.mp4"',
       );
     const range = req.headers.range;
-    if (!range) {
-      res.setHeader("Content-Length", bytes.length);
-      res.writeHead(200);
-      res.end(bytes);
-      return;
-    }
-    const match = /^bytes=(\d*)-(\d*)$/.exec(range);
-    const suffix = match && !match[1] ? Number(match[2]) : null;
-    const start =
-        suffix !== null
-          ? Math.max(0, bytes.length - suffix)
-          : Number(match?.[1]),
-      end =
-        suffix !== null
-          ? bytes.length - 1
-          : match?.[2]
-            ? Number(match[2])
-            : bytes.length - 1;
-    if (
-      !match ||
-      (!match[1] && !match[2]) ||
-      (suffix !== null && (!Number.isSafeInteger(suffix) || suffix <= 0)) ||
-      !Number.isSafeInteger(start) ||
-      !Number.isSafeInteger(end) ||
-      start >= bytes.length ||
-      end < start
-    ) {
-      res.writeHead(416, {
-        "Content-Range": `bytes */${bytes.length}`,
-        "Content-Length": 0,
+    let start = 0,
+      last = size - 1;
+    if (range) {
+      const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+      const suffix = match && !match[1] ? Number(match[2]) : null;
+      start = suffix !== null ? Math.max(0, size - suffix) : Number(match?.[1]);
+      let end = size - 1;
+      if (suffix === null && match?.[2]) end = Number(match[2]);
+      if (
+        !match ||
+        (!match[1] && !match[2]) ||
+        (suffix !== null && (!Number.isSafeInteger(suffix) || suffix <= 0)) ||
+        !Number.isSafeInteger(start) ||
+        !Number.isSafeInteger(end) ||
+        start >= size ||
+        end < start
+      ) {
+        res.writeHead(416, {
+          "Content-Range": `bytes */${size}`,
+          "Content-Length": 0,
+        });
+        res.end();
+        return;
+      }
+      last = Math.min(end, size - 1);
+      res.writeHead(206, {
+        "Content-Range": `bytes ${start}-${last}/${size}`,
+        "Content-Length": last - start + 1,
       });
-      res.end();
-      return;
-    }
-    const last = Math.min(end, bytes.length - 1),
-      chunk = bytes.subarray(start, last + 1);
-    res.writeHead(206, {
-      "Content-Range": `bytes ${start}-${last}/${bytes.length}`,
-      "Content-Length": chunk.length,
-    });
-    res.end(chunk);
+    } else res.writeHead(200, { "Content-Length": size });
+    if (size === 0) return void res.end();
+    await pipeline(createReadStream(file, { start, end: last }), res).catch(
+      () => res.destroy(),
+    );
   };
   try {
     if (closing)
@@ -211,13 +209,16 @@ const server = createServer(async (req, res) => {
         const name = decodeURIComponent(
           String(req.headers["x-asset-name"] || ""),
         );
+        // Uploads stream to disk; the declared size bounds the work up front.
+        const length = String(req.headers["content-length"] ?? "");
+        if (!/^\d{1,16}$/.test(length))
+          throw new CommandError(
+            "VALIDATION",
+            "Uploads require a Content-Length header.",
+          );
         return json(
           200,
-          await store.importAsset(
-            upload[1],
-            name,
-            await body(req, RESOURCE_POLICY.enforced.assetImportBytes),
-          ),
+          await store.importAsset(upload[1], name, req, Number(length)),
         );
       }
       const asset = /^\/api\/v1\/projects\/([^/]+)\/assets\/([^/]+)$/.exec(
@@ -226,7 +227,6 @@ const server = createServer(async (req, res) => {
       if (req.method === "GET" && asset) {
         authorize(principal, "yamakan.project.open");
         const { file, asset: a } = await store.assetFile(asset[1], asset[2]);
-        const bytes = await readFile(file);
         const mime: Record<string, string> = {
           image: `image/${a.extension === "jpg" ? "jpeg" : a.extension}`,
           video: a.extension === "webm" ? "video/webm" : "video/mp4",
@@ -237,7 +237,7 @@ const server = createServer(async (req, res) => {
                 ? "audio/wav"
                 : "audio/ogg",
         };
-        media(bytes, mime[a.kind]);
+        await media(file, mime[a.kind]);
         return;
       }
       const exportMatch = /^\/api\/v1\/jobs\/([^/]+)\/artifact$/.exec(
@@ -252,7 +252,7 @@ const server = createServer(async (req, res) => {
           job.projectId,
           ...job.artifact.split("/"),
         );
-        media(await readFile(file), "video/mp4", true);
+        await media(file, "video/mp4", true);
         return;
       }
       return fail(new CommandError("NOT_FOUND", "Endpoint not found."));
