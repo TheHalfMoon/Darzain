@@ -384,3 +384,40 @@ test("explicit restore replaces a damaged head and preserves the damaged evidenc
   db.close();
   store.close();
 });
+
+test("refusing a WAL-mode foreign database leaves the folder exactly as found", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "yamakan-walforeign-"));
+  const file = path.join(root, "workspace.sqlite");
+  const other = new DatabaseSync(file);
+  other.exec("PRAGMA journal_mode = WAL; CREATE TABLE notes(text TEXT)");
+  other.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+  other.close();
+  const before = (await readdir(root)).sort();
+  const bytes = await readFile(file);
+  await assert.rejects(new ProjectStore(root).initialize(), /not a Yamakan/);
+  assert.deepEqual((await readdir(root)).sort(), before);
+  assert.deepEqual(await readFile(file), bytes);
+});
+
+test("history pages older revisions with a cursor", async () => {
+  const { store, project } = await workspace();
+  let p = project;
+  for (let i = 0; i < 6; i++)
+    p = await store.save({ ...p, name: `v${i}` }, p.revision);
+  const first = await store.history(project.id, 3);
+  assert.deepEqual(
+    first.snapshots.map((s) => s.revision),
+    [6, 5, 4],
+  );
+  const next = await store.history(project.id, 3, 4);
+  assert.deepEqual(
+    next.snapshots.map((s) => s.revision),
+    [3, 2, 1],
+  );
+  const last = await store.history(project.id, 3, 1);
+  assert.deepEqual(
+    last.snapshots.map((s) => s.revision),
+    [0],
+  );
+  store.close();
+});
