@@ -22,7 +22,8 @@
     "benchmark": "node scripts/benchmark-production.ts",
     "mcp": "node mcp/main.ts",
     "migrate": "node cli/migrate.ts",
-    "build:native": "cargo build --release --manifest-path native/procd/Cargo.toml"
+    "build:native": "cargo build --release --manifest-path native/procd/Cargo.toml",
+    "qualify:large-import": "node scripts/qualify-large-import.mjs"
   },
   "dependencies": {
     "react": "18.3.1",

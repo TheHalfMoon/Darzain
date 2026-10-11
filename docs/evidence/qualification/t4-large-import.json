@@ -1,0 +1,18 @@
+{
+  "qualification": "T4 large import",
+  "date": "2026-10-11T20:09:09.915Z",
+  "host": {
+    "platform": "win32",
+    "release": "10.0.26300",
+    "cpus": 12,
+    "memoryGiB": 16
+  },
+  "node": "v24.19.0",
+  "fixture": "FFmpeg testsrc2 1920x1080, 18 s rawvideo uyvy422 MOV (synthetic test pattern)",
+  "bytes": 2239490938,
+  "seconds": 37.5,
+  "samples": 174,
+  "peakServiceWorkingSetMiB": 152,
+  "ceilingMiB": 300,
+  "pass": true
+}
