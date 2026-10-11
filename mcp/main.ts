@@ -2,7 +2,6 @@
 // Yamakan service: tools are derived from the service catalog and every call
 // goes through the same command registry, scopes and validation as the UI.
 import { readFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { YamakanClient, YamakanError } from "../sdk/client.ts";
 import type { Operation } from "../sdk/client.ts";
@@ -14,12 +13,7 @@ const env = (key: string) =>
 const url = env("URL") || "http://127.0.0.1:4318";
 if (new URL(url).hostname !== "127.0.0.1")
   throw new Error("MCP connects only to the local Yamakan server.");
-const root = path.resolve(
-  env("WORKSPACE") ||
-    (!existsSync(".yamakan") && existsSync(".darzain")
-      ? ".darzain"
-      : ".yamakan"),
-);
+const root = path.resolve(env("WORKSPACE") || ".yamakan");
 // The service rotates its credential on restart, so read it for every call.
 const client = async () =>
   new YamakanClient({

@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, fork, spawnSync } from "node:child_process";
+import { once } from "node:events";
+import { fileURLToPath } from "node:url";
 import { mkdtemp, readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -185,4 +187,47 @@ test("migration refuses unsafe or ambiguous source and destination roots", async
   await store.create("Modern");
   store.close();
   assert.equal(await isLegacyWorkspace(modern), false);
+});
+
+test("the service refuses to open a legacy root, and the CLI migrates it", async () => {
+  const { root, source, a } = await legacyWorkspace();
+  const before = await sourceDigest(source);
+  const server = fork(
+    fileURLToPath(new URL("../server/main.ts", import.meta.url)),
+    [],
+    {
+      env: { ...process.env, YAMAKAN_WORKSPACE: source, YAMAKAN_PORT: "24395" },
+      silent: true,
+      windowsHide: true,
+    },
+  );
+  let stderr = "";
+  server.stderr?.on("data", (c) => (stderr += String(c)));
+  const [code] = await once(server, "exit");
+  assert.equal(code, 1);
+  assert.match(stderr, /pre-Yamakan format and was not opened/);
+  assert.equal(
+    await sourceDigest(source),
+    before,
+    "the refused root is untouched",
+  );
+
+  const destination = path.join(root, "via-cli");
+  const cli = spawnSync(
+    process.execPath,
+    [
+      fileURLToPath(new URL("../cli/migrate.ts", import.meta.url)),
+      source,
+      destination,
+    ],
+    { encoding: "utf8", windowsHide: true },
+  );
+  assert.equal(
+    cli.status,
+    2,
+    "one project was skipped, so the exit code says so",
+  );
+  assert.match(cli.stdout, new RegExp(`migrated ${a.id} revisions 0,1,2,3`));
+  assert.match(cli.stdout, /Source unchanged: true/);
+  assert.equal(await sourceDigest(source), before);
 });

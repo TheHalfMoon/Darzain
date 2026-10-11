@@ -20,7 +20,8 @@
     "test:e2e": "node scripts/browser-e2e.mjs",
     "provenance:check": "node scripts/provenance.mjs",
     "benchmark": "node scripts/benchmark-production.ts",
-    "mcp": "node mcp/main.ts"
+    "mcp": "node mcp/main.ts",
+    "migrate": "node cli/migrate.ts"
   },
   "dependencies": {
     "react": "18.3.1",

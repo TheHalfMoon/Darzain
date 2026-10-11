@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { YamakanClient, YamakanError } from "../sdk/client.ts";
@@ -10,13 +9,7 @@ const env = (key: string) =>
 const url = env("URL") || "http://127.0.0.1:4318";
 if (new URL(url).hostname !== "127.0.0.1")
   throw new Error("CLI connects only to the local Yamakan server.");
-// Mirrors the server: a pre-rename .darzain workspace is used until migrated.
-const root = path.resolve(
-  env("WORKSPACE") ||
-    (!existsSync(".yamakan") && existsSync(".darzain")
-      ? ".darzain"
-      : ".yamakan"),
-);
+const root = path.resolve(env("WORKSPACE") || ".yamakan");
 const token = (await readFile(path.join(root, "token"), "utf8")).trim();
 const client = new YamakanClient({ baseUrl: url, token });
 try {
