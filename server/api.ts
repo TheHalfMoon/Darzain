@@ -28,6 +28,11 @@ export class CreativeAPI {
     return {
       apiVersion: API_VERSION,
       service: "yamakan",
+      // How media workers are owned on this host; only Windows is qualified.
+      processOwnership:
+        process.platform === "win32"
+          ? "windows-job-object"
+          : "posix-unqualified",
       // Only enforced limits are advertised; candidates are unqualified targets.
       resourcePolicy: {
         policy: RESOURCE_POLICY.policy,
