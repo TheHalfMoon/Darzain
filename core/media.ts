@@ -1,7 +1,9 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 const execute = promisify(execFile);
-export const MAX_ASSET_BYTES = 50 * 1024 * 1024;
+import { RESOURCE_POLICY } from "./command/policy.ts";
+export const MAX_ASSET_BYTES = RESOURCE_POLICY.enforced.assetImportBytes;
+const { mediaDimension } = RESOURCE_POLICY.enforced;
 export function mediaHeader(bytes: Buffer, ext: string) {
   const valid =
     ext === "png"
@@ -55,8 +57,8 @@ export async function probe(file: string) {
     throw new Error("Unsupported media streams.");
   const width = Number(visual?.width || 0);
   const height = Number(visual?.height || 0);
-  if (width > 4096 || height > 4096)
-    throw new Error("Media dimensions exceed 4096 pixels.");
+  if (width > mediaDimension || height > mediaDimension)
+    throw new Error(`Media dimensions exceed ${mediaDimension} pixels.`);
   const duration = Number(
     info.format?.duration || visual?.duration || audio?.duration || 0,
   );

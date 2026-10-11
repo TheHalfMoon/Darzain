@@ -21,6 +21,7 @@ import {
 } from "./durable.ts";
 import { LocalContentAddressedStorage } from "./donors/skelet/storage.ts";
 import { z } from "zod";
+import { RESOURCE_POLICY } from "./command/policy.ts";
 const HeadSchema = z
   .object({
     revision: z.number().int().min(0).max(10000),
@@ -349,7 +350,8 @@ export class LegacyProjectStore {
   async importAsset(id: string, name: string, bytes: Buffer) {
     return this.exclusive(id, async () => {
       const p = await this.load(id);
-      if (p.assets.length >= 200) throw new Error("Asset limit reached.");
+      if (p.assets.length >= RESOURCE_POLICY.enforced.assetsPerProject)
+        throw new Error("Asset limit reached.");
       if (bytes.length === 0 || bytes.length > MAX_ASSET_BYTES)
         throw new Error("Asset size exceeds limit.");
       const extension = name.split(".").pop()?.toLowerCase() || "";

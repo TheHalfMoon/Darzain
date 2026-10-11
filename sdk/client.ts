@@ -89,13 +89,16 @@ export class YamakanClient {
     const response = await this.#fetch(`${this.#base}/api/v1/tools`, {
       headers: this.#headers(),
     });
-    if (!response.ok)
+    const value = await response.json().catch(() => null);
+    if (!response.ok || !value) {
+      const e = value?.error;
       throw new YamakanError(
-        "UNAUTHENTICATED",
-        `Catalog request failed with HTTP ${response.status}.`,
-        false,
-        null,
+        e?.code ?? "INTERNAL",
+        e?.message ?? `Catalog request failed with HTTP ${response.status}.`,
+        Boolean(e?.retryable),
+        value?.requestId ?? null,
       );
-    return response.json();
+    }
+    return value;
   }
 }

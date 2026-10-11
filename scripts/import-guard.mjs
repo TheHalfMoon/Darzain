@@ -1,5 +1,7 @@
 // Deny-by-default source import guard. Pure: callers supply the file list and
 // a text reader so tests can exercise negative fixtures without touching disk.
+// This is a tripwire over source text, not a sandbox: the enforcement boundary
+// is the command registry, whose strict schemas accept no executable input.
 const REQUIRED = [
   "source",
   "sha",
@@ -8,13 +10,23 @@ const REQUIRED = [
   "sha256",
   "importedSha256",
 ];
-const CHILD_PROCESS =
-  /from\s+["'](?:node:)?child_process["']|require\(\s*["'](?:node:)?child_process["']\s*\)|import\(\s*["'](?:node:)?child_process["']\s*\)/;
+// Any route to process creation, module loading by computed name or code
+// evaluation. Allowlisted spawn modules may only use the named imports below.
+const PROCESS_ACCESS =
+  /child_process|spawn_sync|getBuiltinModule|process\.binding|createRequire|["'](?:node:)?(?:vm|worker_threads|cluster)["']/;
+const ALLOWED_PROCESS_IMPORT =
+  /^import\s*\{\s*((?:spawn|execFile)(?:\s*,\s*(?:spawn|execFile))*)\s*,?\s*\}\s*from\s*["']node:child_process["'];?$/;
 const FORBIDDEN = [
-  [/(?<![.\w])exec(?:Sync)?\s*\(/, "shell-interpreting exec"],
-  [/\bspawnSync\s*\(|\bexecFileSync\s*\(/, "synchronous process execution"],
-  [/\bshell\s*:\s*(?!false\b)/, "shell option"],
-  [/(?<![.\w])eval\s*\(|\bnew\s+Function\s*\(/, "dynamic code evaluation"],
+  [
+    /\bexecSync\b|\bspawnSync\b|\bexecFileSync\b/,
+    "synchronous process execution",
+  ],
+  [/(?<![\w$.])exec\s*\(/, "shell-interpreting exec"],
+  [/["']?\bshell["']?\s*:\s*(?!false\b)/, "shell option"],
+  [/\beval\s*\(|(?<![\w$])Function\s*\(/, "dynamic code evaluation"],
+  // Module specifiers must be one complete string literal.
+  [/\bimport\s*\(\s*(?!(["'])[^"'`]*\1\s*\))/, "computed dynamic import"],
+  [/\brequire\s*\(\s*(?!(["'])[^"'`]*\1\s*\))/, "computed require"],
 ];
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
 
@@ -58,11 +70,18 @@ export function checkImports({ files, read, ledger, policy }) {
       !/\.test\.[cm]?[jt]sx?$/.test(file);
     if (!production) continue;
     const text = read(file);
-    if (
-      CHILD_PROCESS.test(text) &&
-      !policy.processSpawnAllowlist.includes(file)
-    )
-      violations.push(`Process execution outside the allowlist: ${file}`);
+    const allowed = policy.processSpawnAllowlist.includes(file);
+    for (const line of text.split("\n")) {
+      if (!PROCESS_ACCESS.test(line)) continue;
+      if (!allowed || !ALLOWED_PROCESS_IMPORT.test(line.trim())) {
+        violations.push(
+          allowed
+            ? `Process access other than a named spawn/execFile import: ${file}`
+            : `Process execution outside the allowlist: ${file}`,
+        );
+        break;
+      }
+    }
     for (const [pattern, label] of FORBIDDEN)
       if (pattern.test(text)) violations.push(`Forbidden ${label}: ${file}`);
   }

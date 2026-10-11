@@ -117,15 +117,40 @@ test("loopback API rejects unauthenticated and cross-site access; restart preser
     );
     const fromPage = await viaCookie({ Origin: origin });
     assert.equal(fromPage.status, 200);
-    assert.deepEqual(
-      [
-        (await fromPage.json()).requestId,
-        (await viaCookie({ "Sec-Fetch-Site": "same-origin" })).status,
-      ],
-      ["auth-check-1", 200],
+    assert.equal((await fromPage.json()).requestId, "auth-check-1");
+    // Fetch Metadata alone never authorizes a cookie state change.
+    assert.equal(
+      (await viaCookie({ "Sec-Fetch-Site": "same-origin" })).status,
+      401,
     );
     const crossCredential = async (h: Record<string, string>) =>
       (await fetch(`${origin}/api/v1/tools`, { headers: h })).status;
+    assert.equal(await crossCredential({ Cookie: `yamakan=${cookie}` }), 200);
+    assert.equal(
+      await crossCredential({
+        Cookie: `yamakan=${cookie}`,
+        "Sec-Fetch-Site": "same-site",
+      }),
+      401,
+      "another loopback port is same-site but not same-origin",
+    );
+    const badOrigin = await fetch(`${origin}/api/v1/tools`, {
+      headers: { ...headers, Origin: "http://127.0.0.1:1" },
+    });
+    assert.equal((await badOrigin.json()).error.code, "FORBIDDEN_ORIGIN");
+    const malformedName = await fetch(
+      `${origin}/api/v1/projects/${crypto.randomUUID()}/assets`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: headers.Authorization,
+          "X-Asset-Name": "%E0%A4%A",
+        },
+        body: "x",
+      },
+    );
+    assert.equal(malformedName.status, 400);
+    assert.equal((await malformedName.json()).error.code, "VALIDATION");
     assert.equal(await crossCredential({ Cookie: `yamakan=${token}` }), 401);
     assert.equal(
       await crossCredential({ Authorization: `Bearer ${cookie}` }),
