@@ -3,6 +3,7 @@
 // 30 fps editing shape in core/project.ts is a lossless projection of this
 // model used by the current editor until command reducers replace whole-
 // project saves (T6); conversions that would lose information fail instead.
+// The one normalization: a title's source offset, which nothing reads, is 0.
 import { z } from "zod";
 import { Id, ProjectSchema } from "./project.ts";
 import type { Project } from "./project.ts";

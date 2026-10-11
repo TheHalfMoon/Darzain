@@ -199,7 +199,7 @@ function App() {
           startFrame: Math.max(0, Math.round(c.start * 30)),
           durationFrames: Math.max(1, Math.round((c.end - c.start) * 30)),
           sourceFrame:
-            old?.title != null
+            old !== undefined && old.title !== null
               ? 0
               : Math.max(0, Math.round((c.sourceIn || 0) * 30)),
         };

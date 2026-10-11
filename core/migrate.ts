@@ -10,22 +10,26 @@
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import {
+  copyFile,
   lstat,
   mkdir,
+  open,
   readdir,
   realpath,
   rename,
+  rm,
   rmdir,
   stat,
   writeFile,
 } from "node:fs/promises";
+import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { LegacyProjectStore } from "./legacy-store.ts";
 import { ProjectStore } from "./store.ts";
-import { fromEditView } from "./canonical.ts";
+import { fromEditView, parseCanonical } from "./canonical.ts";
 import type { CanonicalProject } from "./canonical.ts";
 import type { Asset, Project } from "./project.ts";
-import { Id } from "./project.ts";
+import { Id, ProjectSchema } from "./project.ts";
 import { acquireServiceLock } from "./service-lock.ts";
 import { canonicalJson, sha256Hex } from "./donors/ninerr/canonical.ts";
 import { CommandError, toCommandError } from "./command/errors.ts";
@@ -133,21 +137,36 @@ export async function sourceDigest(root: string) {
 // Read-only access to a legacy media object. Only a regular file is read; the
 // destination store hashes the stream and the caller compares it with the
 // asset's recorded identity.
-async function* legacyAsset(source: string, projectId: string, asset: Asset) {
+type MediaRef = Pick<Asset, "id" | "hash" | "extension" | "bytes">;
+async function* legacyAsset(
+  source: string,
+  projectId: string,
+  asset: MediaRef,
+) {
   const candidates = [
     ["objects", "sha256", asset.hash.slice(0, 2), asset.hash],
     ["assets", `${asset.hash}.${asset.extension}`],
   ];
   for (const parts of candidates) {
     const file = path.join(source, "projects", projectId, ...parts);
-    const info = await lstat(file).catch(() => null);
+    const info = await lstat(file, { bigint: true }).catch(() => null);
     if (!info) continue;
-    if (!info.isFile())
-      throw new CommandError(
-        "VALIDATION",
-        `Media object is not a regular file: projects/${projectId}/${parts.join("/")}`,
-      );
-    yield* createReadStream(file) as AsyncIterable<Uint8Array>;
+    const notRegular = new CommandError(
+      "VALIDATION",
+      `Media object is not a regular file: projects/${projectId}/${parts.join("/")}`,
+    );
+    if (!info.isFile()) throw notRegular;
+    // Read through the opened handle, and only if it is the file lstat saw.
+    const handle = await open(file, "r");
+    try {
+      const opened = await handle.stat({ bigint: true });
+      if (opened.dev !== info.dev || opened.ino !== info.ino) throw notRegular;
+      yield* handle.createReadStream({
+        autoClose: false,
+      }) as AsyncIterable<Uint8Array>;
+    } finally {
+      await handle.close();
+    }
     return;
   }
   throw new CommandError(
@@ -220,6 +239,106 @@ async function migrateProject(
   outcome.objects = assets.size;
 }
 
+// Projects that exist only in the database of a legacy root an earlier build
+// opened in place. The database is read from a private copy (with its
+// write-ahead log), so the source is never opened, locked or written.
+async function copySourceDatabase(source: string, into: string) {
+  const file = path.join(source, "workspace.sqlite");
+  if (!(await exists(file))) return null;
+  await mkdir(into, { recursive: true });
+  for (const suffix of ["", "-wal"]) {
+    const info = await lstat(file + suffix).catch(() => null);
+    if (!info) continue;
+    if (!info.isFile())
+      throw new CommandError(
+        "VALIDATION",
+        "Source database is not a regular file.",
+      );
+    await copyFile(file + suffix, path.join(into, "workspace.sqlite" + suffix));
+  }
+  return new DatabaseSync(path.join(into, "workspace.sqlite"));
+}
+
+async function migrateDatabaseProject(
+  db: DatabaseSync,
+  destination: ProjectStore,
+  source: string,
+  projectId: string,
+  acceptLatestVerified: boolean,
+  outcome: ProjectOutcome,
+) {
+  const head = db
+    .prepare(
+      "SELECT revision, snapshot_hash FROM projects WHERE project_id = ?",
+    )
+    .get(projectId) as { revision: number; snapshot_hash: string } | undefined;
+  const rows = db
+    .prepare(
+      "SELECT r.revision, r.snapshot_hash, s.format, s.bytes FROM revisions r LEFT JOIN snapshots s ON s.hash = r.snapshot_hash WHERE r.project_id = ? ORDER BY r.revision",
+    )
+    .all(projectId) as {
+    revision: number;
+    snapshot_hash: string;
+    format: string | null;
+    bytes: Uint8Array | null;
+  }[];
+  const decoded = new Map<number, CanonicalProject>();
+  for (const row of rows) {
+    try {
+      if (!row.bytes) throw new Error("missing");
+      const text = Buffer.from(row.bytes).toString("utf8");
+      if (sha256Hex(text) !== row.snapshot_hash) throw new Error("hash");
+      const value: unknown = JSON.parse(text);
+      const project =
+        row.format === "yamakan.edit-view/1"
+          ? fromEditView(ProjectSchema.parse(value))
+          : parseCanonical(value);
+      if (project.id !== projectId || project.revision !== row.revision)
+        throw new Error("identity");
+      decoded.set(row.revision, project);
+    } catch {
+      outcome.unverifiedRevisions.push(row.revision);
+    }
+  }
+  const verified = [...decoded.keys()].sort((a, b) => a - b);
+  if (!verified.length) {
+    outcome.reason = "No revision of this project can be verified.";
+    return;
+  }
+  let accepted = head?.revision ?? -1;
+  if (!head || !decoded.has(head.revision)) {
+    if (!acceptLatestVerified) {
+      outcome.reason =
+        "The project head cannot be verified; rerun with acceptance of the latest verified revision.";
+      return;
+    }
+    accepted = verified[verified.length - 1];
+    outcome.headReplacedByLatestVerified = true;
+  }
+  outcome.revisionsAfterHead = verified.filter((r) => r > accepted);
+  const canonical = verified
+    .filter((r) => r <= accepted)
+    .map((r) => decoded.get(r)!);
+  const assets = new Map<string, MediaRef>();
+  for (const p of canonical) for (const a of p.assets) assets.set(a.hash, a);
+  for (const asset of assets.values()) {
+    const stored = await destination.importObject(
+      projectId,
+      legacyAsset(source, projectId, asset),
+    );
+    if (stored.sha256 !== asset.hash || stored.byteLength !== asset.bytes)
+      throw new CommandError(
+        "RECOVERY_REQUIRED",
+        `Media object of asset ${asset.id} does not match its recorded hash.`,
+      );
+  }
+  destination.importHistory(projectId, canonical);
+  outcome.status = "migrated";
+  outcome.headRevision = accepted;
+  outcome.migratedRevisions = canonical.map((p) => p.revision);
+  outcome.objects = assets.size;
+}
+
 // Filesystem identity of an existing path (volume serial + file index on NTFS).
 async function identity(p: string) {
   const s = await stat(p, { bigint: true });
@@ -274,6 +393,23 @@ async function assertSeparate(source: string, destination: string) {
   }
 }
 
+// The report is written even when the run fails; paths are relative.
+async function writeReport(
+  staging: string,
+  before: ManifestEntry[],
+  report: MigrationReport,
+) {
+  await mkdir(path.join(staging, "migration"), { recursive: true });
+  await writeFile(
+    path.join(staging, "migration", "source-manifest.json"),
+    `${JSON.stringify(before, null, 2)}\n`,
+  );
+  await writeFile(
+    path.join(staging, "migration", "report.json"),
+    `${JSON.stringify(report, null, 2)}\n`,
+  );
+}
+
 const safeMessage = (e: unknown, ...roots: string[]) =>
   roots.reduce(
     (message, root) => message.replaceAll(root, "[workspace]"),
@@ -323,37 +459,68 @@ export async function migrateLegacyWorkspace(
       await store.initialize();
       // Read paths only: no initialize(), save, restore or import on the source.
       const legacy = new LegacyProjectStore(source);
-      const ids = (await readdir(path.join(source, "projects")))
+      const databaseCopy = path.join(staging, "migration", "source-database");
+      const sourceDb = await copySourceDatabase(source, databaseCopy);
+      const databaseIds = new Set(
+        (
+          (sourceDb?.prepare("SELECT project_id FROM projects").all() ??
+            []) as { project_id: string }[]
+        ).map((r) => r.project_id),
+      );
+      const ids = [
+        ...new Set([
+          ...(await readdir(path.join(source, "projects"))),
+          ...databaseIds,
+        ]),
+      ]
         .filter((id) => Id.safeParse(id).success)
         .sort();
-      for (const projectId of ids) {
-        const outcome: ProjectOutcome = {
-          projectId,
-          status: "skipped",
-          reason: null,
-          headRevision: null,
-          migratedRevisions: [],
-          unverifiedRevisions: [],
-          revisionsAfterHead: [],
-          objects: 0,
-          headReplacedByLatestVerified: false,
-        };
-        try {
-          await migrateProject(
-            legacy,
-            store,
-            source,
+      try {
+        for (const projectId of ids) {
+          const outcome: ProjectOutcome = {
             projectId,
-            options.acceptLatestVerified === true,
-            outcome,
-          );
-        } catch (e) {
-          // One unreadable project never aborts the others. Its objects may
-          // remain in staging unreferenced; no snapshot points at them.
-          outcome.status = "skipped";
-          outcome.reason = safeMessage(e, source, staging);
+            status: "skipped",
+            reason: null,
+            headRevision: null,
+            migratedRevisions: [],
+            unverifiedRevisions: [],
+            revisionsAfterHead: [],
+            objects: 0,
+            headReplacedByLatestVerified: false,
+          };
+          try {
+            const hasHead = await exists(
+              path.join(source, "projects", projectId, "head.json"),
+            );
+            if (!hasHead && sourceDb && databaseIds.has(projectId))
+              await migrateDatabaseProject(
+                sourceDb,
+                store,
+                source,
+                projectId,
+                options.acceptLatestVerified === true,
+                outcome,
+              );
+            else
+              await migrateProject(
+                legacy,
+                store,
+                source,
+                projectId,
+                options.acceptLatestVerified === true,
+                outcome,
+              );
+          } catch (e) {
+            // One unreadable project never aborts the others. Its objects may
+            // remain in staging unreferenced; no snapshot points at them.
+            outcome.status = "skipped";
+            outcome.reason = safeMessage(e, source, staging);
+          }
+          report.projects.push(outcome);
         }
-        report.projects.push(outcome);
+      } finally {
+        sourceDb?.close();
+        await rm(databaseCopy, { recursive: true, force: true });
       }
     } finally {
       store.close();
@@ -361,22 +528,20 @@ export async function migrateLegacyWorkspace(
     }
     report.sourceUnchanged =
       sha256Hex(canonicalJson(await manifest(source))) === beforeHash;
-  } finally {
-    // The report is written even when the run fails; paths are relative.
-    await mkdir(path.join(staging, "migration"), { recursive: true });
-    await writeFile(
-      path.join(staging, "migration", "source-manifest.json"),
-      `${JSON.stringify(before, null, 2)}\n`,
-    );
-    await writeFile(
-      path.join(staging, "migration", "report.json"),
-      `${JSON.stringify(report, null, 2)}\n`,
+  } catch (e) {
+    // A failed write of the report never hides the original error.
+    await writeReport(staging, before, report).catch(() => {});
+    const error = toCommandError(e);
+    throw new CommandError(
+      error.code,
+      `${safeMessage(error, source, staging)} The unpublished result is in ${path.basename(staging)} and can be deleted.`,
     );
   }
+  await writeReport(staging, before, report);
   if (!report.sourceUnchanged)
     throw new CommandError(
       "RECOVERY_REQUIRED",
-      `The source workspace changed during migration; the result was left unpublished in ${path.basename(staging)}.`,
+      `The source workspace changed during migration; the unpublished result is in ${path.basename(staging)} and can be deleted.`,
     );
   // Publish: the destination appears only once complete and verified.
   if (await exists(destination)) await rmdir(destination);

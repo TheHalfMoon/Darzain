@@ -291,14 +291,44 @@ test("verified revisions after the legacy head are reported, not migrated", asyn
 test("a legacy root that an earlier build opened in place still migrates", async () => {
   const { root, source, a } = await legacyWorkspace();
   // The T2 server created workspace.sqlite inside the legacy root.
+  // The earlier build also created a project that exists only in its database.
   const opened = new ProjectStore(source);
   await opened.initialize();
+  const dbOnly = await opened.create("Created by the earlier build");
+  const imported = await opened.importAsset(
+    dbOnly.id,
+    "tone.wav",
+    await readFile(path.join(root, "tone.wav")),
+  );
+  const edited = await opened.save(
+    { ...imported.project, name: "Edited by the earlier build" },
+    imported.project.revision,
+  );
   opened.close();
   assert.equal(await isLegacyWorkspace(source), true);
-  const report = await migrateLegacyWorkspace(source, path.join(root, "dest"));
+  const before = await sourceDigest(source);
+  const destination = path.join(root, "dest");
+  const report = await migrateLegacyWorkspace(source, destination);
+  assert.equal(await sourceDigest(source), before);
   assert.equal(
     report.projects.find((p) => p.projectId === a.id)!.status,
     "migrated",
+  );
+  const outcome = report.projects.find((p) => p.projectId === dbOnly.id)!;
+  assert.deepEqual(
+    [outcome.status, outcome.migratedRevisions, outcome.objects],
+    ["migrated", [0, 1, 2], 1],
+  );
+  const store = new ProjectStore(destination);
+  await store.initialize();
+  assert.deepEqual(await store.load(dbOnly.id), edited);
+  await store.assetFile(dbOnly.id, imported.asset.id);
+  store.close();
+  assert.ok(
+    !(await readdir(path.join(destination, "migration"))).includes(
+      "source-database",
+    ),
+    "the private database copy is removed",
   );
 });
 
