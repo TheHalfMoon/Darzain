@@ -16,7 +16,14 @@ import { mediaHeader, MAX_ASSET_BYTES, probe } from "./media.ts";
 import { readBounded } from "./durable.ts";
 import { LocalContentAddressedStorage } from "./donors/skelet/storage.ts";
 import { CommandError } from "./command/errors.ts";
-import { fromEditView, parseCanonical, toEditView } from "./canonical.ts";
+import {
+  FORMAT,
+  FORMAT_VERSION,
+  fromEditView,
+  inspectFormat,
+  parseCanonical,
+  toEditView,
+} from "./canonical.ts";
 import type { CanonicalProject } from "./canonical.ts";
 import { RESOURCE_POLICY } from "./command/policy.ts";
 
@@ -52,7 +59,7 @@ export type StoreOptions = {
 // T2 builds stored in the 30 fps editing shape are upgraded on read by the
 // same pure, lossless conversion; they are never rewritten in place.
 export const SNAPSHOT_FORMAT = "yamakan.project/1";
-const EDIT_VIEW_FORMAT = "yamakan.edit-view/1";
+export const EDIT_VIEW_FORMAT = "yamakan.edit-view/1";
 const MAX_REVISION = 10000;
 const SCHEMA_VERSION = 1;
 const WORKSPACE_SCOPE = "";
@@ -266,6 +273,22 @@ export class ProjectStore {
     if (project.id !== id || project.revision !== revision)
       throw new Error("Project snapshot identity mismatch.");
     return project;
+  }
+  #newerFormat(hash: string): boolean {
+    const row = this.#database
+      .prepare("SELECT format, bytes FROM snapshots WHERE hash = ?")
+      .get(hash) as { format: string; bytes: Uint8Array } | undefined;
+    if (!row || row.format === EDIT_VIEW_FORMAT) return false;
+    try {
+      const info = inspectFormat(
+        JSON.parse(Buffer.from(row.bytes).toString("utf8")),
+      );
+      return (
+        info.format === FORMAT && (info.formatVersion ?? 0) > FORMAT_VERSION
+      );
+    } catch {
+      return false;
+    }
   }
   // The editing shape the current editor and renderer consume.
   #snapshot(hash: string, id: string, revision: number): Project {
@@ -624,6 +647,12 @@ export class ProjectStore {
           throw new CommandError(
             "REVISION_CONFLICT",
             "Revision conflict; refresh history before restoring.",
+          );
+        // A damaged head may be replaced; a head written by a newer build may not.
+        if (this.#newerFormat(head.snapshot_hash))
+          throw new CommandError(
+            "RECOVERY_REQUIRED",
+            "The current revision uses a newer project format; restore it with a newer build.",
           );
       },
       language: () => restoredCanonical.language,

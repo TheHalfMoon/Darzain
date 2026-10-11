@@ -55,6 +55,8 @@ test("rounding modes are explicit and signed", () => {
   assert.equal(divide(-7n, 2n, "nearest"), -4n);
   assert.equal(divide(5n, 3n, "nearest"), 2n);
   assert.equal(divide(-5n, 3n, "nearest"), -2n);
+  assert.equal(divide(-5n, 2n, "nearest"), -3n, "ties away from zero");
+  assert.equal(divide(5n, 2n, "nearest"), 3n);
   assert.equal(divide(4n, -2n, "exact"), -2n);
   assert.throws(() => divide(7n, 2n, "exact"), /not exactly representable/);
   assert.throws(() => divide(1n, 0n, "floor"), /zero/);

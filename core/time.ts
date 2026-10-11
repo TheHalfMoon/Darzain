@@ -57,14 +57,9 @@ export function divide(n: bigint, d: bigint, rounding: Rounding): bigint {
   if (rounding === "ceil") return floor + 1n;
   // Nearest, ties away from zero.
   const twice = 2n * (r < 0n ? -r : r);
-  if (twice === d) return n < 0n ? floor : floor + 1n;
-  return twice > d
-    ? n < 0n
-      ? floor
-      : floor + 1n
-    : n < 0n
-      ? floor + 1n
-      : floor;
+  const awayFromZero = twice >= d;
+  if (n < 0n) return awayFromZero ? floor : floor + 1n;
+  return awayFromZero ? floor + 1n : floor;
 }
 
 export function toSafe(value: bigint): number {

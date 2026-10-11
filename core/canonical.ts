@@ -3,6 +3,7 @@
 // 30 fps editing shape in core/project.ts is a lossless projection of this
 // model used by the current editor until command reducers replace whole-
 // project saves (T6); conversions that would lose information fail instead.
+// The one normalization: a title's source offset, which nothing reads, is 0.
 import { z } from "zod";
 import { Id, ProjectSchema } from "./project.ts";
 import type { Project } from "./project.ts";
@@ -274,7 +275,9 @@ export function fromEditView(
       assetId: c.assetId,
       startTicks: toTicks(c.startFrame),
       durationTicks: toTicks(c.durationFrames),
-      sourceStartTicks: toTicks(c.sourceFrame),
+      // Titles have no source media: the renderer never reads their offset,
+      // so a stray editor value carries no meaning and is not preserved.
+      sourceStartTicks: c.title === null ? toTicks(c.sourceFrame) : 0,
       title: c.title,
     })),
   });
