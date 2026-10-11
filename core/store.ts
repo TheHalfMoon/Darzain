@@ -933,18 +933,22 @@ export class ProjectStore {
     const extension = name.split(".").pop()?.toLowerCase() || "";
     if (!/^[a-z0-9]{1,8}$/.test(extension))
       throw new CommandError("MEDIA_INVALID", "Unsupported media extension.");
+    await this.#ensureDirectories(id);
+    const space = await statfs(this.root);
+    // From the checks to taking the slot and the space there is no await, so
+    // concurrent imports always see each other's reservations.
     if (this.#importing >= RESOURCE_POLICY.enforced.concurrentImports)
       throw new CommandError("BUSY", "Another import is in progress; retry.");
-    await this.#ensureDirectories(id);
     // Staging plus the published object, with a reserve left for the system.
-    const space = await statfs(this.root);
     if (
       Number(space.bavail) * Number(space.bsize) <
       2 * expected + RESOURCE_POLICY.enforced.diskReserveBytes + this.#reserved
     )
       throw new Error("Insufficient free disk space.");
+    this.#reserved += 2 * expected;
+    this.#importing++;
     const assetId = randomUUID();
-    const temp = await this.file(id, "imports", `${assetId}.${extension}`);
+    let temp: string | null = null;
     const hash = createHash("sha256");
     let received = 0;
     const header: Buffer[] = [];
@@ -954,10 +958,7 @@ export class ProjectStore {
           yield source;
         })()
       : source;
-    // Concurrent imports each hold their staging + publication space, and
-    // every upload must finish within a deadline scaled to its size.
-    this.#reserved += 2 * expected;
-    this.#importing++;
+    // Every upload must finish within a deadline scaled to its size.
     const deadline = setTimeout(
       () =>
         (source as { destroy?: (e: Error) => void }).destroy?.(
@@ -968,6 +969,7 @@ export class ProjectStore {
           1000,
     );
     try {
+      temp = await this.file(id, "imports", `${assetId}.${extension}`);
       const file = await open(temp, "wx");
       try {
         for await (const chunk of chunks) {
@@ -1000,6 +1002,8 @@ export class ProjectStore {
       } finally {
         await file.close();
       }
+      // The body has arrived; probing and publication are not upload time.
+      clearTimeout(deadline);
       if (received !== expected)
         throw new CommandError(
           "VALIDATION",
@@ -1074,7 +1078,7 @@ export class ProjectStore {
       clearTimeout(deadline);
       this.#reserved -= 2 * expected;
       this.#importing--;
-      await unlink(temp).catch(() => {});
+      if (temp) await unlink(temp).catch(() => {});
     }
   }
   // Recorded probe and object state for one asset version.

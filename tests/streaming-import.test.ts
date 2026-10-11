@@ -399,3 +399,28 @@ test("an interrupted v2 backfill resumes on the next start", async () => {
   assert.equal(rows(root, "pending_work"), 0);
   reopened.close();
 });
+
+test("imports started in the same tick still respect the concurrency cap", async () => {
+  const { root, store, project } = await workspace({ uploadGraceMs: 200 });
+  const wav = path.join(root, "tone.wav");
+  ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", wav]);
+  const header = (await readFile(wav)).subarray(0, 64);
+  const outcomes = await Promise.all(
+    [0, 1, 2].map((i) => {
+      const s = new PassThrough();
+      s.write(header);
+      return store
+        .importAsset(project.id, `race-${i}.wav`, s, 1024 * 1024)
+        .then(
+          () => "imported",
+          (e: unknown) => toCommandError(e).code,
+        );
+    }),
+  );
+  assert.deepEqual(outcomes.sort(), [
+    "BUSY",
+    "LIMIT_EXCEEDED",
+    "LIMIT_EXCEEDED",
+  ]);
+  store.close();
+});
