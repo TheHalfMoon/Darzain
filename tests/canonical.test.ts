@@ -83,7 +83,7 @@ test("the 30 fps editing shape round-trips losslessly through canonical v1", () 
   const view = richView();
   const canonical = fromEditView(view, "ar");
   assert.equal(canonical.format, FORMAT);
-  assert.equal(canonical.formatVersion, 1);
+  assert.equal(canonical.formatVersion, 2);
   assert.equal(canonical.language, "ar");
   assert.deepEqual(canonical.output.fps, { num: 30, den: 1 });
   // One 30 fps frame is exactly 23,520,000 flicks.
@@ -152,12 +152,12 @@ test("canonical validation enforces refs, safe integers and strict keys", () => 
 test("newer formats can be inspected but not parsed for editing", () => {
   const newer = {
     ...fromEditView(richView()),
-    formatVersion: 2,
+    formatVersion: 3,
     futureField: { x: 1 },
   };
   assert.deepEqual(inspectFormat(newer), {
     format: FORMAT,
-    formatVersion: 2,
+    formatVersion: 3,
     supported: false,
   });
   assert.throws(

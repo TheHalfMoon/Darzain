@@ -51,6 +51,17 @@ export const ClipSchema = z
     durationFrames: frame.min(1),
     sourceFrame: frame,
     title: z.string().max(500).nullable(),
+    // Absent means neutral: 0 dB and no fade.
+    gainDb: z.number().min(-60).max(12).optional(),
+    fadeInFrames: frame.optional(),
+    fadeOutFrames: frame.optional(),
+  })
+  .strict();
+const ShotSchema = z
+  .object({
+    id: Id,
+    name: z.string().min(1).max(120),
+    clipIds: z.array(Id).max(200),
   })
   .strict();
 const SceneSchema = z
@@ -65,6 +76,7 @@ const SceneSchema = z
         movement: z.enum(["static", "dolly", "pan", "orbit"]),
       })
       .strict(),
+    shots: z.array(ShotSchema).max(100).optional(),
   })
   .strict();
 export const ProjectSchema = z

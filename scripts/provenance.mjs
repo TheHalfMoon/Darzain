@@ -21,6 +21,7 @@ for (const file of [
   "NOTICE",
   "notices/ai-video-production-editor-LICENSE",
   "notices/Ninerr-LICENSE",
+  "notices/OpenCut-LICENSE",
 ])
   if (!existsSync(file)) throw new Error(`Missing notice: ${file}`);
 const skip = new Set([

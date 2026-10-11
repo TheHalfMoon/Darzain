@@ -40,11 +40,11 @@ test("snapshots are stored in the canonical format", async () => {
       "SELECT s.format, s.bytes FROM snapshots s JOIN projects p ON p.snapshot_hash = s.hash WHERE p.project_id = ?",
     )
     .get(project.id) as { format: string; bytes: Uint8Array };
-  assert.equal(row.format, "yamakan.project/1");
+  assert.equal(row.format, "yamakan.project/2");
   const stored = JSON.parse(Buffer.from(row.bytes).toString("utf8"));
   assert.deepEqual(
     [stored.format, stored.formatVersion, stored.language],
-    ["yamakan.project", 1, "en"],
+    ["yamakan.project", 2, "en"],
   );
   assert.deepEqual(stored, await store.exportProject(project.id));
   db.close();
@@ -55,7 +55,7 @@ test("a newer project format is inspectable but never edited or rewritten", asyn
   const { store, project, db, plant } = await workspace();
   const future = {
     ...fromEditView({ ...project, revision: 1 }),
-    formatVersion: 2,
+    formatVersion: 3,
     futureTimeline: { tracks: ["kept"] },
   };
   const planted = plant("yamakan.project/1", future, 1);
@@ -101,9 +101,9 @@ test("T2 edit-view snapshots upgrade on read and are never rewritten in place", 
     .all(project.id)
     .map((r: any) => [r.revision, r.format]);
   assert.deepEqual(formats, [
-    [0, "yamakan.project/1"],
+    [0, "yamakan.project/2"],
     [1, "yamakan.edit-view/1"],
-    [2, "yamakan.project/1"],
+    [2, "yamakan.project/2"],
   ]);
   const row = db
     .prepare("SELECT bytes FROM snapshots WHERE hash = ?")
@@ -117,7 +117,7 @@ test("restore never overwrites a head written in a newer format", async () => {
   const { store, project, db, plant } = await workspace();
   const future = {
     ...fromEditView({ ...project, revision: 1 }),
-    formatVersion: 2,
+    formatVersion: 3,
   };
   const planted = plant("yamakan.project/1", future, 1);
   const history = await store.history(project.id);

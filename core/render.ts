@@ -112,8 +112,17 @@ export async function renderProject(
     args.push("-i", file);
     if (asset.kind === "audio") {
       const label = `a${input++}`;
+      // Gain and linear fades are numeric project values (schema-bounded),
+      // applied in the clip's own time before it is placed on the timeline.
+      const shaping = [
+        c.gainDb ? `volume=${c.gainDb}dB` : null,
+        c.fadeInFrames ? `afade=t=in:st=0:d=${c.fadeInFrames / 30}` : null,
+        c.fadeOutFrames
+          ? `afade=t=out:st=${len - c.fadeOutFrames / 30}:d=${c.fadeOutFrames / 30}`
+          : null,
+      ].filter(Boolean);
       filters.push(
-        `[${index}:a]atrim=start=${c.sourceFrame / 30}:duration=${len},asetpts=PTS-STARTPTS,adelay=${Math.round(start * 1000)}:all=1[${label}]`,
+        `[${index}:a]atrim=start=${c.sourceFrame / 30}:duration=${len},asetpts=PTS-STARTPTS,${shaping.map((f) => `${f},`).join("")}adelay=${Math.round(start * 1000)}:all=1[${label}]`,
       );
       audio.push(label);
     } else {

@@ -19,6 +19,8 @@ import {
   toEditView,
 } from "./canonical.ts";
 import type { CanonicalProject } from "./canonical.ts";
+import { applyBatch } from "./timeline/operations.ts";
+import type { Operation } from "./timeline/operations.ts";
 import { RESOURCE_POLICY } from "./command/policy.ts";
 
 export type ProjectHistory = {
@@ -52,10 +54,10 @@ export type StoreOptions = {
 // Snapshots hold canonical project bytes (core/canonical.ts). Snapshots that
 // T2 builds stored in the 30 fps editing shape are upgraded on read by the
 // same pure, lossless conversion; they are never rewritten in place.
-export const SNAPSHOT_FORMAT = "yamakan.project/1";
+export const SNAPSHOT_FORMAT = "yamakan.project/2";
 export const EDIT_VIEW_FORMAT = "yamakan.edit-view/1";
 const MAX_REVISION = 10000;
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const WORKSPACE_SCOPE = "";
 
 // Asset objects are content-addressed files under a project; a version is a
@@ -111,6 +113,23 @@ CREATE TABLE supervisor(
 ) STRICT;
 INSERT INTO supervisor(id, generation) VALUES (1, 0);
 `;
+// Revision-bound undo/redo (T6): each applied batch records the revision it
+// produced and the revision it started from; the cursor binds undo/redo to
+// the exact head they were computed for.
+const SCHEMA_V4 = `
+CREATE TABLE edit_history(
+  project_id TEXT NOT NULL,
+  seq INTEGER NOT NULL CHECK(seq > 0),
+  revision INTEGER NOT NULL,
+  before_revision INTEGER NOT NULL,
+  PRIMARY KEY(project_id, seq)
+) STRICT;
+CREATE TABLE edit_cursor(
+  project_id TEXT PRIMARY KEY,
+  cursor INTEGER NOT NULL CHECK(cursor >= 0),
+  head_revision INTEGER NOT NULL
+) STRICT;
+`;
 const SCHEMA = `
 CREATE TABLE snapshots(
   hash TEXT PRIMARY KEY CHECK(length(hash) = 64),
@@ -159,7 +178,7 @@ type Commit = {
   // Precondition evaluated inside the transaction, before any write.
   check?: (head: Head) => void;
   // Extra rows written in the same transaction, before the snapshot.
-  effects?: (db: DatabaseSync) => void;
+  effects?: (db: DatabaseSync, revision: number) => void;
   // Project language for the new snapshot; defaults to the current head's.
   language?: () => CanonicalProject["language"];
   next: (current: () => Project, revision: number) => Project;
@@ -235,6 +254,13 @@ function registerAsset(
     );
 }
 
+const EDIT_HISTORY_OPERATIONS = new Set([
+  "project.applyBatch",
+  "project.undo",
+  "project.redo",
+]);
+type Cursor = { cursor: number; head_revision: number };
+
 const isBusy = (e: unknown) =>
   e instanceof Error && /database is locked|SQLITE_BUSY/i.test(e.message);
 
@@ -291,7 +317,7 @@ export class ProjectStore {
         "PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;",
       );
       // Versioned, transactional schema steps; each commits on its own.
-      const steps = [SCHEMA, SCHEMA_V2, SCHEMA_V3];
+      const steps = [SCHEMA, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4];
       for (let v = acceptable(db); v < SCHEMA_VERSION; v++) {
         db.exec("BEGIN IMMEDIATE");
         try {
@@ -482,7 +508,16 @@ export class ProjectStore {
       db.prepare(
         "INSERT INTO snapshots(hash, format, bytes, byte_length) VALUES (?, ?, ?, ?) ON CONFLICT(hash) DO NOTHING",
       ).run(hash, SNAPSHOT_FORMAT, bytes, bytes.length);
-      c.effects?.(db);
+      c.effects?.(db, revision);
+      // Edits made any other way end the undo history they would invalidate.
+      if (!EDIT_HISTORY_OPERATIONS.has(c.operation)) {
+        db.prepare("DELETE FROM edit_cursor WHERE project_id = ?").run(
+          c.projectId,
+        );
+        db.prepare("DELETE FROM edit_history WHERE project_id = ?").run(
+          c.projectId,
+        );
+      }
       this.#options.fault?.("after-snapshot-insert");
       if (head) {
         const moved = db
@@ -779,6 +814,121 @@ export class ProjectStore {
       },
       language: () => restoredCanonical.language,
       next: (_current, next) => ({ ...selected, revision: next }),
+    });
+  }
+  // Applies a batch of timeline operations as one revision.
+  async applyOperations(
+    projectId: string,
+    expectedRevision: number,
+    operations: Operation[],
+    receipt?: RequestReceipt,
+  ) {
+    Id.parse(projectId);
+    return this.#commit({
+      operation: "project.applyBatch",
+      projectId,
+      expectedRevision,
+      receipt,
+      next: (current, revision) => ({
+        ...toEditView(applyBatch(fromEditView(current()), operations)),
+        revision,
+      }),
+      effects: (db, revision) => {
+        const at = this.#cursor(db, projectId);
+        const cursor = at?.head_revision === expectedRevision ? at.cursor : 0;
+        // A new edit discards anything that could have been redone.
+        db.prepare(
+          "DELETE FROM edit_history WHERE project_id = ? AND seq > ?",
+        ).run(projectId, cursor);
+        db.prepare(
+          "INSERT INTO edit_history(project_id, seq, revision, before_revision) VALUES (?, ?, ?, ?)",
+        ).run(projectId, cursor + 1, revision, expectedRevision);
+        this.#setCursor(db, projectId, cursor + 1, revision);
+      },
+    });
+  }
+  // Undo commits a new revision equal to the state before the last batch,
+  // and only from the head that batch (or a redo of it) produced.
+  async undo(
+    projectId: string,
+    expectedRevision: number,
+    receipt?: RequestReceipt,
+  ) {
+    return this.#travel(projectId, expectedRevision, "undo", receipt);
+  }
+  async redo(
+    projectId: string,
+    expectedRevision: number,
+    receipt?: RequestReceipt,
+  ) {
+    return this.#travel(projectId, expectedRevision, "redo", receipt);
+  }
+  #cursor(db: DatabaseSync, projectId: string) {
+    return db
+      .prepare(
+        "SELECT cursor, head_revision FROM edit_cursor WHERE project_id = ?",
+      )
+      .get(projectId) as Cursor | undefined;
+  }
+  #setCursor(
+    db: DatabaseSync,
+    projectId: string,
+    cursor: number,
+    head: number,
+  ) {
+    db.prepare(
+      "INSERT INTO edit_cursor(project_id, cursor, head_revision) VALUES (?, ?, ?) ON CONFLICT(project_id) DO UPDATE SET cursor = excluded.cursor, head_revision = excluded.head_revision",
+    ).run(projectId, cursor, head);
+  }
+  async #travel(
+    projectId: string,
+    expectedRevision: number,
+    direction: "undo" | "redo",
+    receipt?: RequestReceipt,
+  ) {
+    Id.parse(projectId);
+    let target = 0;
+    let cursor = 0;
+    return this.#commit({
+      operation: `project.${direction}`,
+      projectId,
+      expectedRevision,
+      receipt,
+      check: (head) => {
+        const db = this.#database;
+        const at = this.#cursor(db, projectId);
+        if (!at || at.head_revision !== head.revision)
+          throw new CommandError(
+            "REVISION_CONFLICT",
+            `Nothing to ${direction} at this revision.`,
+          );
+        const step = db
+          .prepare(
+            "SELECT revision, before_revision FROM edit_history WHERE project_id = ? AND seq = ?",
+          )
+          .get(projectId, direction === "undo" ? at.cursor : at.cursor + 1) as
+          { revision: number; before_revision: number } | undefined;
+        if (!step)
+          throw new CommandError(
+            "REVISION_CONFLICT",
+            `Nothing to ${direction} at this revision.`,
+          );
+        target = direction === "undo" ? step.before_revision : step.revision;
+        cursor = direction === "undo" ? at.cursor - 1 : at.cursor + 1;
+      },
+      next: (_current, revision) => {
+        const row = this.#database
+          .prepare(
+            "SELECT snapshot_hash FROM revisions WHERE project_id = ? AND revision = ?",
+          )
+          .get(projectId, target) as { snapshot_hash: string };
+        return {
+          ...this.#snapshot(row.snapshot_hash, projectId, target),
+          revision,
+        };
+      },
+      effects: (db, revision) =>
+        this.#setCursor(db, projectId, cursor, revision),
     });
   }
   async save(

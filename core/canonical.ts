@@ -20,7 +20,7 @@ import {
 import { CommandError } from "./command/errors.ts";
 
 export const FORMAT = "yamakan.project";
-export const FORMAT_VERSION = 1;
+export const FORMAT_VERSION = 2;
 const { mediaDimension, timelineFrames } = RESOURCE_POLICY.enforced;
 // The timeline horizon stays the editor's ten minutes at 30 fps.
 const MAX_TIMELINE_TICKS = framesToTicks(timelineFrames, rational(30, 1));
@@ -76,6 +76,18 @@ const CanonicalClip = z
     // Offset into the source media, in flicks from the source's first sample.
     sourceStartTicks: Ticks,
     title: z.string().max(500).nullable(),
+    // v2: audio gain and linear fades. MVP renders them on audio clips only.
+    gainDb: z.number().min(-60).max(12),
+    fadeInTicks: Ticks,
+    fadeOutTicks: Ticks,
+  })
+  .strict();
+// v2: a shot is an ordered group of a scene's clips.
+const CanonicalShot = z
+  .object({
+    id: Id,
+    name: z.string().min(1).max(120),
+    clipIds: z.array(Id).max(200),
   })
   .strict();
 const CanonicalScene = z
@@ -91,6 +103,7 @@ const CanonicalScene = z
         movement: z.enum(["static", "dolly", "pan", "orbit"]),
       })
       .strict(),
+    shots: z.array(CanonicalShot).max(100),
   })
   .strict();
 
@@ -129,9 +142,14 @@ const ProjectBody = z
   .strict()
   .superRefine((p, ctx) => {
     const fail = (message: string) => ctx.addIssue({ code: "custom", message });
-    const ids = [p.id, ...p.assets, ...p.scenes, ...p.tracks, ...p.clips].map(
-      (x) => (typeof x === "string" ? x : x.id),
-    );
+    const ids = [
+      p.id,
+      ...p.assets,
+      ...p.scenes,
+      ...p.scenes.flatMap((s) => s.shots),
+      ...p.tracks,
+      ...p.clips,
+    ].map((x) => (typeof x === "string" ? x : x.id));
     if (new Set(ids).size !== ids.length) fail("Identifiers must be unique.");
     for (const s of p.scenes)
       if (
@@ -139,8 +157,20 @@ const ProjectBody = z
         !p.assets.some((a) => a.id === s.referenceAssetId && a.kind === "image")
       )
         fail("Scene reference must identify an imported image.");
+    const shotClips = p.scenes.flatMap((s) =>
+      s.shots.flatMap((sh) => sh.clipIds),
+    );
+    if (new Set(shotClips).size !== shotClips.length)
+      fail("A clip belongs to at most one shot.");
+    for (const id of shotClips)
+      if (!p.clips.some((c) => c.id === id)) fail("Shot clip is missing.");
     for (const c of p.clips) {
       const track = p.tracks.find((t) => t.id === c.trackId);
+      if (c.fadeInTicks + c.fadeOutTicks > c.durationTicks)
+        fail("Fades are longer than the clip.");
+      const audible = track?.kind === "audio";
+      if (!audible && (c.gainDb !== 0 || c.fadeInTicks || c.fadeOutTicks))
+        fail("Gain and fades apply to audio clips only.");
       const asset = p.assets.find((a) => a.id === c.assetId);
       if (!track) fail("Clip track is missing.");
       let end: number;
@@ -207,7 +237,29 @@ export function inspectFormat(value: unknown): {
   return {
     format,
     formatVersion,
-    supported: format === FORMAT && formatVersion === FORMAT_VERSION,
+    supported:
+      format === FORMAT &&
+      formatVersion !== null &&
+      formatVersion >= 1 &&
+      formatVersion <= FORMAT_VERSION,
+  };
+}
+
+// v1 had no gain, fades or shots; their neutral values are exactly v1's meaning.
+function upgradeV1(value: Record<string, unknown>) {
+  const clips = Array.isArray(value.clips) ? value.clips : [];
+  const scenes = Array.isArray(value.scenes) ? value.scenes : [];
+  return {
+    ...value,
+    formatVersion: FORMAT_VERSION,
+    clips: clips.map((c) =>
+      c && typeof c === "object"
+        ? { ...c, gainDb: 0, fadeInTicks: 0, fadeOutTicks: 0 }
+        : c,
+    ),
+    scenes: scenes.map((sc) =>
+      sc && typeof sc === "object" ? { ...sc, shots: [] } : sc,
+    ),
   };
 }
 
@@ -221,7 +273,11 @@ export function parseCanonical(value: unknown): CanonicalProject {
       );
     throw new CommandError("VALIDATION", "Not a Yamakan project snapshot.");
   }
-  return CanonicalProjectSchema.parse(value);
+  return CanonicalProjectSchema.parse(
+    info.formatVersion === 1
+      ? upgradeV1(value as Record<string, unknown>)
+      : value,
+  );
 }
 
 const EDIT_FPS = rational(30, 1);
@@ -263,7 +319,7 @@ export function fromEditView(
       durationTicks: toTicks(a.durationFrames),
       timebase: null,
     })),
-    scenes: p.scenes,
+    scenes: p.scenes.map((sc) => ({ ...sc, shots: sc.shots ?? [] })),
     tracks: p.tracks.map((t) => ({
       ...t,
       solo: Boolean(t.solo),
@@ -279,6 +335,9 @@ export function fromEditView(
       // so a stray editor value carries no meaning and is not preserved.
       sourceStartTicks: c.title === null ? toTicks(c.sourceFrame) : 0,
       title: c.title,
+      gainDb: c.gainDb ?? 0,
+      fadeInTicks: toTicks(c.fadeInFrames ?? 0),
+      fadeOutTicks: toTicks(c.fadeOutFrames ?? 0),
     })),
   });
 }
@@ -318,7 +377,9 @@ export function toEditView(project: CanonicalProject): Project {
       width: a.width,
       height: a.height,
     })),
-    scenes: p.scenes,
+    scenes: p.scenes.map(({ shots, ...sc }) =>
+      shots.length ? { ...sc, shots } : sc,
+    ),
     tracks: p.tracks.map((t) => ({
       id: t.id,
       name: t.name,
@@ -336,6 +397,13 @@ export function toEditView(project: CanonicalProject): Project {
       durationFrames: toFrames(c.durationTicks, "Clip duration"),
       sourceFrame: toFrames(c.sourceStartTicks, "Clip source offset"),
       title: c.title,
+      ...(c.gainDb !== 0 ? { gainDb: c.gainDb } : {}),
+      ...(c.fadeInTicks
+        ? { fadeInFrames: toFrames(c.fadeInTicks, "Clip fade-in") }
+        : {}),
+      ...(c.fadeOutTicks
+        ? { fadeOutFrames: toFrames(c.fadeOutTicks, "Clip fade-out") }
+        : {}),
     })),
   });
 }
