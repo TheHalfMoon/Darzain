@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "date": "2026-10-11",
+  "baseMain": "0d3bdacb51188294ba8d36ce2b218db72f6073a6",
+  "originalPlan": "419bc356eaa6738ba546f38310687739177da6bb",
+  "reviewBase": "73910ba9db870a68c9b08c7c369c4bdd1ff3f420",
+  "scope": "Planning and bounded reversible experiments only. Production source unchanged.",
+  "rea": {
+    "identity": {
+      "package": {
+        "name": "rea-agents",
+        "version": "6.3.0",
+        "root_path": "C:\\Users\\Shehr\\AppData\\Local\\npm-cache\\_npx\\ec0ab2283efe73f6\\node_modules\\rea-agents",
+        "build_commit": null
+      },
+      "server": {
+        "name": "rea",
+        "version": "6.3.0",
+        "started_at": "2026-10-11T16:34:26.993Z",
+        "command_path": "C:\\Users\\Shehr\\AppData\\Local\\npm-cache\\_npx\\ec0ab2283efe73f6\\node_modules\\rea-agents\\scripts\\rea.mjs"
+      },
+      "protocol": "2025-06-18",
+      "alignment": {
+        "state": "aligned",
+        "reasons": [],
+        "remediation": null
+      },
+      "catalogCounts": {
+        "cli_commands": 95,
+        "mcp_tools": 139,
+        "mcp_prompts": 6
+      }
+    },
+    "operation": "analyze_javascript_application",
+    "inputPin": "cf5e79e919144200294fb9fed22a222592a0aeea",
+    "inputManifestSha256": "2232d3dcb0ca7871efca2edc5721d0c3021e6e6e594ebb64f5844cc0a17d00fa",
+    "files": 50,
+    "bytes": 124734,
+    "parseFailures": 0,
+    "findings": 708,
+    "evidenceId": "ev_f468aa4d1595355be05ad9d6d31c6d86d257ccce597326bafed3f08ded75dbe9",
+    "transport": "MCP analysis completed but full response exceeded 10 MB. Complete retained evidence exported successfully, 20610544 bytes, one record.",
+    "rawEvidence": "Retained locally in work; not public raw source.",
+    "limitations": [
+      "Static inert text only; no donor runtime, whole-app security proof, or native engine.",
+      "Only selected OpenCut algorithm and command files; dependencies outside subset unresolved."
+    ],
+    "exportSha256": "0b300d52ab5a3d4d7861ab5593af751285032ccf8f32e8bf834ca066910d2a9f"
+  },
+  "experiments": {
+    "sqlite": {
+      "node": "v24.19.0",
+      "sqlite": "3.53.3",
+      "checks": [
+        "snapshot/head/request committed in one DB transaction",
+        "same-payload retry returns original revision before stale-revision check",
+        "different-payload retry rejected",
+        "stale new request rejected",
+        "process killed after snapshot INSERT rolls back snapshot and head together",
+        "integrity_check ok",
+        "committed canonical bytes available without external snapshot file"
+      ],
+      "time": {
+        "flicksPerSecond": "705600000",
+        "sample48000Ticks": 14700,
+        "legacy120000TicksPer48000Sample": 2.5,
+        "unsafeIntermediateAt213Seconds": true,
+        "counterexample": null
+      },
+      "limits": [
+        "One bounded process-kill trial; not power-loss, physical disk-full, hostile filesystems, or production integration",
+        "No hardware flush guarantee",
+        "No application-code change"
+      ]
+    },
+    "opencut": {
+      "runtime": "Bun 1.2.18 (0d4089ea)",
+      "bunArchiveSha256": "240122daf8d848812d14a7f7a08deddf9c8f3768a62f360ca756c92e383227af",
+      "initial": "0 pass, 5 fail, 3 module errors: missing culori/soundtouchjs and bundler-target WASM import",
+      "boundedWithLoader": {
+        "pass": 53,
+        "fail": 4,
+        "testFiles": 5,
+        "tests": 57,
+        "changes": "Custom loader instantiates actual WASM. Source and tests unchanged. Installed pinned opencut-wasm 0.2.10, culori 4.0.2, soundtouchjs 0.3.0; ignore-scripts.",
+        "failures": [
+          "mask uniform-scale activeLines mismatch",
+          "text-mask canvas unavailable in headless Bun",
+          "freeform segment handles differ from expected",
+          "placement fixture uses fractional 2.5 integer ticks"
+        ]
+      },
+      "otherOriginalTests": {
+        "pass": 23,
+        "fail": 0,
+        "testFiles": 2,
+        "scope": "math and sticker IDs"
+      },
+      "batchFailure": {
+        "testPass": 1,
+        "assertions": 2,
+        "result": "First source mutation survives second command exception; BatchCommand is not atomic."
+      },
+      "limits": "No full OpenCut build, no browser output, no Yamakan integration qualification."
+    },
+    "jev": {
+      "cli": "jev 2026.919.0",
+      "exit": 0,
+      "stdout": "{\"answers\":{\"q\":{\"noul\":0.81,\"type\":\"noul\"}},\"latency_ms\":492,\"model\":\"jev-1.13.0\",\"ok\":true,\"usage\":{\"input_tokens\":393,\"output_tokens\":20}}\n",
+      "stderr": "",
+      "limitation": "Advisory single typed judgment only; no correctness, security, E2E or approval authority"
+    },
+    "graft": {
+      "pass": "keyless structural graph build",
+      "files": 9,
+      "nodes": 95,
+      "edges": 239,
+      "cards": 9,
+      "query": "persist callers: create, importAsset, restore, save",
+      "limitations": "Structural graph only; no deep LLM review."
+    },
+    "pstack": "Fresh-context combined and separate security panels completed initial review and revised-delta review; all must-fix findings addressed. No remaining must-fix in reviewed planning scope. See panel-review.json; no runtime/release/approval authority.",
+    "ocr": "1.12.13 delegate preview selected 9/34 staged files; 25 excluded, including Markdown unsupported by delegate language list. Rules inspected separately. No model-backed OCR review configured."
+  },
+  "notExecuted": [
+    "Production implementation",
+    "Physical power loss",
+    "Windows ACL second-account test",
+    "Physical disk-full/volume fixture",
+    "Final product E2E (product unchanged)",
+    "GPU inference",
+    "Paid generation",
+    "Competitor generation benchmarks",
+    "Native Hopper/Ghidra/IDA analysis"
+  ],
+  "history": "PR #3 and #4 remain open; Claude review directory must be byte-identical."
+}

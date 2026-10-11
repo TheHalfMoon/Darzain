@@ -1,43 +1,27 @@
-# Security and privacy proposal
+# Security and privacy gates — final proposal
 
-The legacy trusted-local-account boundary is not internet tenancy or a same-account adversary defense. Planned controls below need their own qualification; static types/graphs do not prove enforcement.
+Scope is a local trusted account, one granted workspace, loopback service and explicitly bound stdio clients. It is not internet tenancy or a defense against the same account rewriting data/hashes. Controls below are proposed unless linked to an executed receipt; types and static graphs are not enforcement. [Contracts](OPERATIONAL_CONTRACTS.md), [source exclusions](SOURCE_IMPORT_MATRIX.md) and [acceptance](E2E_ACCEPTANCE.md) define executable gates.
 
-| Threat | Required boundary | Attack acceptance |
+| Boundary | Enforced design / negative test | Gate / owner |
 |---|---|---|
-| Malicious media | Signatures plus bounded probes; decoder time/resource/stream limits | Malformed containers, huge dimensions, remote protocols |
-| Project archives | Strict manifest/entry/depth/expanded limits; separate import root | ZIP bombs, traversal/drive/UNC paths, symlinks, duplicate/case collisions |
-| Filesystem escape | Workspace grants, safe ancestry/reparse checks, verified handles | Traversal, junction swap, unauthorized outputs |
-| Workflow/plugin injection | Registered declarative nodes; sandbox arbitrary code only after qualification | eval/shell/project JSX, malicious template/skill authority |
-| Credentials | OS store or qualified secret service, opaque refs, redaction/rotation | Project/archive/log/browser/SDK leaks, stale sessions |
-| Upload/SSRF | Default-deny provider allowlists, DNS/IP/redirect checks, asset/region consent | Metadata/LAN redirects, hidden cloud fallback |
-| Unauthorized jobs | Scoped transport auth, local Host/Origin/session protection, owned workers | Cross-site bootstrap, forged grant/job/paths |
-| Resource/cost abuse | CPU/GPU/disk/queue quotas, timeout, cancellation/reserved spend | Flood/hung worker/disk full/ambiguous paid retry |
-| Agent escalation | Trusted grants separate from model content and revision/schema validation | Prompt injection, tool-output scope forgery |
-| Likeness/voice misuse | Version/purpose/use/expiry/revocation consent and provenance | Missing/revoked consent, unauthorized voice uploads |
+| Acknowledged edits | Snapshot/head/revision/receipt transaction, scoped replay-before-CAS, original-preserving migration, live backup/restore; concurrent/kill/ENOSPC/corruption fixtures | B1 MVP; Storage builder |
+| Asset publication | Staging/hash/flush/close/no-overwrite/verify then ready registration; scoped managed keys, reparse/ancestry checks and pinned GC roots | MVP; Media builder |
+| Media decode | Fixed absolute binaries/argv, local protocol allowlist, no arbitrary filters/URLs, dimensions/streams/time/memory quotas, explicit demuxer and nested-subresource restrictions, vulnerability/binary provenance review; local/remote playlist sentinel corpus and egress capture | MVP; Media/security reviewers. This is resource/input containment, **not** a proven exploit sandbox |
+| Loopback/browser | Exact Host/Origin, deny other loopback origins, Fetch Metadata/navigation bootstrap policy, no credential on error/static misses, no wide CORS. Explicit-token CLI path distinct from browser cookies | MVP; Security reviewer |
+| Workspace/credentials | Owner-only Windows ACL verified with second account; project/archive/log/SDK never contains credential bytes; keys later use a qualified secret service | MVP token gate; BYOK credential gate later |
+| Job/process lifecycle | Lease-generation fencing, validation/current-state publication, cancel wins before success, native service-owned atomic Job Object launch for direct FFmpeg/ffprobe, scrubbed env; launch-seam/crash/cancel/cleanup tests | B3 MVP. PID metadata is reconciliation evidence, not ownership |
+| Descendant processes | Extend the already-qualified MVP ownership binding; atomic assignment at creation, no breakaway, Python→FFmpeg; service and host death tests | B4 blocks Python/model descendants. Job Object is lifetime/resource control, not FS/network sandbox |
+| Agent authority | Registry schemas and derived principal, workspace/action grant, revision+request digest, atomic batch; approved proposal binds operation-list hash and expiry; model text cannot grant rights | MVP API/MCP parity/security |
+| Render/text | Frozen typed plan and registered effects, escaped plain ASS text, fixed fonts/engine; no arbitrary shell/filtergraph/JS/JSX or remote fonts | B5/B6 MVP; Media + Arabic reviewers |
+| Donor code | Path and transitive dependency-closure allowlist + hash/notice ledger; negative exclusion test; no whole-app bootstrap | B2 before affected import; Security reviewer |
+| Provider egress/spend | Hard capability/entitlement/privacy/region filters, asset consent; outbound allowlist + DNS/IP/redirect SSRF policy; intent/reservation/reconciliation; fault and approved capped tests | Before any provider activation; adapter builder + Founder |
+| Archive/plugin/remote | Safe bounded archive parser, declared nodes only; no trusted arbitrary plugin code. Remote tenancy/auth reviewed separately | Post-MVP feature gates, not waived |
+| Likeness/voice | Version/purpose/expiry/revocation consent and lineage; minimal biometric retention, user deletion and derived-output/reference invalidation policy; photo import does not authorize cloning/upload. Disclose each provider retention/training/deletion policy before upload | Before respective AI operation |
 
-A photo import does not authorize voice cloning. Derived biometric/voice assets inherit access/deletion policy; avoid unnecessary raw biometric retention. Disclose provider retention/region/upload metadata. Prompts, generations and retrieved documents remain untrusted proposals.
+Mandatory exclusions retain ArtCraft browser_emulation/consumer-cookie clients and broad Tauri configs, filmmaker unvalidated Electron/file/shell IPC, OGA provider/download authority, OpenCut browser persistence/global managers/canonical export and Kodac fallback-secret authentication. Founder source authorization does not grant unrelated assets, weights, trademarks or hosted capacity. Process isolation does not itself remove license/distribution obligations.
 
-Executed legacy controls include bounded schemas/media probes, traversal defense, local auth, verified history and real export checks. Gaps include Windows directory fsync, stale locks/orphans, same-account path/handle races, buffered media serving, secure decoder sandbox and public tenancy. Do not inherit filmmaker unrestricted Electron IPC or Kodac development-secret auth.
+Physical power loss/hardware flush, external media directory durability, native exploit sandboxing and same-account adversary protection are not proven. Bounded probes/timeouts cannot prevent every codec exploit. An internal local preview can keep decoder sandbox deferred only with that residual risk explicitly accepted under J and a known-vulnerability/binary review; stronger public security claims or untrusted multi-user media require qualified OS containment. The accepted MVP gates still include adversarial inputs and zero egress, not an assertion of sandbox perfection.
 
-Release requires fresh independent review of immutable diffs, actual adversarial media/archive/network/credential/quota tests, dependency/binary provenance, exact-head CI and clean install/update workflows. Failures and unavailable tooling remain explicit. No sandbox claim follows from Ecra/kernux policy types alone.
+Crash recovery preserves original DB/WAL/SHM/corrupt media; a page-level DB failure is diagnostic mode, not a safely skipped row. Renderer/workers receive staging inputs/output keys and no writable DB handles, tokens or project grants; validate/fence outputs before publication. Full-process sandbox/egress grants for optional engines need actual runtime enforcement, not Ecra/kernux policy types. Remote collaboration and cloud resale remain disabled.
 
-## Independent review: blockers versus deferrable (2026-10-11)
-
-From the [independent Claude review](review/CLAUDE_INDEPENDENT_REVIEW.md). Each control needs a negative test; policy text alone does not count.
-
-| Control | Status at 419bc356 | Gate | Negative test |
-|---|---|---|---|
-| Single persisted authority with compare-and-swap (B1) | Lost update demonstrated (T2b) | MVP blocker | Forced-interleave conflict |
-| Donor exclusions enforced by provenance tooling (B2) | Not listed | Blocker for any desktop or ArtCraft import | `provenance:check` rejects excluded paths |
-| Loopback: accept only `Sec-Fetch-Site` same-origin/none; cookie only on top-level same-origin navigation (M1) | Same-site loopback ports accepted | MVP blocker | Page from another 127.0.0.1 port is denied |
-| Token/workspace owner-only ACL on Windows (M2) | `0o600` ignored on Windows | MVP release blocker | Second account cannot read |
-| Streaming, bounded media handling (H3) | Whole-file buffering, 50 MB cap | MVP blocker | 4 GB import within memory ceiling; corpus rejection |
-| Owned process trees: Job Object without breakaway (H5) | Grandchildren survive crash (T3) | Blocker for any local worker | No descendant survives a service kill |
-| Write-ahead paid submission intents (H7) | Specified only in prose | Blocker for any paid provider | Fault matrix with zero automatic resubmits |
-| Single outbound HTTP module: allowlist, DNS/IP checks, redirect re-validation | Policy only | Blocker for any network feature | Metadata, LAN and redirect SSRF corpus |
-| Credentials in the OS credential store via the desktop host, never in projects, logs or archives | Policy only | Blocker for BYOK | Archive, log and crash-dump scan |
-| Archive extraction limits and reparse checks | Policy only | MVP blocker (archive feature) | Malicious archive corpus |
-| Decoder sandboxing (AppContainer or similar) for FFmpeg | None | Deferrable to v1; bounded by probe limits, timeouts and protocol whitelist | Fuzzed-media timeouts |
-| Remote/multi-user exposure | Out of scope | Deferred; requires separate auth/tenancy review | None |
-
-ArtCraft's desktop configuration (`withGlobalTauri`, asset scope `**`, `'unsafe-eval'`, `https://*` fetch) and the filmmaker Electron shell (`webSecurity:false`, renderer-controlled `shell:true` spawn, arbitrary file read) are anti-patterns, not references.
+Release requires exact-head independent review, real Windows fault/ACL/backup/network/parity tests, dependency/binary SBOM/notices/source offer and clean install/update/rollback. An OCR delegate result, Jev verdict, static REA graph or Linux prototype pass cannot approve the release. [Founder packet](FOUNDER_DECISION_PACKET.md) names the remaining decisions.
