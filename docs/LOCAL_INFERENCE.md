@@ -18,3 +18,15 @@ Offline editing/render/export must launch without GPU/Python/weights/cloud. Opti
 First AI qualification should use one existing supported user-owned ComfyUI backend or an explicitly consented user-controlled inference host. Direct BYOK can be qualified independently without pretending this laptop supports cinematic diffusion. No paid run or weight download occurred during planning.
 
 Supervisor owns processes, concurrency, CPU/GPU/disk budgets and cancellation. Shared ComfyUI global interrupt requires exclusive ownership or a documented limitation. No automatic custom-node installation. Project archives cannot supply trusted executable configs/pickle checkpoints. Inference failures cannot disable offline editing.
+
+## Execution profiles (independent review, 2026-10-11)
+
+| Profile | Scope | Proposed minimum | Gate |
+|---|---|---|---|
+| A — Offline CPU | Whole MVP: edit, preview, FFmpeg export, optional CPU transcription later | 4 cores, 8 GB RAM, 10 GB free, NTFS, Windows 10 22H2+ | First-slice DoD on a clean host with the network disabled |
+| B — Local AI (optional) | ComfyUI or a pinned worker environment per operation | NVIDIA with ≥ 12 GB VRAM (video) or ≥ 8 GB (image), 32 GB RAM, ≥ 60 GB free | Per-operation receipt on that hardware (model/weights hash and license, input/output hashes, latency, memory, cancel and recovery). Disabled otherwise |
+| C — BYOK cloud | User's own provider keys | Network, per-upload consent, budget | Founder-approved capped real test; never required for A |
+
+The current development host (i5-13420H, 16 GiB, Intel UHD, about 3.4 GB free disk at review time) is a **Profile A machine only**. Every qualification script must preflight free disk space and refuse below its stated need.
+
+On Windows, workers must run inside a Job Object owned by the desktop host, created with `KILL_ON_JOB_CLOSE` and without breakaway. Launch them by absolute interpreter path, never through WindowsApps execution aliases. Review T3 showed that the FFmpeg grandchild of a Python worker survives a hard kill of the Node service, and that alias launchers escape entirely. ComfyUI supports targeted `prompt_id` interruption at the pinned commit, but its check-then-interrupt is not atomic, so prefer an exclusive Yamakan-owned ComfyUI instance.

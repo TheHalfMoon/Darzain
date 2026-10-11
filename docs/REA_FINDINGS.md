@@ -7,3 +7,12 @@ Four bounded CLI investigations succeeded: filmmaker Electron main/preload/FFmpe
 Findings: filmmaker shell/IPC requires a bounded replacement; provider module relationships do not establish service support; ArtCraft scene state needs canonical translation; OpenMontage composer has Remotion, external-font and asset-resolution dependencies. Direct source inspection supplements static evidence: offline fonts, scoped asset resolution and renderer isolation are required before importing the composer.
 
 The graphs were constructed from inert text, without bundle execution. Dynamic imports, omitted files and native/runtime behavior remain unresolved. Three earlier whole-tree analyses failed with ENOBUFS; they are not completed investigations. Static graph success does not prove output correctness, security, reconstruction completeness or native compatibility.
+
+## Independent review investigations (2026-10-11)
+
+The installed 6.3.0 was verified. Upstream **6.4.0** (published 2026-10-11) was installed into an isolated prefix with `--ignore-scripts` and used for two new bounded static runs. `rea doctor` reports that no native engine (Hopper, Ghidra, IDA) is configured. Receipts: [evidence.json](review/claude-2026-10-11/evidence.json).
+
+- **Filmmaker `electron/` (752cd43d), 8 files:** exit 0, 10.5 s, ev_27e25b61…3f940c. 55 IPC handlers, 70 bridge members, 0 sender-validation observations. Source corroboration: `webSecurity:false`, `shell:true` spawn of a renderer-supplied command, arbitrary-path read. Confirms exclusion of the shell.
+- **OpenCut Classic web subset (cf5e79e9), 141 files:** exit 0, 29.5 s, ev_c9f0020060…afac80, 0 parse failures. Persistence is IndexedDB/OPFS behind `StorageAdapter<T>`; one canvas scene graph serves preview and export; export is held in memory (mediabunny `BufferTarget`).
+
+Direct source inspection was sufficient, so REA was not used, for: the ArtCraft consumer clients and `browser_emulation`, the Open Generative AI MuAPI routing, and ComfyUI targeted interrupt. Static graphs remain incomplete, and the absence of a finding is not proof of absence.

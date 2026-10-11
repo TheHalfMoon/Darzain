@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "reviewer": "Claude (Opus 5.5), independent principal-architect review",
+  "date": "2026-10-11",
+  "repository": "TheHalfMoon/Darzain",
+  "reviewedPr": 3,
+  "reviewedHeadSha": "419bc356eaa6738ba546f38310687739177da6bb",
+  "baseMainSha": "0d3bdacb51188294ba8d36ce2b218db72f6073a6",
+  "scope": "Planning review plus bounded reversible experiments. No production code changed, no donor modified, no paid inference, no model download, no deployment.",
+  "host": {
+    "os": "Windows 11 Home 10.0.26300",
+    "node": "24.19.0",
+    "ffmpeg": "8.1.1-full_build-www.gyan.dev (libass, libharfbuzz, libfribidi, libfreetype enabled)",
+    "python": "3.14.7",
+    "freeDiskAtStartGiB": 4.4,
+    "freeDiskAtEndGiB": 3.4,
+    "note": "C: was 98-99% full during review; no donor build, npm ci or model download was attempted for that reason."
+  },
+  "packageIntegrity": {
+    "prState": "OPEN, draft, head 419bc356 = review SHA, base main 0d3bdacb",
+    "zip": "Yamakan-Claude-review-419bc356.zip",
+    "manifestEntries": 121,
+    "entriesMatchingZipAndGitBlob": 121,
+    "fileSetEqual": true,
+    "productionCodeDiffMainToReviewSha": "none (core/server/cli/src/tests/scripts/package files identical)"
+  },
+  "durableJobsDraft": {
+    "worktreeBranch": "feat/durable-jobs (staged, uncommitted, base 0d3bdacb)",
+    "command": "git diff --cached | sha256sum",
+    "sha256": "998f50c7479d55fc34c3aa1b8e1b12533ceafc64e964a90941828cee7f959ca6",
+    "matchesHandoff": true,
+    "unchangedAfterReview": true
+  },
+  "existingQualificationAtReviewSha": {
+    "npmTest": { "exit": 0, "tests": 33, "pass": 32, "fail": 0, "skipped": 1, "skipReason": "POSIX-only permission test" },
+    "typecheck": { "exit": 0 },
+    "lint": { "exit": 0 },
+    "formatCheck": { "exit": 0 },
+    "provenanceCheck": { "exit": 0 },
+    "build": { "exit": 0, "seconds": 10.8 },
+    "browserE2E": { "exit": 0, "seconds": 12.2, "browser": "Microsoft Edge", "pageErrors": 0, "steps": 26 },
+    "dependencyNote": "node_modules reused by junction from the Codex workspace at identical package-lock.json; npm ci was not run because of disk pressure."
+  },
+  "failureInjection": [
+    {
+      "id": "T1", "script": "harness/t1-rename-lock.ts",
+      "question": "Does head publication survive a second process holding head.json open without FILE_SHARE_DELETE (antivirus/indexer/backup/editor)?",
+      "result": "FAIL: save rejected with EPERM after 17 ms, no retry. Revision 1 snapshot + receipt remain and history reports it verified although the caller was told the save failed; next save becomes revision 2.",
+      "impact": "Spurious user-visible save failures on ordinary Windows hosts; commit point is ambiguous (snapshot exists, head not advanced)."
+    },
+    {
+      "id": "T2", "script": "harness/t2-cross-process.ts",
+      "question": "Two independent store instances save from the same expectedRevision with natural timing.",
+      "result": "40/40 trials: exactly one writer acknowledged (link() on the snapshot name acts as an accidental compare-and-swap)."
+    },
+    {
+      "id": "T2b", "script": "harness/t2b-interleave.ts",
+      "question": "Writer B validates expectedRevision before writer A commits, then allocates its revision after A commits.",
+      "result": "FAIL: LOST UPDATE. A acknowledged revision 1; B (based on revision 0) acknowledged revision 2 and became head. Root cause: nextRevision() = max(existing)+1 instead of exactly expectedRevision+1.",
+      "impact": "Silent loss of acknowledged edits once any second writer process exists (worker, CLI-direct, MCP stdio host, second desktop instance)."
+    },
+    {
+      "id": "T3", "scripts": ["harness/t3-parent2.mjs", "harness/t3-py.mjs"],
+      "question": "After a hard kill of the Node service on Windows, do spawned processes survive?",
+      "result": {
+        "nodeDirectFfmpegChild": "killed (libuv kill-on-close job object)",
+        "pythonWorkerDirectChildAbsolutePath": "killed",
+        "ffmpegGrandchildOfPythonWorker": "SURVIVED (orphan)",
+        "pythonViaWindowsAppsExecutionAlias": "worker AND grandchild SURVIVED"
+      },
+      "impact": "Local inference/ComfyUI/Python workers leak orphan GPU/CPU processes and partial outputs after a service crash. Node cannot create a no-breakaway Job Object natively."
+    },
+    {
+      "id": "T4", "scripts": ["harness/t4.mjs", "harness/t4b.mjs", "harness/t4c.mjs"],
+      "question": "Does the current export title path (FFmpeg drawtext, as emitted by core/render.ts) render Arabic correctly?",
+      "result": {
+        "shapingDefaultOnThisBuild": "letters joined correctly (text_shaping defaults true when built with HarfBuzz/FriBidi)",
+        "shapingOff": "letters disconnected and misordered (build-dependent)",
+        "baseDirection": "FAIL: paragraph base direction is LTR; pure Arabic 'مرحبا بالعالم!' places '!' at the right edge; mixed Arabic/Latin line misordered",
+        "libassEncodingMinus1": "PASS: correct RTL punctuation and mixed-script order (t4-libass-auto.png)"
+      },
+      "images": {
+        "t4-render-default.png": "604387f2e998b540c8247ed6cdedfdbbade03aa5d207d49a3cf5585d80faf172",
+        "t4-punct.png": "8d323dc5993864d7b607e375c7a2911b1ce30e5787ea41791cfb98e16abf2c91",
+        "t4-libass-auto.png": "2c88c4118fc6df8fc0136be304f16c96d80529aaadbe710edd9b27e364fbfce0"
+      },
+      "limitation": "Visual inspection of rendered frames by the reviewer; no OCR/glyph-level automated comparison yet."
+    },
+    {
+      "id": "T5", "script": "harness/t5-draft.ts",
+      "question": "Durable-jobs draft behavior under one damaged journal record and long-lived use.",
+      "result": {
+        "oneDamagedRecord": "FAIL: every subsequent submit fails and initialize() stays rejected (cached rejected promise) until the file is removed by hand",
+        "lifetimeCap": "FAIL: after 1000 lifetime jobs all exports are refused ('Durable job limit reached'); no retention/GC exists"
+      }
+    },
+    {
+      "id": "T6", "scripts": ["harness/t6-writer.mjs", "harness/t6-check.mjs"],
+      "question": "Can built-in node:sqlite (SQLite 3.53.3, WAL, synchronous=FULL) provide cross-process CAS + atomic idempotency on this host?",
+      "result": {
+        "twoProcessContention": "6000 attempts: 5996 committed, 4 stale writers rejected; head == revision rows == idempotency rows == 5996; integrity_check ok",
+        "hardKill10x": "10/10 force-kills mid-write: integrity_check ok and invariant held every time"
+      },
+      "limitation": "Process kill is not power loss; OS write-cache/power-cut behavior is not qualified."
+    },
+    {
+      "id": "T7", "script": "harness/t7-canon.ts",
+      "question": "Does the imported canonical serializer enforce the PROJECT_DATA_MODEL numeric/key guarantees?",
+      "result": "Partial: rejects NaN/Infinity/undefined/sparse/non-plain/BigInt; normalizes -0. ACCEPTS unsafe integers (2^53+2) and '__proto__' keys. Guarantees must be enforced by schema validators."
+    }
+  ],
+  "rea": {
+    "installedByCodex": "rea-agents 6.3.0 (npx cache)",
+    "usedForThisReview": "rea-agents 6.4.0 (published 2026-10-11, installed into an isolated scratch prefix with --ignore-scripts)",
+    "doctor": "healthy:false; native engines (Hopper, Ghidra, IDA) not configured; static JavaScript analysis available",
+    "investigations": [
+      {
+        "target": "ai-video-production-editor@752cd43d electron/{main,preload,ffmpeg-handler,local-agents,mcp-client,studio-mcp-server,midjourney-agent}.js",
+        "command": "rea analyze-javascript-application <bounded-copy> --artifact-format directory --format json --analysis-timeout-ms 120000",
+        "inputManifestSha256": "b29ad6e5beed19ded0f87346abbd9542803ba4bd61e22af54ad8db2a06f3eaf3",
+        "exit": 0, "seconds": 10.5,
+        "evidenceId": "ev_27e25b61ebc13c19e4292ef1af783d593a354b57f7e1e57224f79bc3a43f940c",
+        "outputSha256": "d923bf06076237adfa5323b2ebb136a1d7ffb4fd1129c78ba608b62d88a292f3",
+        "summary": { "browserWindows": 3, "explicitWebPreferences": 12, "contextBridgeMembers": 70, "ipcMainHandlers": 55, "senderValidationObservations": 0 },
+        "sourceCorroboration": "webSecurity:false (two windows), sandbox:false (one window), comfyui:start spawns renderer-supplied command with shell:true, project:readFile reads arbitrary renderer-supplied path",
+        "conclusion": "Confirms Codex: exclude the shell/IPC layer entirely."
+      },
+      {
+        "target": "opencut-classic@cf5e79e9 apps/web/src/{services/storage,services/renderer,core/managers,wasm,export,commands/timeline/element}",
+        "command": "rea analyze-javascript-application <bounded-copy> --artifact-format directory --format json --analysis-timeout-ms 240000",
+        "inputManifestSha256": "3c361bee97111b152a4b3a94bde47527eb5079cd15e5714ace89da57185c4e57",
+        "exit": 0, "seconds": 29.5,
+        "evidenceId": "ev_c9f0020060dd8c0b869d4c9de9c722a4ce7378e7e46346265c34e127b1afac80",
+        "outputSha256": "9ce66c2a21cd63da40f5aa1d16874171cd8ca924b7210345ce0b790988f65009",
+        "summary": { "parsedFiles": 141, "parseFailures": 0, "findings": 1510 },
+        "sourceCorroboration": "Persistence is browser-local (IndexedDB + OPFS) behind a StorageAdapter<T> interface; preview and export share one canvas scene graph; export encodes through mediabunny into an in-memory BufferTarget; integer MediaTime ticks at 120000/s with rational FrameRate from prebuilt npm opencut-wasm.",
+        "conclusion": "Highest-value unqualified editing donor; adopt pure modules/patterns, not its managers as persisted authority."
+      }
+    ],
+    "limitations": "Static inert-text graphs only. No runtime capture, no native provider, absence of a finding is not proof of absence. Raw evidence JSON (25 MB and 48 MB) retained locally, not committed."
+  },
+  "directSourceFindingsNotInCodexPackage": [
+    "ArtCraft crates/lib/browser_emulation impersonates browser TLS fingerprints with captured cookies; consumer clients (openai_sora_client, grok_consumer_client, midjourney_client, worldlabs_consumer_client, kinovi_web_client) authenticate with consumer-session cookies.",
+    "ArtCraft tauri.conf.json: withGlobalTauri true, assetProtocol scope ['**'], CSP includes 'unsafe-eval'; capabilities allow http fetch to https://*.",
+    "Open-Generative-AI generation path is a client of a single commercial aggregator (api.muapi.ai); submit carries no idempotency key; poll timeout throws while the remote paid job continues.",
+    "ComfyUI@7f7fd918 /interrupt supports targeted prompt_id interruption and /queue supports per-id delete; the targeted path still sets a global interrupt flag after a non-atomic running check.",
+    "OpenCut@e6680107 rewrite timeline is a GPUI placeholder (confirms Codex); opencut-classic is the functioning MIT editor and was never qualified."
+  ],
+  "toolStatus": {
+    "openCodeReview": "v1.12.13 delegate mode ran (file selection + rule set, no LLM). Rules were applied by Claude to the durable-jobs draft; this is a host-performed review, not an OCR LLM pass.",
+    "jev": "Unavailable: no TypeSafe API key configured (JEV_API_KEY unset, no presets). Not run.",
+    "graft": "Installed; requires an LLM provider key for its graph pass. Not run.",
+    "pstack": "Not installed on this host. Not run.",
+    "ci": "Exact-head CI for the review branch is recorded in the pull request, not here."
+  }
+}

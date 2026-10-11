@@ -1,0 +1,3 @@
+import { canonicalJson } from "../darzain/core/donors/ninerr/canonical.ts";
+const cases: [string, unknown][] = [["-0", -0], ["NaN", NaN], ["Infinity", Infinity], ["unsafe int", 2 ** 53 + 2], ["1e21", 1e21], ["undefined member", { a: undefined, b: 1 }], ["__proto__ key", JSON.parse('{"__proto__":{"x":1}}')], ["lone surrogate", "\ud800"], ["Date", new Date(0)], ["sparse array", [1, , 3]], ["BigInt", 1n]];
+for (const [n, v] of cases) { try { console.log(n.padEnd(17), "=>", JSON.stringify(canonicalJson(v as any))); } catch (e: any) { console.log(n.padEnd(17), "=> THROWS", e.message.slice(0, 60)); } }
