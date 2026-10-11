@@ -251,7 +251,7 @@ test("playlist and concat files cannot reach other files or the network", async 
     const file = path.join(root, name);
     await writeFile(file, text);
     // Control: without the format whitelist, ffprobe treats the file as a
-    // playlist and reaches for the local file it names.
+    // playlist (hls or concat) and reaches for the files it names.
     const control = spawnSync(
       mediaTools().ffprobe,
       [
@@ -269,7 +269,7 @@ test("playlist and concat files cannot reach other files or the network", async 
     );
     assert.match(
       `${control.stdout}${control.stderr}`,
-      /concat|secret\.wav/,
+      /hls|concat|secret\.wav/,
       `${name} would be followed without the whitelist`,
     );
     await assert.rejects(
