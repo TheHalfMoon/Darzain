@@ -15,6 +15,9 @@ export const RESOURCE_POLICY = Object.freeze({
     assetImportBytes: 4 * GiB,
     // Free space kept after staging plus publication of an import.
     diskReserveBytes: 256 * MiB,
+    // Uploads in flight at once, and the slowest sustained upload accepted.
+    concurrentImports: 2,
+    minUploadBytesPerSecond: 1 * MiB,
     assetsPerProject: 200,
     timelineFrames: 18000,
     // The render queue is a single serial tail; this documents, not configures, it.

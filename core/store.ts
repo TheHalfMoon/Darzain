@@ -58,6 +58,8 @@ export type StoreOptions = {
   fault?: (point: FaultPoint) => void;
   // Test seam: can only lower the policy's snapshot byte limit.
   snapshotBytes?: number;
+  // Test seam: can only shorten the 60 s grace added to every upload deadline.
+  uploadGraceMs?: number;
 };
 
 // Snapshots hold canonical project bytes (core/canonical.ts). Snapshots that
@@ -87,6 +89,9 @@ CREATE TABLE asset_versions(
   probe TEXT,
   FOREIGN KEY(project_id, digest) REFERENCES asset_objects(project_id, digest)
 ) STRICT;
+-- Work that must finish after this step; cleared in the work's own transaction.
+CREATE TABLE pending_work(name TEXT PRIMARY KEY) STRICT;
+INSERT INTO pending_work(name) VALUES ('asset-backfill');
 `;
 const SCHEMA = `
 CREATE TABLE snapshots(
@@ -221,6 +226,7 @@ export class ProjectStore {
   #db: DatabaseSync | null = null;
   // Bytes promised to in-flight imports (staging + publication).
   #reserved = 0;
+  #importing = 0;
   constructor(root: string, options: StoreOptions = {}) {
     this.root = root;
     this.#options = options;
@@ -298,7 +304,12 @@ export class ProjectStore {
     }
     this.#db = db;
     // Upgrading to v2: register every asset that existing snapshots reference.
-    if (upgradedFrom < 2) await this.#backfillAssets();
+    if (
+      this.#database
+        .prepare("SELECT 1 FROM pending_work WHERE name = 'asset-backfill'")
+        .get()
+    )
+      await this.#backfillAssets();
   }
   // Registers objects/versions for assets referenced by snapshots written
   // before schema v2. An object whose file is missing or has the wrong size is
@@ -367,6 +378,9 @@ export class ProjectStore {
           "INSERT INTO asset_versions(version_id, project_id, digest, probe) VALUES (?, ?, ?, NULL) ON CONFLICT(version_id) DO NOTHING",
         ).run(a.id, a.projectId, a.hash);
       }
+      db.prepare(
+        "DELETE FROM pending_work WHERE name = 'asset-backfill'",
+      ).run();
       db.exec("COMMIT");
     } catch (e) {
       if (db.isTransaction) db.exec("ROLLBACK");
@@ -919,6 +933,8 @@ export class ProjectStore {
     const extension = name.split(".").pop()?.toLowerCase() || "";
     if (!/^[a-z0-9]{1,8}$/.test(extension))
       throw new CommandError("MEDIA_INVALID", "Unsupported media extension.");
+    if (this.#importing >= RESOURCE_POLICY.enforced.concurrentImports)
+      throw new CommandError("BUSY", "Another import is in progress; retry.");
     await this.#ensureDirectories(id);
     // Staging plus the published object, with a reserve left for the system.
     const space = await statfs(this.root);
@@ -927,8 +943,6 @@ export class ProjectStore {
       2 * expected + RESOURCE_POLICY.enforced.diskReserveBytes + this.#reserved
     )
       throw new Error("Insufficient free disk space.");
-    // Concurrent imports each hold their staging + publication space.
-    this.#reserved += 2 * expected;
     const assetId = randomUUID();
     const temp = await this.file(id, "imports", `${assetId}.${extension}`);
     const hash = createHash("sha256");
@@ -940,8 +954,21 @@ export class ProjectStore {
           yield source;
         })()
       : source;
-    const file = await open(temp, "wx");
+    // Concurrent imports each hold their staging + publication space, and
+    // every upload must finish within a deadline scaled to its size.
+    this.#reserved += 2 * expected;
+    this.#importing++;
+    const deadline = setTimeout(
+      () =>
+        (source as { destroy?: (e: Error) => void }).destroy?.(
+          new CommandError("LIMIT_EXCEEDED", "Upload is too slow."),
+        ),
+      Math.min(60_000, this.#options.uploadGraceMs ?? 60_000) +
+        Math.ceil(expected / RESOURCE_POLICY.enforced.minUploadBytesPerSecond) *
+          1000,
+    );
     try {
+      const file = await open(temp, "wx");
       try {
         for await (const chunk of chunks) {
           const bytes = Buffer.from(
@@ -1044,7 +1071,9 @@ export class ProjectStore {
       });
       return { project, asset, probe: JSON.parse(probeRecord) };
     } finally {
+      clearTimeout(deadline);
       this.#reserved -= 2 * expected;
+      this.#importing--;
       await unlink(temp).catch(() => {});
     }
   }
