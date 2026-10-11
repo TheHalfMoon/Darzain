@@ -30,8 +30,23 @@ const CanonicalAsset = z
     name: z.string().min(1).max(120),
     kind: z.enum(["image", "video", "audio"]),
     hash: z.string().regex(/^[a-f0-9]{64}$/),
-    extension: z.enum(["png", "jpg", "jpeg", "webp", "mp4", "mov", "webm", "wav", "mp3", "ogg"]),
-    bytes: z.number().int().positive().max(RESOURCE_POLICY.enforced.assetImportBytes),
+    extension: z.enum([
+      "png",
+      "jpg",
+      "jpeg",
+      "webp",
+      "mp4",
+      "mov",
+      "webm",
+      "wav",
+      "mp3",
+      "ogg",
+    ]),
+    bytes: z
+      .number()
+      .int()
+      .positive()
+      .max(RESOURCE_POLICY.enforced.assetImportBytes),
     width: z.number().int().min(0).max(mediaDimension),
     height: z.number().int().min(0).max(mediaDimension),
     durationTicks: Ticks.max(MAX_TIMELINE_TICKS),
@@ -78,7 +93,7 @@ const CanonicalScene = z
   })
   .strict();
 
-export const CanonicalProjectSchema = z
+const ProjectBody = z
   .object({
     format: z.literal(FORMAT),
     formatVersion: z.literal(FORMAT_VERSION),
@@ -88,12 +103,24 @@ export const CanonicalProjectSchema = z
     language: z.enum(["en", "ar"]),
     output: z
       .object({
-        width: z.number().int().min(16).max(1920).refine((x) => x % 2 === 0),
-        height: z.number().int().min(16).max(1080).refine((x) => x % 2 === 0),
+        width: z
+          .number()
+          .int()
+          .min(16)
+          .max(1920)
+          .refine((x) => x % 2 === 0),
+        height: z
+          .number()
+          .int()
+          .min(16)
+          .max(1080)
+          .refine((x) => x % 2 === 0),
         fps: RationalSchema,
       })
       .strict(),
-    assets: z.array(CanonicalAsset).max(RESOURCE_POLICY.enforced.assetsPerProject),
+    assets: z
+      .array(CanonicalAsset)
+      .max(RESOURCE_POLICY.enforced.assetsPerProject),
     scenes: z.array(CanonicalScene).max(100),
     tracks: z.array(CanonicalTrack).max(16),
     clips: z.array(CanonicalClip).max(200),
@@ -101,12 +128,15 @@ export const CanonicalProjectSchema = z
   .strict()
   .superRefine((p, ctx) => {
     const fail = (message: string) => ctx.addIssue({ code: "custom", message });
-    const ids = [p.id, ...p.assets, ...p.scenes, ...p.tracks, ...p.clips].map((x) =>
-      typeof x === "string" ? x : x.id,
+    const ids = [p.id, ...p.assets, ...p.scenes, ...p.tracks, ...p.clips].map(
+      (x) => (typeof x === "string" ? x : x.id),
     );
     if (new Set(ids).size !== ids.length) fail("Identifiers must be unique.");
     for (const s of p.scenes)
-      if (s.referenceAssetId && !p.assets.some((a) => a.id === s.referenceAssetId && a.kind === "image"))
+      if (
+        s.referenceAssetId &&
+        !p.assets.some((a) => a.id === s.referenceAssetId && a.kind === "image")
+      )
         fail("Scene reference must identify an imported image.");
     for (const c of p.clips) {
       const track = p.tracks.find((t) => t.id === c.trackId);
@@ -121,17 +151,42 @@ export const CanonicalProjectSchema = z
       }
       if (end > MAX_TIMELINE_TICKS) fail("Timeline exceeds ten minutes.");
       if (c.title !== null) {
-        if (c.assetId !== null || track?.kind !== "video") fail("Title requires a video track and no asset.");
+        if (c.assetId !== null || track?.kind !== "video")
+          fail("Title requires a video track and no asset.");
         if (c.sourceStartTicks !== 0) fail("Titles have no source offset.");
       } else if (!asset) fail("Clip asset is missing.");
       else {
-        if ((asset.kind === "audio") !== (track?.kind === "audio")) fail("Asset and track types do not match.");
-        if (asset.kind !== "image" && addTicks(c.sourceStartTicks, c.durationTicks) > asset.durationTicks)
+        if ((asset.kind === "audio") !== (track?.kind === "audio"))
+          fail("Asset and track types do not match.");
+        if (
+          asset.kind !== "image" &&
+          addTicks(c.sourceStartTicks, c.durationTicks) > asset.durationTicks
+        )
           fail("Clip extends beyond its source.");
       }
     }
   });
-export type CanonicalProject = z.infer<typeof CanonicalProjectSchema>;
+// Own keys that alter prototypes when objects are copied or merged. Zod's
+// strict mode does not report an own "__proto__" key, so it is checked here.
+const PROTOTYPE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+function prototypeKey(value: unknown, depth = 0): boolean {
+  if (depth > 32 || value === null || typeof value !== "object") return false;
+  for (const key of Object.keys(value)) {
+    if (PROTOTYPE_KEYS.has(key)) return true;
+    if (prototypeKey((value as Record<string, unknown>)[key], depth + 1))
+      return true;
+  }
+  return false;
+}
+export const CanonicalProjectSchema = z.preprocess((value, ctx) => {
+  if (prototypeKey(value))
+    ctx.addIssue({
+      code: "custom",
+      message: "Prototype keys are not allowed.",
+    });
+  return value;
+}, ProjectBody);
+export type CanonicalProject = z.output<typeof ProjectBody>;
 
 // Bounded, write-free inspection of a stored snapshot whose format may be
 // newer than this build. Never used to rewrite the snapshot.
@@ -140,10 +195,19 @@ export function inspectFormat(value: unknown): {
   formatVersion: number | null;
   supported: boolean;
 } {
-  const v = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  const v = (value && typeof value === "object" ? value : {}) as Record<
+    string,
+    unknown
+  >;
   const format = typeof v.format === "string" ? v.format.slice(0, 80) : null;
-  const formatVersion = Number.isSafeInteger(v.formatVersion) ? (v.formatVersion as number) : null;
-  return { format, formatVersion, supported: format === FORMAT && formatVersion === FORMAT_VERSION };
+  const formatVersion = Number.isSafeInteger(v.formatVersion)
+    ? (v.formatVersion as number)
+    : null;
+  return {
+    format,
+    formatVersion,
+    supported: format === FORMAT && formatVersion === FORMAT_VERSION,
+  };
 }
 
 export function parseCanonical(value: unknown): CanonicalProject {
@@ -173,7 +237,10 @@ const toFrames = (ticks: number, what: string) => {
 };
 
 // Editing shape → canonical. Exact: one 30 fps frame is 23,520,000 flicks.
-export function fromEditView(view: Project, language: "en" | "ar" = "en"): CanonicalProject {
+export function fromEditView(
+  view: Project,
+  language: "en" | "ar" = "en",
+): CanonicalProject {
   const p = ProjectSchema.parse(view);
   return CanonicalProjectSchema.parse({
     format: FORMAT,
@@ -196,7 +263,11 @@ export function fromEditView(view: Project, language: "en" | "ar" = "en"): Canon
       timebase: null,
     })),
     scenes: p.scenes,
-    tracks: p.tracks.map((t) => ({ ...t, solo: Boolean(t.solo), targeted: Boolean(t.targeted) })),
+    tracks: p.tracks.map((t) => ({
+      ...t,
+      solo: Boolean(t.solo),
+      targeted: Boolean(t.targeted),
+    })),
     clips: p.clips.map((c) => ({
       id: c.id,
       trackId: c.trackId,
@@ -213,11 +284,17 @@ export function fromEditView(view: Project, language: "en" | "ar" = "en"): Canon
 export function toEditView(project: CanonicalProject): Project {
   const p = CanonicalProjectSchema.parse(project);
   if (p.output.fps.num !== 30 || p.output.fps.den !== 1)
-    throw new CommandError("CAPABILITY_UNAVAILABLE", "This editor supports only 30 fps projects.");
+    throw new CommandError(
+      "CAPABILITY_UNAVAILABLE",
+      "This editor supports only 30 fps projects.",
+    );
   for (const a of p.assets)
     if (a.timebase !== null) {
       // Recorded time bases are not representable in the editing shape yet.
-      throw new CommandError("CAPABILITY_UNAVAILABLE", "Source time bases require the timeline editor.");
+      throw new CommandError(
+        "CAPABILITY_UNAVAILABLE",
+        "Source time bases require the timeline editor.",
+      );
     }
   return ProjectSchema.parse({
     schemaVersion: 1,

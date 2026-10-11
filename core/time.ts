@@ -32,7 +32,12 @@ function gcd(a: bigint, b: bigint): bigint {
 }
 
 export function rational(num: number, den: number): Rational {
-  if (!Number.isSafeInteger(num) || !Number.isSafeInteger(den) || num <= 0 || den <= 0)
+  if (
+    !Number.isSafeInteger(num) ||
+    !Number.isSafeInteger(den) ||
+    num <= 0 ||
+    den <= 0
+  )
     throw new RangeError("Rational parts must be positive safe integers.");
   const g = gcd(BigInt(num), BigInt(den));
   return { num: Number(BigInt(num) / g), den: Number(BigInt(den) / g) };
@@ -53,37 +58,87 @@ export function divide(n: bigint, d: bigint, rounding: Rounding): bigint {
   // Nearest, ties away from zero.
   const twice = 2n * (r < 0n ? -r : r);
   if (twice === d) return n < 0n ? floor : floor + 1n;
-  return twice > d ? (n < 0n ? floor : floor + 1n) : n < 0n ? floor + 1n : floor;
+  return twice > d
+    ? n < 0n
+      ? floor
+      : floor + 1n
+    : n < 0n
+      ? floor + 1n
+      : floor;
 }
 
 export function toSafe(value: bigint): number {
-  if (value > BigInt(Number.MAX_SAFE_INTEGER) || value < BigInt(Number.MIN_SAFE_INTEGER))
+  if (
+    value > BigInt(Number.MAX_SAFE_INTEGER) ||
+    value < BigInt(Number.MIN_SAFE_INTEGER)
+  )
     throw new RangeError("Time value exceeds the safe-integer range.");
   return Number(value);
 }
 
 const big = (value: number, label: string) => {
-  if (!Number.isSafeInteger(value)) throw new RangeError(`${label} must be a safe integer.`);
+  if (!Number.isSafeInteger(value))
+    throw new RangeError(`${label} must be a safe integer.`);
   return BigInt(value);
 };
 
 // frame index at rate fps → ticks: frame * F * den / num
-export function framesToTicks(frames: number, fps: Rational, rounding: Rounding = "exact") {
-  return toSafe(divide(big(frames, "Frames") * F * big(fps.den, "fps.den"), big(fps.num, "fps.num"), rounding));
+export function framesToTicks(
+  frames: number,
+  fps: Rational,
+  rounding: Rounding = "exact",
+) {
+  return toSafe(
+    divide(
+      big(frames, "Frames") * F * big(fps.den, "fps.den"),
+      big(fps.num, "fps.num"),
+      rounding,
+    ),
+  );
 }
 
 // ticks → frame index at rate fps: ticks * num / (F * den)
-export function ticksToFrames(ticks: number, fps: Rational, rounding: Rounding = "exact") {
-  return toSafe(divide(big(ticks, "Ticks") * big(fps.num, "fps.num"), F * big(fps.den, "fps.den"), rounding));
+export function ticksToFrames(
+  ticks: number,
+  fps: Rational,
+  rounding: Rounding = "exact",
+) {
+  return toSafe(
+    divide(
+      big(ticks, "Ticks") * big(fps.num, "fps.num"),
+      F * big(fps.den, "fps.den"),
+      rounding,
+    ),
+  );
 }
 
 // stream PTS in timebase units → ticks: pts * tb.num * F / tb.den
-export function ptsToTicks(pts: number, timebase: Rational, rounding: Rounding = "exact") {
-  return toSafe(divide(big(pts, "PTS") * big(timebase.num, "timebase.num") * F, big(timebase.den, "timebase.den"), rounding));
+export function ptsToTicks(
+  pts: number,
+  timebase: Rational,
+  rounding: Rounding = "exact",
+) {
+  return toSafe(
+    divide(
+      big(pts, "PTS") * big(timebase.num, "timebase.num") * F,
+      big(timebase.den, "timebase.den"),
+      rounding,
+    ),
+  );
 }
 
-export function ticksToPts(ticks: number, timebase: Rational, rounding: Rounding = "exact") {
-  return toSafe(divide(big(ticks, "Ticks") * big(timebase.den, "timebase.den"), big(timebase.num, "timebase.num") * F, rounding));
+export function ticksToPts(
+  ticks: number,
+  timebase: Rational,
+  rounding: Rounding = "exact",
+) {
+  return toSafe(
+    divide(
+      big(ticks, "Ticks") * big(timebase.den, "timebase.den"),
+      big(timebase.num, "timebase.num") * F,
+      rounding,
+    ),
+  );
 }
 
 // Checked addition of serialized tick values.
