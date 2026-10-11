@@ -184,9 +184,10 @@
     "imported": "core/render.ts",
     "sha256": "3d00d53bb30d060c80319147e0afab0f696d2b439e8384b6f495c4b1a902342b",
     "modifications": [
-      "Adapt buildTimelineCommand algorithm only: canonical frame data, local process isolation, explicit audio mixing, safe title files, cancellation and verified atomic output."
+      "Adapt buildTimelineCommand algorithm only: canonical frame data, local process isolation, explicit audio mixing, safe title files, cancellation and verified atomic output.",
+      "T1: prefer YAMAKAN_FFMPEG/YAMAKAN_FONT with DARZAIN_* compatibility fallback; product name in comments."
     ],
-    "importedSha256": "a1b56cbb533ade20fa13d20c1c115eda23824c5d336e036a06a0a9b484fa08ec"
+    "importedSha256": "36ea7864bd45480b35ce19e5e23e981754e0bffc50a171e3419da12b1393ede1"
   },
   {
     "source": "TheHalfMoon/Skelet",

@@ -1,0 +1,64 @@
+{
+  "policy": "yamakan.import-policy/v1",
+  "donorRoots": ["src/donors", "core/donors"],
+  "localFilesInDonorRoots": [
+    {
+      "path": "src/donors/film-editor/libraryAsset.ts",
+      "reason": "Yamakan-authored type shim isolating the donor LibraryAsset type from its cloud-backed library hook (see Timeline.tsx ledger modification)."
+    }
+  ],
+  "excludedPaths": [
+    {
+      "pattern": "(^|/)electron/main\\.js$",
+      "source": "LudwigKienle/ai-video-production-editor",
+      "reason": "Unsafe Electron shell: unrestricted filesystem and renderer-to-shell IPC."
+    },
+    {
+      "pattern": "(^|/)preload\\.js$",
+      "source": "LudwigKienle/ai-video-production-editor",
+      "reason": "Renderer bridge exposing privileged desktop IPC."
+    },
+    {
+      "pattern": "(^|/)local-agents\\.js$",
+      "source": "LudwigKienle/ai-video-production-editor",
+      "reason": "Arbitrary local command execution."
+    },
+    {
+      "pattern": "(^|/)midjourney-agent\\.js$",
+      "source": "LudwigKienle/ai-video-production-editor",
+      "reason": "Consumer-session automation of a third-party service."
+    },
+    {
+      "pattern": "(^|/)studio-mcp-server\\.js$",
+      "source": "LudwigKienle/ai-video-production-editor",
+      "reason": "Unbounded MCP server with desktop shell access."
+    },
+    {
+      "pattern": "(^|/)browser_emulation(/|$)",
+      "source": "storytold/artcraft",
+      "reason": "Browser TLS-fingerprint spoofing and bot-protection bypass."
+    },
+    {
+      "pattern": "(^|/)(cookie|cookies|session)[-_]?(client|store|jar)[^/]*$",
+      "source": "storytold/artcraft",
+      "reason": "Consumer cookie/session impersonation clients."
+    },
+    {
+      "pattern": "(^|/)src-tauri/(capabilities|tauri\\.conf\\.json)",
+      "source": "storytold/artcraft",
+      "reason": "Desktop configurations granting broad filesystem/shell capabilities."
+    },
+    {
+      "pattern": "(^|/)studio/core/render\\.py$",
+      "source": "mne03005-png/OpenVideoStudio",
+      "reason": "Alternate renderer; FFmpeg render plan is the single rendering authority."
+    },
+    {
+      "pattern": "(^|/)muapi[^/]*\\.(js|ts)$",
+      "source": "Anil-matcha/Open-Generative-AI",
+      "reason": "Unqualified provider submit/poll proxy with ambiguous billing retries."
+    }
+  ],
+  "processSpawnAllowlist": ["core/media.ts", "core/render.ts"],
+  "productionRoots": ["core", "server", "cli", "sdk", "mcp", "src"]
+}

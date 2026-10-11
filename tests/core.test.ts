@@ -223,7 +223,7 @@ test("unknown tools and injected call keys are rejected", async () => {
   const api = new CreativeAPI(store);
   await assert.rejects(
     api.call("run_command", { cmd: "whoami" }),
-    /Unknown tool/,
+    /Unknown operation/,
   );
   await assert.rejects(
     api.call("darzain.project.open", {

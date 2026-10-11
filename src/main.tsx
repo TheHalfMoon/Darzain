@@ -14,18 +14,17 @@ import {
   redoHistoryState,
 } from "./donors/film-editor/utils/historyState";
 import { editorView } from "./adapter";
+import { YamakanClient } from "../sdk/client.ts";
+import type { Operation, OperationInput } from "../sdk/client.ts";
 import "./donors/film-editor/editor.css";
 import "./style.css";
-async function call(name: string, args: unknown) {
-  const r = await fetch("/api/v1/call", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, arguments: args }),
-  });
-  const v = await r.json();
-  if (!r.ok) throw new Error(v.error || "Operation failed.");
-  return v.result;
-}
+// The UI is a same-origin client of the shared command registry; its session
+// cookie identifies the browser-ui principal.
+const client = new YamakanClient();
+const call = <O extends Operation>(
+  operation: O,
+  parameters: OperationInput<O>,
+) => client.call(operation, parameters);
 function App() {
   const [history, setHistory] = useState<ReturnType<
       typeof createHistoryState<Project>
@@ -51,7 +50,7 @@ function App() {
   const current = useRef(p);
   current.current = p;
   const refresh = async () =>
-    setProjects(await call("darzain.project.list", {}));
+    setProjects(await call("yamakan.project.list", {}));
   useEffect(() => {
     refresh().catch((e) => setMessage(e.message));
   }, []);
@@ -89,7 +88,7 @@ function App() {
   };
   const save = async () => {
     if (!current.current) return;
-    const saved = await call("darzain.project.save", {
+    const saved = await call("yamakan.project.save", {
       project: current.current,
       expectedRevision: current.current.revision,
     });
@@ -117,7 +116,7 @@ function App() {
     if (!job || ["COMPLETED", "FAILED", "CANCELLED"].includes(job.state))
       return;
     const timer = setInterval(() => {
-      call("darzain.job.status", { jobId: job.id })
+      call("yamakan.job.status", { jobId: job.id })
         .then(setJob)
         .catch((e) => {
           setMessage(e.message);
@@ -212,7 +211,7 @@ function App() {
         <div className="identity">
           <span className="mark">D</span>
           <div>
-            <strong>DARZAIN</strong>
+            <strong>YAMAKAN</strong>
             <small>Creative production · Offline workspace</small>
           </div>
         </div>
@@ -245,7 +244,7 @@ function App() {
             onClick={() =>
               run(async () => {
                 if (history?.past.length) await save();
-                accept(await call("darzain.project.create", { name }));
+                accept(await call("yamakan.project.create", { name }));
                 await refresh();
               })
             }
@@ -261,7 +260,7 @@ function App() {
                     run(async () => {
                       if (history?.past.length) await save();
                       accept(
-                        await call("darzain.project.open", {
+                        await call("yamakan.project.open", {
                           projectId: item.id,
                         }),
                       );
@@ -276,7 +275,7 @@ function App() {
                   onClick={() =>
                     run(async () => {
                       setRevisionHistory(
-                        await call("darzain.project.history", {
+                        await call("yamakan.project.history", {
                           projectId: item.id,
                         }),
                       );
@@ -386,7 +385,7 @@ function App() {
                     onClick={() =>
                       run(async () => {
                         accept(
-                          await call("darzain.project.restore", {
+                          await call("yamakan.project.restore", {
                             projectId: revisionHistory.projectId,
                             revision: snapshot.revision,
                             expectedHeadFingerprint:
@@ -419,7 +418,7 @@ function App() {
                       );
                       const link = document.createElement("a");
                       link.href = url;
-                      link.download = `darzain-draft-${draft.id}.json`;
+                      link.download = `yamakan-draft-${draft.id}.json`;
                       link.click();
                       setTimeout(() => URL.revokeObjectURL(url), 1000);
                       setDownloadedDraft(draft);
@@ -436,12 +435,12 @@ function App() {
           )}
           {tools ? (
             <section className="tools">
-              <h1>Darzain agent tools</h1>
+              <h1>Yamakan agent tools</h1>
               <p>
                 The same validated project and render operations power the
                 editor and local REST API.
               </p>
-              <pre>npm run cli -- darzain.project.list {"{}"}</pre>
+              <pre>npm run cli -- yamakan.project.list {"{}"}</pre>
               <p>
                 <a href="/api/v1/tools" target="_blank" rel="noreferrer">
                   Open the versioned tool catalog
@@ -499,7 +498,7 @@ function App() {
                         const saved = await save();
                         if (saved)
                           setJob(
-                            await call("darzain.export.video", {
+                            await call("yamakan.export.video", {
                               projectId: saved.id,
                               idempotencyKey: crypto.randomUUID(),
                             }),
@@ -732,7 +731,7 @@ function App() {
                           onClick={() =>
                             run(async () =>
                               setJob(
-                                await call("darzain.job.cancel", {
+                                await call("yamakan.job.cancel", {
                                   jobId: job.id,
                                 }),
                               ),
@@ -864,14 +863,14 @@ function App() {
                 timeline and export a playable video.
               </p>
               <p>
-                Projects remain editable after closing and reopening Darzain.
+                Projects remain editable after closing and reopening Yamakan.
               </p>
             </section>
           )}
         </main>
       </div>
       <footer>
-        Darzain engineering preview · Project schema v1 · Offline workflows
+        Yamakan engineering preview · Project schema v1 · Offline workflows
       </footer>
     </div>
   );

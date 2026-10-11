@@ -22,7 +22,7 @@ export type RenderJob = {
   artifact: string | null;
 };
 // Adapted from the donor's buildTimelineCommand: ordered overlays, source trimming,
-// normalized timestamps, scale-to-fit, and a deterministic black canvas. Darzain adds
+// normalized timestamps, scale-to-fit, and a deterministic black canvas. Yamakan adds
 // explicit audio mixing, safe title text files, cancellation and verified atomic output.
 export async function renderProject(
   store: ProjectStore,
@@ -51,6 +51,7 @@ export async function renderProject(
   await mkdir(dir, { recursive: false });
   if (active.some((c) => c.title !== null)) {
     const fonts = [
+      process.env.YAMAKAN_FONT,
       process.env.DARZAIN_FONT,
       process.env.WINDIR ? `${process.env.WINDIR}/Fonts/arial.ttf` : null,
       "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -66,7 +67,7 @@ export async function renderProject(
     }
     if (!font)
       throw new Error(
-        "No local title font found. Configure DARZAIN_FONT to a readable TTF font.",
+        "No local title font found. Configure YAMAKAN_FONT to a readable TTF font.",
       );
     await copyFile(font, `${dir}/font.ttf`);
   }
@@ -166,11 +167,15 @@ export async function renderProject(
         reject(new Error("Cancelled."));
         return;
       }
-      const child = spawn(process.env.DARZAIN_FFMPEG || "ffmpeg", args, {
-        cwd: dir,
-        windowsHide: true,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      const child = spawn(
+        process.env.YAMAKAN_FFMPEG || process.env.DARZAIN_FFMPEG || "ffmpeg",
+        args,
+        {
+          cwd: dir,
+          windowsHide: true,
+          stdio: ["ignore", "pipe", "pipe"],
+        },
+      );
       let error = "",
         progress = "";
       const cancel = () => child.kill();

@@ -33,7 +33,7 @@ export function mediaHeader(bytes: Buffer, ext: string) {
 }
 export async function probe(file: string) {
   const { stdout } = await execute(
-    process.env.DARZAIN_FFPROBE || "ffprobe",
+    process.env.YAMAKAN_FFPROBE || process.env.DARZAIN_FFPROBE || "ffprobe",
     [
       "-v",
       "error",
