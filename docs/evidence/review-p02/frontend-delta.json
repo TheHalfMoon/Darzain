@@ -1,0 +1,23 @@
+{
+  "scope": "Frontend and browser-test delta only; SHA256 8fbb87fa349262cdcf78c470f2b6363245b44c5a69f5f80bf53cb996d7eb7939",
+  "bars": {
+    "correctness": "pass: read-only history opens independently of unsavable current edits; restore remains gated by saving or downloading the exact current draft",
+    "product": "pass for P02-T01: dirty open-project recovery is reachable with explicit preservation of local edits",
+    "parsimony": "pass: one identity-bound draft state and native Blob download; bounded change",
+    "security": "not separately assessed; parent panel owns backend delta"
+  },
+  "findings": [],
+  "resolved": [
+    "Original must-fix src/main.tsx:276: removed autosave precondition from history loading",
+    "Draft protection compares the downloaded Project object to history.present, so a subsequent immutable edit invalidates restore eligibility; accept also resets the downloaded draft",
+    "Target project UUID and current revision/unverified state are visible in the history panel",
+    "Restore-success test now waits for the actual new-revision status before reading server state"
+  ],
+  "evidence": [
+    "Read frozen delta and immutable historyState helper",
+    "Inspected refreshed actual Edge darzain-recovery.png: dirty project recovery visible, identity displayed, draft-download path present",
+    "Read refreshed 22-step Edge receipt with zero page errors",
+    "Regression downloads real draft JSON and asserts exact unsaved scene text before restoring the corrupt open project"
+  ],
+  "manifest": "frontend delta: independent session-model review; correctness inline, parsimony inline, product refreshed actual Edge artifacts"
+}

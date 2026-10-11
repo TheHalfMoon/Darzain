@@ -187,5 +187,27 @@
       "Adapt buildTimelineCommand algorithm only: canonical frame data, local process isolation, explicit audio mixing, safe title files, cancellation and verified atomic output."
     ],
     "importedSha256": "a1b56cbb533ade20fa13d20c1c115eda23824c5d336e036a06a0a9b484fa08ec"
+  },
+  {
+    "source": "TheHalfMoon/Skelet",
+    "sha": "5d4778636de8fbb3c8ef71efbfe46d473f8e97e3",
+    "original": "packages/storage/src/storage.ts",
+    "imported": "core/donors/skelet/storage.ts",
+    "sha256": "67deb21124c581eb5b099a073f11b71c47eb3aa0892e7aabb8835570fbaf3e20",
+    "importedSha256": "67deb21124c581eb5b099a073f11b71c47eb3aa0892e7aabb8835570fbaf3e20",
+    "modifications": [],
+    "authorization": "Founder-provided authorization in the Darzain master directive. No repository license file was found in this pinned snapshot; no third-party license is inferred."
+  },
+  {
+    "source": "TheHalfMoon/Skelet",
+    "sha": "5d4778636de8fbb3c8ef71efbfe46d473f8e97e3",
+    "original": "packages/storage/tests/storage.test.mjs",
+    "imported": "tests/skelet-storage.test.mjs",
+    "sha256": "55699dfdd4ca300e2b71eb2e8303fafac32bd0ba31addcfb94d80abbfd6acd4c",
+    "importedSha256": "0e8d6d0785377b0671ec5e71618f71a972602a4462d3b55fc4fbe458ad3ba2ba",
+    "modifications": [
+      "Use Darzain module import; verify absolute generated temporary fixture paths before recursive cleanup on Windows; format test source."
+    ],
+    "authorization": "Founder-provided authorization in the Darzain master directive. No repository license file was found in this pinned snapshot; no third-party license is inferred."
   }
 ]

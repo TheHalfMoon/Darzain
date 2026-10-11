@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { ProjectSchema } from "../core/project.ts";
 import type { Project, Clip } from "../core/project.ts";
 import type { RenderJob } from "../core/render.ts";
+import type { ProjectHistory } from "../core/store.ts";
 import Timeline from "./donors/film-editor/components/Timeline";
 import PreviewPlayer from "./donors/film-editor/components/PreviewPlayer";
 import type { TimelineClip } from "./donors/film-editor/types";
@@ -40,7 +41,11 @@ function App() {
     [snapping, setSnapping] = useState(true),
     [activeTrack, setActiveTrack] = useState<string | null>(null),
     [job, setJob] = useState<RenderJob | null>(null),
-    [tools, setTools] = useState(false);
+    [tools, setTools] = useState(false),
+    [downloadedDraft, setDownloadedDraft] = useState<Project | null>(null),
+    [revisionHistory, setRevisionHistory] = useState<ProjectHistory | null>(
+      null,
+    );
   const input = useRef<HTMLInputElement>(null);
   const p = history?.present;
   const current = useRef(p);
@@ -79,6 +84,8 @@ function App() {
     setSelected(null);
     setPlayhead(0);
     setPlaying(false);
+    setRevisionHistory(null);
+    setDownloadedDraft(null);
   };
   const save = async () => {
     if (!current.current) return;
@@ -247,23 +254,38 @@ function App() {
           </button>
           <div className="project-list">
             {projects.map((item) => (
-              <button
-                key={item.id}
-                disabled={busy || item.error}
-                onClick={() =>
-                  run(async () => {
-                    if (history?.past.length) await save();
-                    accept(
-                      await call("darzain.project.open", {
-                        projectId: item.id,
-                      }),
-                    );
-                  })
-                }
-              >
-                {item.name}
-                <small>{item.error || `Revision ${item.revision}`}</small>
-              </button>
+              <div key={item.id}>
+                <button
+                  disabled={busy || item.error}
+                  onClick={() =>
+                    run(async () => {
+                      if (history?.past.length) await save();
+                      accept(
+                        await call("darzain.project.open", {
+                          projectId: item.id,
+                        }),
+                      );
+                    })
+                  }
+                >
+                  {item.name}
+                  <small>{item.error || `Revision ${item.revision}`}</small>
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    run(async () => {
+                      setRevisionHistory(
+                        await call("darzain.project.history", {
+                          projectId: item.id,
+                        }),
+                      );
+                    })
+                  }
+                >
+                  History & recovery
+                </button>
+              </div>
             ))}
           </div>
           {p && (
@@ -331,6 +353,87 @@ function App() {
           </p>
         </aside>
         <main>
+          {revisionHistory && (
+            <section className="tools" aria-label="Project history">
+              <h2>Project history & recovery</h2>
+              <p>
+                Project {revisionHistory.projectId} · Current revision{" "}
+                {revisionHistory.currentRevision ?? "unverified"}
+              </p>
+              <p>
+                Restoring creates a new revision. Existing snapshots and the
+                previous head are preserved.
+              </p>
+              {revisionHistory.currentRevision === null && (
+                <p className="error">
+                  The current project cannot be verified. Choose a verified
+                  snapshot to recover it.
+                </p>
+              )}
+              {revisionHistory.snapshots.map((snapshot) => (
+                <div key={snapshot.revision} className="scene">
+                  <span>
+                    Revision {snapshot.revision} ·{" "}
+                    {snapshot.name || snapshot.error}
+                  </span>
+                  <button
+                    disabled={
+                      busy ||
+                      !snapshot.verified ||
+                      (!!history?.past.length &&
+                        downloadedDraft !== history.present)
+                    }
+                    onClick={() =>
+                      run(async () => {
+                        accept(
+                          await call("darzain.project.restore", {
+                            projectId: revisionHistory.projectId,
+                            revision: snapshot.revision,
+                            expectedHeadFingerprint:
+                              revisionHistory.headFingerprint,
+                          }),
+                        );
+                        await refresh();
+                      })
+                    }
+                  >
+                    Restore revision {snapshot.revision}
+                  </button>
+                </div>
+              ))}
+              {history?.past.length ? (
+                <>
+                  <p>
+                    Save your edits or download an unsaved draft before
+                    restoring. Draft JSON retains edits; media stays in this
+                    workspace.
+                  </p>
+                  <button
+                    disabled={busy}
+                    onClick={() => {
+                      const draft = history.present;
+                      const url = URL.createObjectURL(
+                        new Blob([JSON.stringify(draft, null, 2)], {
+                          type: "application/json",
+                        }),
+                      );
+                      const link = document.createElement("a");
+                      link.href = url;
+                      link.download = `darzain-draft-${draft.id}.json`;
+                      link.click();
+                      setTimeout(() => URL.revokeObjectURL(url), 1000);
+                      setDownloadedDraft(draft);
+                    }}
+                  >
+                    Download unsaved draft
+                  </button>
+                </>
+              ) : null}
+              <button onClick={() => setRevisionHistory(null)}>
+                Close history
+              </button>
+            </section>
+          )}
           {tools ? (
             <section className="tools">
               <h1>Darzain agent tools</h1>

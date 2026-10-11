@@ -11,3 +11,7 @@ REA static output is evidence of relationships, not a test pass. Graft currently
 Linux CI and final-head independent review remain integration gates. Broader codec/large-project/editor parity, crash/power loss, generation, cross-platform installers and portable archives remain unqualified.
 
 Independent fresh-context PStack review identified and fixed cancellation/publication and queue-close races, dirty project switching, locked duplication, shared playback elements, embedded video audio and portrait fitting. Regressions include actual browser source offsets and authenticated byte-range behavior. Delta verdicts are recorded after execution; no OCR LLM success is inferred from the skipped run.
+
+P02-T01 adds seven recovery/storage integration tests and eleven adopted Skelet byte-storage tests. Local Windows result: 32 total pass, zero fail, one POSIX-permission skip. Browser E2E additionally restores an older revision and recovers after a real head-file corruption; no page errors. The interruption test injects failure at head publication and verifies orphan preservation; it is not a physical power-loss experiment.
+
+Review-driven regressions additionally cover a 3 MiB damaged head and a valid current head with a damaged receipt. The browser recovery case preserves a dirty draft as an actual downloadable JSON file before restoration.

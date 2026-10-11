@@ -19,13 +19,17 @@
     "autosave on project switch",
     "video import via agent API",
     "independent overlapping audio",
-    "embedded video audio muted"
+    "embedded video audio muted",
+    "restore older revision through UI",
+    "detect corrupt on-disk project head",
+    "recover project through UI",
+    "download unsaved draft before restoring corrupt open project"
   ],
   "focalLengthMm": 85,
   "clipsAfterSplit": 4,
   "overlappingAudioOffsets": [
-    0.337818,
-    1.314587
+    0.33132,
+    1.308082
   ],
   "pageErrors": [],
   "artifactBytes": 84614

@@ -5,8 +5,8 @@ Each phase advances only on its acceptance evidence. Implementation and producti
 | Phase | Scope | Acceptance gates | Frontier |
 |---|---|---|---|
 | P00 | Sources, competitor workflows, licenses, foundation decisions | Actual source inspection, strongest builds, REA decisions and reuse ledger | Partial: 7 donors and 13 owner snapshots inventoried; remaining sources pending |
-| P01 | Imported-media creative slice | Editable project, actual timeline/preview/export, local agent surface, negative tests, review and exact-head CI | Implemented locally; qualification underway |
-| P02 | Durable owned projects and jobs | Checksummed history, explicit recovery, crash-safe writes, verified media store, portable archives, restart/cancel/idempotency evidence | Next |
+| P01 | Imported-media creative slice | Editable project, actual timeline/preview/export, local agent surface, negative tests, review and exact-head CI | Integrated via PR #1; exact-head CI passed; release qualification remains scoped |
+| P02 | Durable owned projects and jobs | Checksummed history, explicit recovery, crash-safe writes, verified media store, portable archives, restart/cancel/idempotency evidence | In progress: media storage and explicit history/recovery implemented; remaining durability tasks pending |
 | P03 | Local generation execution | Real ComfyUI/Wan2GP adapter, capability/hardware gating, validated generated artifacts and E2E | Pending |
 | P04 | Agent creative parity | Granular typed creative tools, MCP transport, permissions, auditable/idempotent edits | Pending |
 | P05 | Scene composition and art direction | ArtCraft state reuse, camera transforms, layers/poses, render/generation integration | Pending |

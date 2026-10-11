@@ -1,0 +1,25 @@
+{
+  "judge": "security",
+  "cycle": 2,
+  "scope": "Frozen recovery delta only; authenticated loopback preview under a trusted local account",
+  "diffSha256": "8fbb87fa349262cdcf78c470f2b6363245b44c5a69f5f80bf53cb996d7eb7939",
+  "verdict": "pass",
+  "findings": {
+    "must-fix": [],
+    "worth-considering": [],
+    "skip-it": []
+  },
+  "confirmed": [
+    "Oversized damaged heads now use fixed-size hashing buffers without relaxing the 2 MiB JSON parse boundary.",
+    "Head preservation uses no-clobber hardlinks and verifies the preserved fingerprint before replacement-head publication.",
+    "A valid current head remains an integrity anchor when its separate receipt is damaged; project and asset verification still precede restoration.",
+    "Draft download remains local JSON with a schema-controlled UUID filename; no new executable-content or network sink was introduced."
+  ],
+  "resolvedHandoff": "The initial review's oversized-head recovery edge is addressed with bounded-memory fingerprinting and preservation, covered by the new 3 MiB regression.",
+  "acceptedLimitations": [
+    "The workspace owner can mutate hardlinked evidence, as explicitly documented; same-account adversarial filesystem mutation remains outside the preview guarantee.",
+    "The fingerprint deadline is checked between local filesystem reads; it is not OS-enforced cancellation of a stalled read."
+  ],
+  "validation": "Static delta review; delta SHA-256 verified. Parent-provided 32 passing tests, one POSIX skip and browser evidence were not independently rerun.",
+  "manifest": "security delta: fresh-context inline judge (session model)"
+}

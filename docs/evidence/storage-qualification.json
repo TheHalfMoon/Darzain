@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-11",
+  "source": "TheHalfMoon/Skelet",
+  "sourceCommit": "5d4778636de8fbb3c8ef71efbfe46d473f8e97e3",
+  "node": "24.19.0",
+  "platform": "win32 x64",
+  "donorTests": {
+    "passed": 10,
+    "failed": 0,
+    "skipped": 1,
+    "skip": "POSIX permissions do not apply on Windows"
+  },
+  "darzainRecoveryTests": 7,
+  "reaDecision": "Not necessary for this bounded stdlib module: all source is available and direct source inspection plus actual tests answer the integration questions.",
+  "limitations": [
+    "File fsync precedes publication; Node directory fsync is unsupported on Windows, so no power-loss guarantee is claimed there.",
+    "HTTP media import remains buffered with a 50 MiB cap; the adopted byte store itself accepts bounded async streams.",
+    "Render and HTTP serving still use verified file paths in the trusted-account model; same-account mutation after verification is not prevented.",
+    "Hash receipts detect corruption; they do not authenticate against an operator who can rewrite both data and receipts.",
+    "Job durability, portable archives and crash-lock recovery remain separate P02 tasks.",
+    "Damaged heads are fingerprinted in 64 KiB chunks with a 10-second read budget and preserved by a verified hardlink; JSON parsing retains its 2 MiB limit."
+  ]
+}
