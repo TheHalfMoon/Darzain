@@ -178,9 +178,12 @@ export class ProjectStore {
         probe.close();
       }
       if (refusal) {
-        // Remove only WAL side files this read-only check itself created.
-        for (const [i, side] of sideFiles.entries())
-          if (!hadSideFiles[i]) await unlink(side).catch(() => {});
+        // Remove only WAL side files this read-only check itself created; a
+        // busy database has a live writer whose files must not be touched.
+        const busy = refusal instanceof CommandError && refusal.code === "BUSY";
+        if (!busy)
+          for (const [i, side] of sideFiles.entries())
+            if (!hadSideFiles[i]) await unlink(side).catch(() => {});
         throw refusal;
       }
     }
@@ -207,8 +210,13 @@ export class ProjectStore {
         ? new CommandError("BUSY", "Workspace database is busy.")
         : e;
     }
+    try {
+      await mkdir(await safePath(this.root, "projects"), { recursive: true });
+    } catch (e) {
+      db.close();
+      throw e;
+    }
     this.#db = db;
-    await mkdir(await safePath(this.root, "projects"), { recursive: true });
   }
   close() {
     this.#db?.close();
