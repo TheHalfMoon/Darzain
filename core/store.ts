@@ -1115,16 +1115,22 @@ export class ProjectStore {
         height: metadata.height,
         durationFrames: kind === "image" ? 0 : metadata.durationFrames,
       });
-      // Publish by streaming the staged bytes; the store re-hashes them.
-      const reader = createReadStream(temp);
+      // Publish by streaming the staged bytes; the store re-hashes them. The
+      // handle opens eagerly and closes before cleanup, so no deferred open
+      // can race the staging file's removal.
+      this.#options.fault?.("stage-publish");
+      const source = await open(temp, "r");
       let stored;
       try {
-        this.#options.fault?.("stage-publish");
         stored = await (
           await this.#objects(id)
-        ).put(reader as AsyncIterable<Uint8Array>);
+        ).put(
+          source.createReadStream({
+            autoClose: false,
+          }) as AsyncIterable<Uint8Array>,
+        );
       } finally {
-        reader.destroy();
+        await source.close();
       }
       if (stored.sha256 !== asset.hash || stored.byteLength !== asset.bytes)
         throw new Error("Asset integrity check failed.");
