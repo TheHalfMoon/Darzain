@@ -198,7 +198,10 @@ function App() {
           trackId: c.trackId,
           startFrame: Math.max(0, Math.round(c.start * 30)),
           durationFrames: Math.max(1, Math.round((c.end - c.start) * 30)),
-          sourceFrame: Math.max(0, Math.round((c.sourceIn || 0) * 30)),
+          sourceFrame:
+            old?.title != null
+              ? 0
+              : Math.max(0, Math.round((c.sourceIn || 0) * 30)),
         };
         return clips.some((x) => x.id === c.id)
           ? clips.map((x) => (x.id === c.id ? converted : x))

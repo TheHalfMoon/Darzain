@@ -274,7 +274,9 @@ export function fromEditView(
       assetId: c.assetId,
       startTicks: toTicks(c.startFrame),
       durationTicks: toTicks(c.durationFrames),
-      sourceStartTicks: toTicks(c.sourceFrame),
+      // Titles have no source media: the renderer never reads their offset,
+      // so a stray editor value carries no meaning and is not preserved.
+      sourceStartTicks: c.title === null ? toTicks(c.sourceFrame) : 0,
       title: c.title,
     })),
   });

@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import { execFileSync, fork, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
-import { mkdtemp, readFile, writeFile, mkdir, readdir } from "node:fs/promises";
+import {
+  mkdtemp,
+  readFile,
+  writeFile,
+  mkdir,
+  readdir,
+  symlink,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { LegacyProjectStore } from "../core/legacy-store.ts";
@@ -173,7 +180,7 @@ test("migration refuses unsafe or ambiguous source and destination roots", async
     );
   await refused(source, nonEmpty, /new or empty/);
   await refused(source, path.join(source, "inside"), /separate folders/);
-  await refused(root, path.join(source, "..", "x"), /separate folders/);
+  await refused(root, path.join(source, "..", "x"), /not a legacy/);
   await refused(
     path.join(root, "occupied"),
     path.join(root, "d2"),
@@ -230,4 +237,108 @@ test("the service refuses to open a legacy root, and the CLI migrates it", async
   assert.match(cli.stdout, new RegExp(`migrated ${a.id} revisions 0,1,2,3`));
   assert.match(cli.stdout, /Source unchanged: true/);
   assert.equal(await sourceDigest(source), before);
+});
+
+test("one unreadable project is skipped and reported; the others still publish", async () => {
+  const { root, source, a } = await legacyWorkspace();
+  // A stray project folder with a head but no snapshots.
+  const stray = crypto.randomUUID();
+  await mkdir(path.join(source, "projects", stray));
+  await writeFile(path.join(source, "projects", stray, "head.json"), "{}");
+  const destination = path.join(root, "dest");
+  const report = await migrateLegacyWorkspace(source, destination);
+  const outcome = report.projects.find((p) => p.projectId === stray)!;
+  assert.equal(outcome.status, "skipped");
+  assert.ok(
+    outcome.reason && !outcome.reason.includes(root),
+    "reason has no host path",
+  );
+  assert.equal(
+    report.projects.find((p) => p.projectId === a.id)!.status,
+    "migrated",
+  );
+  assert.ok(
+    !(await readdir(root)).some((f) => f.includes(".migrating-")),
+    "staging was published, not left behind",
+  );
+  const written = JSON.parse(
+    await readFile(path.join(destination, "migration", "report.json"), "utf8"),
+  );
+  assert.deepEqual(written, report);
+});
+
+test("verified revisions after the legacy head are reported, not migrated", async () => {
+  const { root, source, a } = await legacyWorkspace();
+  // Simulate an interrupted head publication: the head still names revision 2
+  // while revision 3 and its receipt were fully written.
+  const dir = path.join(source, "projects", a.id);
+  await writeFile(
+    path.join(dir, "head.json"),
+    await readFile(path.join(dir, "snapshots", "2.receipt.json")),
+  );
+  const report = await migrateLegacyWorkspace(source, path.join(root, "dest"));
+  const outcome = report.projects.find((p) => p.projectId === a.id)!;
+  assert.deepEqual(
+    [
+      outcome.headRevision,
+      outcome.migratedRevisions,
+      outcome.revisionsAfterHead,
+    ],
+    [2, [0, 1, 2], [3]],
+  );
+});
+
+test("a legacy root that an earlier build opened in place still migrates", async () => {
+  const { root, source, a } = await legacyWorkspace();
+  // The T2 server created workspace.sqlite inside the legacy root.
+  const opened = new ProjectStore(source);
+  await opened.initialize();
+  opened.close();
+  assert.equal(await isLegacyWorkspace(source), true);
+  const report = await migrateLegacyWorkspace(source, path.join(root, "dest"));
+  assert.equal(
+    report.projects.find((p) => p.projectId === a.id)!.status,
+    "migrated",
+  );
+});
+
+test("destinations that alias into the source by junction or short name are refused", async (t) => {
+  if (process.platform !== "win32") return t.skip("Windows path aliasing");
+  const { root, source, a } = await legacyWorkspace();
+  const before = await sourceDigest(source);
+  const exportsDir = path.join(source, "projects", a.id, "exports");
+  const junction = path.join(root, "alias");
+  await symlink(source, junction, "junction");
+  const refused = (dst: string) =>
+    assert.rejects(
+      migrateLegacyWorkspace(source, dst),
+      (e: unknown) =>
+        e instanceof CommandError && /separate folders|Network/.test(e.message),
+      dst,
+    );
+  await refused(path.join(junction, "projects", a.id, "exports"));
+  await refused(path.join(junction, "projects", a.id, "exports", "new"));
+  await refused("\\\\localhost\\" + exportsDir.replace(":", "$"));
+  // 8.3 short names exist only where the volume generates them.
+  const short = spawnSync(
+    "powershell",
+    [
+      "-NoProfile",
+      "-Command",
+      "(New-Object -ComObject Scripting.FileSystemObject).GetFolder($env:TARGET).ShortPath",
+    ],
+    {
+      encoding: "utf8",
+      windowsHide: true,
+      env: { ...process.env, TARGET: exportsDir },
+    },
+  ).stdout.trim();
+  if (short && short.toLowerCase() !== exportsDir.toLowerCase())
+    await refused(short);
+  else t.diagnostic("no 8.3 short name on this volume");
+  assert.equal(
+    await sourceDigest(source),
+    before,
+    "nothing was written into the source",
+  );
 });

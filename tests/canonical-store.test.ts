@@ -112,3 +112,25 @@ test("T2 edit-view snapshots upgrade on read and are never rewritten in place", 
   db.close();
   store.close();
 });
+
+test("restore never overwrites a head written in a newer format", async () => {
+  const { store, project, db, plant } = await workspace();
+  const future = {
+    ...fromEditView({ ...project, revision: 1 }),
+    formatVersion: 2,
+  };
+  const planted = plant("yamakan.project/1", future, 1);
+  const history = await store.history(project.id);
+  await assert.rejects(
+    store.restore(project.id, 0, history.headFingerprint),
+    (e: unknown) => e instanceof CommandError && e.code === "RECOVERY_REQUIRED",
+  );
+  const head = db
+    .prepare(
+      "SELECT revision, snapshot_hash FROM projects WHERE project_id = ?",
+    )
+    .get(project.id) as { revision: number; snapshot_hash: string };
+  assert.deepEqual([head.revision, head.snapshot_hash], [1, planted.hash]);
+  db.close();
+  store.close();
+});
