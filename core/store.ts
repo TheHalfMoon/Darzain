@@ -227,7 +227,13 @@ export class ProjectStore {
   }
   // Media, exports and staging stay outside the database as immutable files.
   async #ensureDirectories(id: string) {
-    for (const sub of ["objects", "exports", "imports"])
+    // The content-addressed store requires a private objects directory on
+    // POSIX; mkdir never tightens an existing directory, so create it first.
+    await mkdir(await this.file(id, "objects"), {
+      recursive: true,
+      mode: 0o700,
+    });
+    for (const sub of ["exports", "imports"])
       await mkdir(await this.file(id, sub), { recursive: true });
   }
 
