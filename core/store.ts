@@ -88,7 +88,7 @@ type Commit = {
   receipt?: RequestReceipt;
   // Precondition evaluated inside the transaction, before any write.
   check?: (head: Head) => void;
-  next: (current: Project | null, revision: number) => Project;
+  next: (current: () => Project, revision: number) => Project;
 };
 
 const isBusy = (e: unknown) =>
@@ -252,9 +252,12 @@ export class ProjectStore {
           "LIMIT_EXCEEDED",
           "Project history limit reached.",
         );
-      const current = head
-        ? this.#snapshot(head.snapshot_hash, c.projectId, head.revision)
-        : null;
+      // Decoded only on demand: restore must be able to replace a head whose
+      // snapshot no longer verifies.
+      const current = () => {
+        if (!head) throw new Error("Project not found.");
+        return this.#snapshot(head.snapshot_hash, c.projectId, head.revision);
+      };
       const next = ProjectSchema.parse(c.next(current, revision));
       if (next.id !== c.projectId || next.revision !== revision)
         throw new Error("Project snapshot identity mismatch.");
@@ -464,7 +467,7 @@ export class ProjectStore {
       receipt,
       next: (current, revision) => {
         // Asset identities and immutable metadata come only from the validated import path.
-        if (canonicalJson(proposed.assets) !== canonicalJson(current!.assets))
+        if (canonicalJson(proposed.assets) !== canonicalJson(current().assets))
           throw new CommandError(
             "VALIDATION",
             "Assets must be added through asset.import.",
@@ -564,14 +567,13 @@ export class ProjectStore {
         projectId: id,
         expectedRevision: null,
         next: (current, revision) => {
-          if (
-            current!.assets.length >= RESOURCE_POLICY.enforced.assetsPerProject
-          )
+          const head = current();
+          if (head.assets.length >= RESOURCE_POLICY.enforced.assetsPerProject)
             throw new Error("Asset limit reached.");
           return {
-            ...current!,
+            ...head,
             revision,
-            assets: [...current!.assets, asset],
+            assets: [...head.assets, asset],
           };
         },
       });

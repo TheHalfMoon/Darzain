@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { once } from "node:events";
+import { DatabaseSync } from "node:sqlite";
 import assert from "node:assert/strict";
 const root = mkdtempSync(join(tmpdir(), "yamakan-browser-"));
 const output = resolve(
@@ -360,9 +361,15 @@ try {
   await page
     .getByLabel("Scene name")
     .fill("Unsaved draft retained during recovery");
-  // Corrupt a real head while the editor holds a dirty draft, then recover through UI.
-  const headFile = join(root, "workspace", "projects", projectId, "head.json");
-  writeFileSync(headFile, "interrupted head fixture");
+  // Corrupt the committed head pointer through an independent SQLite
+  // connection while the editor holds a dirty draft, then recover through UI.
+  // The pointer now names another project's snapshot; every revision of this
+  // project stays intact, so the latest revision remains restorable.
+  const db = new DatabaseSync(join(root, "workspace", "workspace.sqlite"));
+  db.prepare(
+    "UPDATE projects SET snapshot_hash = (SELECT snapshot_hash FROM projects WHERE project_id != ? LIMIT 1) WHERE project_id = ?",
+  ).run(projectId, projectId);
+  db.close();
   await page
     .locator(".project-list > div")
     .filter({
@@ -442,7 +449,7 @@ try {
       "independent overlapping audio",
       "embedded video audio muted",
       "restore older revision through UI",
-      "detect corrupt on-disk project head",
+      "detect corrupt committed head pointer",
       "recover project through UI",
       "download unsaved draft before restoring corrupt open project",
     ],

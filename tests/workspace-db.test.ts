@@ -283,3 +283,43 @@ test("oversized snapshots and newer database versions are refused without writes
     "workspace.sqlite",
   );
 });
+
+test("explicit restore replaces a damaged head and preserves the damaged evidence", async () => {
+  const { root, store, project } = await workspace();
+  const one = await store.save({ ...project, name: "Good" }, 0);
+  await store.save({ ...one, name: "Will be damaged" }, 1);
+  const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
+  // Damage the head snapshot bytes: the head cannot be read, older revisions can.
+  db.prepare(
+    "UPDATE snapshots SET bytes = ?, byte_length = 3 WHERE hash = (SELECT snapshot_hash FROM projects WHERE project_id = ?)",
+  ).run(Buffer.from("bad"), project.id);
+  await assert.rejects(store.load(project.id), /hash mismatch/);
+  let history = await store.history(project.id);
+  assert.equal(history.currentRevision, null);
+  assert.deepEqual(
+    history.snapshots.map((s) => [s.revision, s.verified]),
+    [
+      [2, false],
+      [1, true],
+      [0, true],
+    ],
+  );
+  await assert.rejects(store.save({ ...one, revision: 2 }, 2), /hash mismatch/);
+  const restored = await store.restore(project.id, 1, history.headFingerprint);
+  assert.deepEqual([restored.revision, restored.name], [3, "Good"]);
+  // Damage only the head pointer (identity mismatch); its snapshot stays intact.
+  const other = await store.create("Other");
+  db.prepare(
+    "UPDATE projects SET snapshot_hash = (SELECT snapshot_hash FROM projects WHERE project_id = ?) WHERE project_id = ?",
+  ).run(other.id, project.id);
+  await assert.rejects(store.load(project.id), /identity mismatch/);
+  history = await store.history(project.id);
+  const again = await store.restore(project.id, 3, history.headFingerprint);
+  assert.deepEqual([again.revision, again.name], [4, "Good"]);
+  const kept = db
+    .prepare("SELECT count(*) AS n FROM snapshots WHERE bytes = ?")
+    .get(Buffer.from("bad")) as { n: number };
+  assert.equal(kept.n, 1, "damaged bytes are preserved for diagnosis");
+  db.close();
+  store.close();
+});
