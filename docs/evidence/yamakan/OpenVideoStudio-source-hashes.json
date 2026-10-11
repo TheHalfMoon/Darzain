@@ -1,0 +1,232 @@
+{
+  "repo": "mne03005-png/OpenVideoStudio",
+  "sha": "175da9960411fbe740932b0a08d57e32a4a36a18",
+  "method": "SHA-256 of unchanged pinned files in isolated qualification copy; dependency installation only in separate venv",
+  "files": [
+    {
+      "path": "studio/app.py",
+      "sha256": "42c7cfdb6c8abe595d047c1c5d5c30b5394dd5fd329d7f4c0a62a073e6282111",
+      "bytes": 13880
+    },
+    {
+      "path": "studio/config.toml",
+      "sha256": "58318e06837739bad1ecca7e4ec11e88c74be88ec4a2fec14c4cafd9d736ce4f",
+      "bytes": 3102
+    },
+    {
+      "path": "studio/core/audio.py",
+      "sha256": "fb53ff408ada47162883556fb54c292312f9cd635b65d92dbe32a4f2d3936a56",
+      "bytes": 5430
+    },
+    {
+      "path": "studio/core/pipeline.py",
+      "sha256": "883fd2a48f813e5314608949edbd0c2aa1e0a142aa35786f5534042204157399",
+      "bytes": 11446
+    },
+    {
+      "path": "studio/core/plan.py",
+      "sha256": "b4431af7574e287bc90004a07b73acf756b8a23e4aee944b0ea9eecf2e213907",
+      "bytes": 8095
+    },
+    {
+      "path": "studio/core/render.py",
+      "sha256": "e0b00b575b3833005e30b700b667540e938649685e1e68118d31fb9e4bcc6e55",
+      "bytes": 13973
+    },
+    {
+      "path": "studio/core/scan.py",
+      "sha256": "b0cc59a90960ffceb529fa0b8d69baa61206b031f930e228bf649a8f6e4fe6a4",
+      "bytes": 8976
+    },
+    {
+      "path": "studio/core/score.py",
+      "sha256": "f4abda8fde39aa16b1c675c2c034e44f4031345f7d44d94830216252843f8761",
+      "bytes": 10167
+    },
+    {
+      "path": "studio/creative/_json_utils.py",
+      "sha256": "8617204a404ae575454486cb5427fddf48818ad91f65429144487eceb693de98",
+      "bytes": 835
+    },
+    {
+      "path": "studio/creative/clips.py",
+      "sha256": "0413542af364b5ec1e9c113ae278463f04c8bf9a26bbb3f00937ce31b23f09dd",
+      "bytes": 8644
+    },
+    {
+      "path": "studio/creative/identity.py",
+      "sha256": "f0d76b27f2072d7384c680f7925766c55fe308d9e47415859ca2f32abe9d4b56",
+      "bytes": 8779
+    },
+    {
+      "path": "studio/creative/keyframes.py",
+      "sha256": "872d56143c8658684da3eb2309df7a3640a80d8b3b08ba2b667bf60e3aecbfd9",
+      "bytes": 6363
+    },
+    {
+      "path": "studio/creative/narration.py",
+      "sha256": "9ddcd046f730488d1ac18145bc026af6311340a0ecb2ec7e0bf88345ae3d99b7",
+      "bytes": 4764
+    },
+    {
+      "path": "studio/creative/pipeline.py",
+      "sha256": "e0e68d53db663b5c7390236a894788665ff364b1ffb40218d10d6e888ece2825",
+      "bytes": 29751
+    },
+    {
+      "path": "studio/creative/references.py",
+      "sha256": "52eea45241b9db675f74eca4ced6c5c1252cdcf661deb374e6147a610af40923",
+      "bytes": 2963
+    },
+    {
+      "path": "studio/creative/script.py",
+      "sha256": "c261436b1b1f63741929840faec754bcd270446ecca35009e2a1ea655d28621e",
+      "bytes": 3329
+    },
+    {
+      "path": "studio/creative/storyboard.py",
+      "sha256": "b7ab560ad44dcafcbe1f5a05663774d672e732354ee2d1ae41f429bf6a1d78d3",
+      "bytes": 10873
+    },
+    {
+      "path": "studio/creative/subtitles.py",
+      "sha256": "e489960afe74476a1e949931efbee21ddb9db63fe34761f7d68fa1d441f5c628",
+      "bytes": 3973
+    },
+    {
+      "path": "studio/creative/validation.py",
+      "sha256": "3742694d366fe8ba7aebbbe1ba0c3bb48694195b1de3057f2ece4e04b5b60321",
+      "bytes": 5335
+    },
+    {
+      "path": "studio/identity/__init__.py",
+      "sha256": "e8212a1312876e07f007c7f4e76ac07f25ab34c49781866d289e1097d0951cd8",
+      "bytes": 410
+    },
+    {
+      "path": "studio/identity/assets.py",
+      "sha256": "c7a08f5520efea1053992e88a2465c10d654aab03fbab30bf5b26bcf4cc3d3bb",
+      "bytes": 2544
+    },
+    {
+      "path": "studio/identity/models.py",
+      "sha256": "160268fce36d2dfc31a8454c4c474b487031005598a65ccea04a862f66435364",
+      "bytes": 1199
+    },
+    {
+      "path": "studio/providers/_comfy_client.py",
+      "sha256": "f17af3e0f6cd43efd321021724c9223e8210c23563890f2dbe37bdd0727315c0",
+      "bytes": 6771
+    },
+    {
+      "path": "studio/providers/_config_utils.py",
+      "sha256": "f0a6d1db206aeb6eb1b75e223bae40bbba0298b2ba5e9854a0236a33271441d3",
+      "bytes": 1159
+    },
+    {
+      "path": "studio/providers/base.py",
+      "sha256": "0278058decdd63a00cfbdaf6286a28b4768024153fa48b8f755aec2dd12dd18f",
+      "bytes": 2996
+    },
+    {
+      "path": "studio/providers/identity_image.py",
+      "sha256": "280aac4f6f0389a75da396f3ee06112d4f4ab045df30343c37bd93350b740ded",
+      "bytes": 4825
+    },
+    {
+      "path": "studio/providers/identity_text.py",
+      "sha256": "e8166375e86650aa7eab576e68487e7977258d37a91dc67c6582d560b4018c5f",
+      "bytes": 1822
+    },
+    {
+      "path": "studio/providers/image/comfyui_sdxl.py",
+      "sha256": "2d4a981e33694e9021d24fc8c4b2b1df8ceb86149b4fe4bdf95792ca78e703af",
+      "bytes": 4438
+    },
+    {
+      "path": "studio/providers/image/instantid_sdxl.py",
+      "sha256": "4721001aefc1adda1ebd8fff05a47219a7e7483d890ba09af39f5d24a462f2be",
+      "bytes": 5051
+    },
+    {
+      "path": "studio/providers/llm/ollama_provider.py",
+      "sha256": "455eea1077bfb6c81df360c6a00d20ed8c6cf994e4dac3356e8d79e434a5bb68",
+      "bytes": 4106
+    },
+    {
+      "path": "studio/providers/registry.py",
+      "sha256": "3b6d08c446a0bea4d1877310575ec2c2573365c1a6525002a40c02e5a58fb473",
+      "bytes": 1792
+    },
+    {
+      "path": "studio/providers/tts/edge_tts_provider.py",
+      "sha256": "083230578a3bc94609e6943279ad5286e481894ef62103b249b4a5c2c13d19a5",
+      "bytes": 2973
+    },
+    {
+      "path": "studio/providers/video/comfyui_ltx.py",
+      "sha256": "366af447329d4f95aeb5b9b99f3ccf3f62f751e3f32e1b3e0d21cbe91521a5f3",
+      "bytes": 4986
+    },
+    {
+      "path": "studio/providers/workflows/character_instantid_v1_api.json",
+      "sha256": "af3a021d3493647d3c702ad61fb2d0d8fc379a4acdb9473d95527192b0d357e8",
+      "bytes": 3208
+    },
+    {
+      "path": "studio/tests/conftest.py",
+      "sha256": "329f7c0ea3546b122d81741d9263a6dc9167769829c49d44fe277d08da0348bc",
+      "bytes": 205
+    },
+    {
+      "path": "studio/tests/test_app.py",
+      "sha256": "4d7f49a89950982bef20574a33d12ad8eec4a5eb6c8fdc6a7ce715a1fe862b4c",
+      "bytes": 2055
+    },
+    {
+      "path": "studio/tests/test_comfy_client.py",
+      "sha256": "4065b6900aad773716561efb83696ea535270352227b2271bcf9aae5dac29dbf",
+      "bytes": 2485
+    },
+    {
+      "path": "studio/tests/test_comfyui_sdxl.py",
+      "sha256": "b9c29e0a4a091e588054b72ff62e0f51da4a8b942d866a57ad88ce24f55ee1f7",
+      "bytes": 2690
+    },
+    {
+      "path": "studio/tests/test_config_utils.py",
+      "sha256": "ad4e526b6d38471c5f8c60d8dadb20abb867b1cb54693ac057b766dcba3b38a0",
+      "bytes": 2683
+    },
+    {
+      "path": "studio/tests/test_creative_pipeline.py",
+      "sha256": "e6e34ebeed8a30d416cf4cf96b1ef11c2de7025b218a073193c90b3f970ef780",
+      "bytes": 12128
+    },
+    {
+      "path": "studio/tests/test_identity.py",
+      "sha256": "ddaae47e52871e7fcc5842f23bda8f0b6443ee4540c872ad1e95badbab1f8ef5",
+      "bytes": 8544
+    },
+    {
+      "path": "studio/tests/test_identity_provider.py",
+      "sha256": "d81e43d071e23f463adef451bebf6357d44ee60c05124abb0e876d2c0338a243",
+      "bytes": 5186
+    },
+    {
+      "path": "studio/tests/test_instantid_sdxl.py",
+      "sha256": "cfc8a152170241a25f78ff70c9e791bc6c1dccf898f3b7ce743970d467fe1dc9",
+      "bytes": 4636
+    },
+    {
+      "path": "studio/tests/test_references_and_hybrid_shots.py",
+      "sha256": "0ddb2c7e8245475dc967279f4cb555a6160b2ca804ed028b57f4f3528ea3512a",
+      "bytes": 11860
+    },
+    {
+      "path": "studio/tests/test_v02.py",
+      "sha256": "250349f49f2884a148892ca834d0ea09f66e1a0fedd9f64e3ee2350c53d67085",
+      "bytes": 18486
+    }
+  ]
+}

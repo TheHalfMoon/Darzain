@@ -1,0 +1,1094 @@
+{
+  "schemaVersion": "planning-provider-registry/1",
+  "observedAt": "2026-10-11",
+  "status": "research snapshot; not a runnable provider registry",
+  "rules": {
+    "unknownMeansDisabled": true,
+    "accountVerificationRequired": true,
+    "pricesMustBeRefreshedBeforeQuote": true,
+    "resaleNotInferred": true
+  },
+  "records": [
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": "https://www.alibabacloud.com/contact-sales",
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "Ignore time-limited discount for conservative quotes; 30 fps/MP4 and 2–30 s are documented, not measured."
+      ],
+      "provider": "Alibaba Cloud / Wan",
+      "model": "wan3.0-video",
+      "apiEndpointDocumentation": "https://www.alibabacloud.com/help/en/model-studio/wan-video-generation-api-reference",
+      "modalities": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video"
+      ],
+      "maximumDurationSeconds": 30,
+      "resolutions": [
+        "480p",
+        "720p",
+        "1080p"
+      ],
+      "nativeAudio": true,
+      "startEndFrameSupport": true,
+      "referenceSupport": "multiple images, videos and audio documented; input URLs require upload consent and bounded download validation",
+      "motionControl": "reference driving documented; exact camera/path schema unqualified",
+      "asyncJobs": "task API documented; integration unqualified",
+      "regions": "International list pricing; other Global/US/China tables must be separately keyed",
+      "pricingUnits": "USD per output second",
+      "publicPricing": [
+        {
+          "resolution": "480p",
+          "amount": "0.05"
+        },
+        {
+          "resolution": "720p",
+          "amount": "0.10"
+        },
+        {
+          "resolution": "1080p",
+          "amount": "0.20"
+        }
+      ],
+      "evidenceLinks": [
+        "https://www.alibabacloud.com/help/en/model-studio/video-generate-edit-model/",
+        "https://www.alibabacloud.com/help/en/model-studio/model-pricing",
+        "https://www.alibabacloud.com/help/en/model-studio/wan-video-generation-api-reference"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": "https://www.alibabacloud.com/contact-sales",
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "Ignore time-limited discount for conservative quotes; 30 fps/MP4 and 2–30 s are documented, not measured."
+      ],
+      "provider": "Alibaba Cloud / Wan",
+      "model": "wan3.0-video-prime",
+      "apiEndpointDocumentation": "https://www.alibabacloud.com/help/en/model-studio/wan-video-generation-api-reference",
+      "modalities": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video"
+      ],
+      "maximumDurationSeconds": 30,
+      "resolutions": [
+        "480p",
+        "720p",
+        "1080p"
+      ],
+      "nativeAudio": true,
+      "startEndFrameSupport": true,
+      "referenceSupport": "multiple images, videos and audio documented; input URLs require upload consent and bounded download validation",
+      "motionControl": "reference driving documented; exact camera/path schema unqualified",
+      "asyncJobs": "task API documented; integration unqualified",
+      "regions": "International list pricing; other Global/US/China tables must be separately keyed",
+      "pricingUnits": "USD per output second",
+      "publicPricing": [
+        {
+          "resolution": "480p",
+          "amount": "0.068"
+        },
+        {
+          "resolution": "720p",
+          "amount": "0.14"
+        },
+        {
+          "resolution": "1080p",
+          "amount": "0.28"
+        }
+      ],
+      "evidenceLinks": [
+        "https://www.alibabacloud.com/help/en/model-studio/video-generate-edit-model/",
+        "https://www.alibabacloud.com/help/en/model-studio/model-pricing",
+        "https://www.alibabacloud.com/help/en/model-studio/wan-video-generation-api-reference"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": null,
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "Verify exact supported resolution/audio/duration combinations against model revision before adapter enablement."
+      ],
+      "provider": "Alibaba Cloud / Wan",
+      "model": "wan2.7-t2v",
+      "apiEndpointDocumentation": "https://www.alibabacloud.com/help/en/model-studio/text-to-video-api-reference",
+      "modalities": [
+        "text-to-video"
+      ],
+      "maximumDurationSeconds": 15,
+      "resolutions": [
+        "720p"
+      ],
+      "nativeAudio": null,
+      "startEndFrameSupport": null,
+      "referenceSupport": null,
+      "motionControl": null,
+      "asyncJobs": "task API documented",
+      "regions": "not verified for an eligible account",
+      "pricingUnits": "USD per output second",
+      "publicPricing": [
+        {
+          "scope": "International; 720p",
+          "amount": "0.10"
+        }
+      ],
+      "evidenceLinks": [
+        "https://www.alibabacloud.com/help/en/model-studio/model-pricing",
+        "https://www.alibabacloud.com/help/en/model-studio/text-to-video-api-reference"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": null,
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "Flash audio flag affects pricing. Do not apply 720p price to 1080p or a different deployment scope."
+      ],
+      "provider": "Alibaba Cloud / Wan",
+      "model": "wan2.6-i2v / wan2.6-i2v-flash",
+      "apiEndpointDocumentation": "https://www.alibabacloud.com/help/en/model-studio/wan-video-generation-api-reference",
+      "modalities": [
+        "image-to-video"
+      ],
+      "maximumDurationSeconds": 15,
+      "resolutions": [
+        "720p",
+        "1080p"
+      ],
+      "nativeAudio": true,
+      "startEndFrameSupport": null,
+      "referenceSupport": "input image; multi-shot narrative documented",
+      "motionControl": null,
+      "asyncJobs": "task API documented",
+      "regions": "not verified for an eligible account",
+      "pricingUnits": "USD per output second",
+      "publicPricing": [
+        {
+          "model": "wan2.6-i2v",
+          "resolution": "720p",
+          "scope": "International",
+          "amount": "0.10"
+        },
+        {
+          "model": "wan2.6-i2v-flash",
+          "resolution": "720p",
+          "scope": "International; audio=true",
+          "amount": "0.05"
+        }
+      ],
+      "evidenceLinks": [
+        "https://www.alibabacloud.com/help/en/model-studio/video-generate-edit-model/",
+        "https://www.alibabacloud.com/help/en/model-studio/model-pricing"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "published tutorial: enterprise 600 RPM / 10 concurrent; individual 180 RPM / 3 concurrent; query 20 QPS, list 1 QPS, cancel/delete 20 QPS; account qualification still required",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": "https://www.volcengine.com/product/contact",
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "First tutorial fetch failed; subsequent fresh retry succeeded. Output duration 4–30 s or automatic -1; edit tasks require -1 and adaptive ratio. Output may have fractional seconds. Draft is 480p; confirmed draft-to-final only 1080p and draft task expires after seven days.",
+        "Direct real-face reference upload is disallowed; authorized-person asset route is separate. Task records retained seven days. Multilingual audio including Arabic is documented, not output-quality tested.",
+        "Input video supports 4k; documented output is 480/720/1080p. 1080p output uses 10-bit HEVC, requiring playback/proxy qualification. Conversion of frames to tokens and rounding remain unverified. Do not convert into flat per-second pricing."
+      ],
+      "provider": "ByteDance / Volcengine",
+      "model": "doubao-seedance-2-5",
+      "apiEndpointDocumentation": "https://docs.volcengine.com/docs/ark/seedance-2-5?lang=zh",
+      "modalities": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video editing",
+        "video extension"
+      ],
+      "maximumDurationSeconds": 30,
+      "resolutions": [
+        "480p",
+        "720p",
+        "1080p"
+      ],
+      "nativeAudio": true,
+      "startEndFrameSupport": true,
+      "referenceSupport": "up to 30 images, 10 videos and 10 audio clips; input video/audio total <=30 s for each kind",
+      "motionControl": "reference-video guidance documented; explicit physical camera/path compliance unqualified",
+      "asyncJobs": true,
+      "regions": "cn-beijing endpoint documented; user eligibility and international service equivalence unverified",
+      "pricingUnits": "CNY per million video tokens",
+      "publicPricing": [
+        {
+          "resolution": "480p/720p",
+          "inputVideo": false,
+          "amount": "70"
+        },
+        {
+          "resolution": "480p/720p",
+          "inputVideo": true,
+          "amount": "42"
+        },
+        {
+          "resolution": "1080p",
+          "inputVideo": false,
+          "amount": "77"
+        },
+        {
+          "resolution": "1080p",
+          "inputVideo": true,
+          "amount": "46"
+        }
+      ],
+      "evidenceLinks": [
+        "https://docs.volcengine.com/docs/ark/model-pricing?lang=zh",
+        "https://www.volcengine.com/product/visual-generation",
+        "https://docs.volcengine.com/docs/ark/seedance-2-5?lang=zh"
+      ],
+      "endpoint": "POST https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks"
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": "https://www.volcengine.com/product/contact",
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "Exact model IDs, input limits and account scope need direct endpoint qualification. Pricing is not enough to advertise camera, audio or reference capabilities."
+      ],
+      "provider": "ByteDance / Volcengine",
+      "model": "doubao-seedance-2-0 / fast / mini",
+      "apiEndpointDocumentation": "https://docs.volcengine.com/docs/ark/model-pricing?lang=zh",
+      "modalities": [
+        "video generation"
+      ],
+      "maximumDurationSeconds": null,
+      "resolutions": [],
+      "nativeAudio": null,
+      "startEndFrameSupport": null,
+      "referenceSupport": null,
+      "motionControl": null,
+      "asyncJobs": null,
+      "regions": "not verified for an eligible account",
+      "pricingUnits": "CNY per million video tokens",
+      "publicPricing": [
+        {
+          "model": "2.0",
+          "resolution": "480p/720p",
+          "inputVideo": false,
+          "amount": "46"
+        },
+        {
+          "model": "2.0",
+          "resolution": "480p/720p",
+          "inputVideo": true,
+          "amount": "28"
+        },
+        {
+          "model": "2.0-fast",
+          "resolution": "480p/720p",
+          "inputVideo": false,
+          "amount": "37"
+        },
+        {
+          "model": "2.0-fast",
+          "resolution": "480p/720p",
+          "inputVideo": true,
+          "amount": "22"
+        },
+        {
+          "model": "2.0-mini",
+          "resolution": "480p/720p",
+          "inputVideo": false,
+          "amount": "23"
+        },
+        {
+          "model": "2.0-mini",
+          "resolution": "480p/720p",
+          "inputVideo": true,
+          "amount": "14"
+        }
+      ],
+      "evidenceLinks": [
+        "https://docs.volcengine.com/docs/ark/model-pricing?lang=zh"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": "https://www.volcengine.com/product/contact",
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "Pro first input image free; additional input images CNY 0.02 each. Pixel bucket and output count are needed to quote. Consumer Dreamina subscription is not API or resale entitlement."
+      ],
+      "provider": "ByteDance / Volcengine",
+      "model": "doubao-seedream-5-0-pro / flash",
+      "apiEndpointDocumentation": "https://docs.volcengine.com/docs/ark/seedream-5-0-pro?lang=zh",
+      "modalities": [
+        "image generation",
+        "image editing"
+      ],
+      "maximumDurationSeconds": null,
+      "resolutions": [],
+      "nativeAudio": null,
+      "startEndFrameSupport": null,
+      "referenceSupport": "input-image charging documented; precise edit/reference contract unqualified",
+      "motionControl": null,
+      "asyncJobs": null,
+      "regions": "not verified for an eligible account",
+      "pricingUnits": "CNY per generated image/layer; input-image surcharges separate",
+      "publicPricing": [
+        {
+          "model": "pro",
+          "scope": "single-image; <=2.61 million pixels",
+          "amount": "0.30"
+        },
+        {
+          "model": "pro",
+          "scope": "single-image; >2.61 million pixels",
+          "amount": "0.60"
+        },
+        {
+          "model": "pro",
+          "scope": "layer splitting; <=2.61 million pixels per layer",
+          "amount": "0.15"
+        },
+        {
+          "model": "pro",
+          "scope": "layer splitting; >2.61 million pixels per layer",
+          "amount": "0.30"
+        },
+        {
+          "model": "flash",
+          "scope": "per output image",
+          "amount": "0.12"
+        }
+      ],
+      "evidenceLinks": [
+        "https://docs.volcengine.com/docs/ark/model-pricing?lang=zh"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "official AK/SK HS256 JWT authentication documented; credential adapter not qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": null,
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "docs.klingai.com fetch failed. Current official document site resolved; mode-specific maximum duration and concurrency not extracted reliably, so remain unknown. Kling Skills navigation and GitHub organization are not a qualified MCP implementation."
+      ],
+      "provider": "Kuaishou / Kling",
+      "model": "Kling 3.0 / 3.0 Turbo",
+      "apiEndpointDocumentation": "https://app.klingai.com/global/dev/document-api/apiReference/model/textToVideo",
+      "modalities": [
+        "text-to-video",
+        "image-to-video"
+      ],
+      "maximumDurationSeconds": null,
+      "resolutions": [
+        "720p",
+        "1080p",
+        "4k (specific standard modes)"
+      ],
+      "nativeAudio": "mode dependent",
+      "startEndFrameSupport": null,
+      "referenceSupport": "Omni/motion products documented separately; parameters not yet qualified",
+      "motionControl": "dedicated model/API family; not a universal generation parameter",
+      "asyncJobs": "task API documented",
+      "regions": "api-singapore.klingai.com documented; account eligibility unknown",
+      "pricingUnits": "USD per generated second, mode/resolution dependent",
+      "publicPricing": [
+        {
+          "model": "3.0 Turbo",
+          "audio": true,
+          "resolution": "720p",
+          "amount": "0.112"
+        },
+        {
+          "model": "3.0 Turbo",
+          "audio": true,
+          "resolution": "1080p",
+          "amount": "0.14"
+        },
+        {
+          "model": "3.0",
+          "audio": false,
+          "resolution": "720p",
+          "amount": "0.084"
+        },
+        {
+          "model": "3.0",
+          "audio": false,
+          "resolution": "1080p",
+          "amount": "0.112"
+        },
+        {
+          "model": "3.0",
+          "audio": true,
+          "voiceControl": false,
+          "resolution": "720p",
+          "amount": "0.126"
+        },
+        {
+          "model": "3.0",
+          "audio": true,
+          "voiceControl": false,
+          "resolution": "1080p",
+          "amount": "0.168"
+        },
+        {
+          "model": "3.0",
+          "resolution": "4k",
+          "scope": "listed standard mode; verify audio/voice combination",
+          "amount": "0.42"
+        }
+      ],
+      "evidenceLinks": [
+        "https://app.klingai.com/global/dev/document-api/productBilling/prePaidResourcePackage",
+        "https://app.klingai.com/global/dev/document-api/apiReference/commonInfo",
+        "https://app.klingai.com/global/dev/document-api/apiReference/model/textToVideo",
+        "https://kling.ai/document-api/api/get-started/concurrency-rules"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": null,
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "Output duration integer 4–15 s. First five input images free then $0.04/image; audio input free; input video charged at $0.08/s for 768p and $0.13/s for 2k output. Official pinned MCP targets older video API, not this v2 schema."
+      ],
+      "provider": "MiniMax / Hailuo",
+      "model": "MiniMax-H3",
+      "apiEndpointDocumentation": "https://platform.minimax.io/docs/api-reference/video-generation-v2-create",
+      "modalities": [
+        "text-to-video",
+        "image/reference-to-video",
+        "video-guided generation"
+      ],
+      "maximumDurationSeconds": 15,
+      "resolutions": [
+        "768p",
+        "2k"
+      ],
+      "nativeAudio": "audio references documented; generated audio behavior requires capability qualification",
+      "startEndFrameSupport": null,
+      "referenceSupport": "images, videos and audio; <=3 input videos/audio clips, each 2–15 s, total <=15 s",
+      "motionControl": "reference based; parameter-level camera/path controls unqualified",
+      "asyncJobs": true,
+      "regions": "not verified for an eligible account",
+      "pricingUnits": "USD per output second plus input charges",
+      "publicPricing": [
+        {
+          "resolution": "768p",
+          "amount": "0.08"
+        },
+        {
+          "resolution": "2k",
+          "amount": "0.13"
+        }
+      ],
+      "evidenceLinks": [
+        "https://platform.minimax.io/docs/guides/video-generation",
+        "https://platform.minimax.io/docs/pricing/overview",
+        "https://platform.minimax.io/docs/api-reference/video-generation-v2-create"
+      ],
+      "endpoint": "POST https://api.minimax.io/v2/video_generation"
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": null,
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "Output duration integer 5–15 s. First two input images free then $0.074/image. Input video $0.0553/s for 480p and $0.143/s for 768p output. Native audio and start/end contracts remain unqualified."
+      ],
+      "provider": "MiniMax / Hailuo",
+      "model": "MiniMax-H3-Max",
+      "apiEndpointDocumentation": "https://platform.minimax.io/docs/api-reference/video-generation-v2-create",
+      "modalities": [
+        "text-to-video",
+        "image/reference-to-video",
+        "video-guided generation"
+      ],
+      "maximumDurationSeconds": 15,
+      "resolutions": [
+        "480p",
+        "768p"
+      ],
+      "nativeAudio": null,
+      "startEndFrameSupport": null,
+      "referenceSupport": "image/video/audio; verify Max-specific counts",
+      "motionControl": null,
+      "asyncJobs": true,
+      "regions": "not verified for an eligible account",
+      "pricingUnits": "USD per output second plus input charges",
+      "publicPricing": [
+        {
+          "resolution": "480p",
+          "amount": "0.05"
+        },
+        {
+          "resolution": "768p",
+          "amount": "0.08"
+        }
+      ],
+      "evidenceLinks": [
+        "https://platform.minimax.io/docs/guides/video-generation",
+        "https://platform.minimax.io/docs/pricing/overview",
+        "https://platform.minimax.io/docs/api-reference/video-generation-v2-create"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": null,
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "4/6/8 s generally; reference images and high resolution require 8 s. Extension documented at 720p only; 8 s is per generation, not cumulative extension maximum. Video has no free tier. Per-variant eligibility, person-generation and regional restrictions require current account verification."
+      ],
+      "provider": "Google Gemini API",
+      "model": "Veo 3.1 Standard / Fast / Lite",
+      "apiEndpointDocumentation": "https://ai.google.dev/gemini-api/docs/veo",
+      "modalities": [
+        "text-to-video",
+        "image-to-video",
+        "reference-to-video",
+        "video extension (specific variants)"
+      ],
+      "maximumDurationSeconds": 8,
+      "resolutions": [
+        "720p",
+        "1080p",
+        "4k (Standard/Fast)"
+      ],
+      "nativeAudio": true,
+      "startEndFrameSupport": "first/last frame documented; per variant restrictions must be enforced",
+      "referenceSupport": "reference-image variants; require 8 s",
+      "motionControl": null,
+      "asyncJobs": "long-running operation documented",
+      "regions": "not verified for an eligible account",
+      "pricingUnits": "USD per generated second",
+      "publicPricing": [
+        {
+          "model": "Standard",
+          "resolution": "720p/1080p",
+          "amount": "0.40"
+        },
+        {
+          "model": "Standard",
+          "resolution": "4k",
+          "amount": "0.60"
+        },
+        {
+          "model": "Fast",
+          "resolution": "720p",
+          "amount": "0.10"
+        },
+        {
+          "model": "Fast",
+          "resolution": "1080p",
+          "amount": "0.12"
+        },
+        {
+          "model": "Fast",
+          "resolution": "4k",
+          "amount": "0.30"
+        },
+        {
+          "model": "Lite",
+          "resolution": "720p",
+          "amount": "0.05"
+        },
+        {
+          "model": "Lite",
+          "resolution": "1080p",
+          "amount": "0.08"
+        }
+      ],
+      "evidenceLinks": [
+        "https://ai.google.dev/gemini-api/docs/veo",
+        "https://ai.google.dev/gemini-api/docs/pricing",
+        "https://ai.google.dev/gemini-api/docs/rate-limits"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": null,
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "Pricing source lists provider-native and third-party models. Direct model contract, duration/resolution, regions and content restrictions require model-specific documentation and account qualification."
+      ],
+      "provider": "Runway",
+      "model": "gen4.5 / gen4_turbo",
+      "apiEndpointDocumentation": "https://docs.dev.runwayml.com/guides/using-the-api",
+      "modalities": [
+        "video generation"
+      ],
+      "maximumDurationSeconds": null,
+      "resolutions": [],
+      "nativeAudio": null,
+      "startEndFrameSupport": null,
+      "referenceSupport": null,
+      "motionControl": null,
+      "asyncJobs": true,
+      "regions": "not verified for an eligible account",
+      "pricingUnits": "credits per generated second; USD 0.01 per credit",
+      "publicPricing": [
+        {
+          "model": "gen4.5",
+          "credits": "12",
+          "amountUSD": "0.12"
+        },
+        {
+          "model": "gen4_turbo",
+          "credits": "5",
+          "amountUSD": "0.05"
+        }
+      ],
+      "evidenceLinks": [
+        "https://docs.dev.runwayml.com/guides/pricing",
+        "https://docs.dev.runwayml.com/guides/using-the-api"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": "support@fal.ai (official pricing page); sales section https://fal.ai/pricing#contact-sales",
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "Model page input options may change actual cost. Aggregator terms, output licenses and upstream model access remain separate. No volume/reseller discount inferred."
+      ],
+      "provider": "fal.ai",
+      "model": "model-specific endpoints; H3 Max example",
+      "apiEndpointDocumentation": "https://fal.ai/models",
+      "modalities": [
+        "model dependent"
+      ],
+      "maximumDurationSeconds": null,
+      "resolutions": [],
+      "nativeAudio": null,
+      "startEndFrameSupport": null,
+      "referenceSupport": null,
+      "motionControl": null,
+      "asyncJobs": "queue support must be bound to endpoint revision",
+      "regions": "not verified for an eligible account",
+      "pricingUnits": "endpoint-specific; example USD per second",
+      "publicPricing": [
+        {
+          "model": "MiniMax H3 Max T2V/I2V/reference",
+          "scope": "listed baseline settings",
+          "amount": "0.05"
+        },
+        {
+          "model": "MiniMax H3 Max Turbo T2V/I2V",
+          "scope": "listed baseline settings",
+          "amount": "0.025"
+        },
+        {
+          "model": "Kling v3 Pro T2V/I2V",
+          "scope": "listed baseline settings",
+          "amount": "0.14"
+        }
+      ],
+      "evidenceLinks": [
+        "https://fal.ai/pricing"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": null,
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "No provider-wide flat price. Pin model version and billing method; hardware time and cold starts can differ from output duration."
+      ],
+      "provider": "Replicate",
+      "model": "model/version-specific endpoints",
+      "apiEndpointDocumentation": "https://replicate.com/docs",
+      "modalities": [
+        "model dependent"
+      ],
+      "maximumDurationSeconds": null,
+      "resolutions": [],
+      "nativeAudio": null,
+      "startEndFrameSupport": null,
+      "referenceSupport": null,
+      "motionControl": null,
+      "asyncJobs": "prediction API; endpoint/version qualification required",
+      "regions": "not verified for an eligible account",
+      "pricingUnits": "model output or hardware-runtime dependent",
+      "publicPricing": [],
+      "evidenceLinks": [
+        "https://replicate.com/pricing"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "developer service credentials documented; consumer subscription is not API entitlement",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": null,
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "Video/audio service contracts, quotas, regions, duration and exact pricing not established by this overview. Keep adapter disabled until specific endpoint and access are qualified."
+      ],
+      "provider": "Adobe",
+      "model": "Firefly Services",
+      "apiEndpointDocumentation": "https://developer.adobe.com/firefly-services/docs/firefly-api/",
+      "modalities": [
+        "image generation/editing services; additional media endpoints require separate qualification"
+      ],
+      "maximumDurationSeconds": null,
+      "resolutions": [],
+      "nativeAudio": null,
+      "startEndFrameSupport": null,
+      "referenceSupport": null,
+      "motionControl": null,
+      "asyncJobs": null,
+      "regions": "not verified for an eligible account",
+      "pricingUnits": "contract/operation specific; public comparable quote not verified",
+      "publicPricing": [],
+      "evidenceLinks": [
+        "https://developer.adobe.com/firefly-services/docs/firefly-api/"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": null,
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "Use measured usage tokens rather than a fixed invented per-image price. Direct Images API edits do not receive cached-input pricing. Model, quality and dimension combinations must be validated; public guidance is not account entitlement."
+      ],
+      "provider": "OpenAI",
+      "model": "gpt-image-2.5-sunburst / gpt-image-2.5-flare",
+      "apiEndpointDocumentation": "https://developers.openai.com/api/docs/guides/image-generation",
+      "modalities": [
+        "text-to-image",
+        "image editing"
+      ],
+      "maximumDurationSeconds": null,
+      "resolutions": [],
+      "nativeAudio": null,
+      "startEndFrameSupport": null,
+      "referenceSupport": "image input; fidelity remains model/operation dependent",
+      "motionControl": null,
+      "asyncJobs": "Responses streaming/tool workflow; not a video task API",
+      "regions": "not verified for an eligible account",
+      "pricingUnits": "USD per million tokens by token type",
+      "publicPricing": [
+        {
+          "tokenType": "image input",
+          "amount": "8"
+        },
+        {
+          "tokenType": "cached image input (Responses only)",
+          "amount": "2"
+        },
+        {
+          "tokenType": "image output",
+          "amount": "30"
+        },
+        {
+          "tokenType": "text input",
+          "amount": "5"
+        },
+        {
+          "tokenType": "cached text input (Responses only)",
+          "amount": "1.25"
+        }
+      ],
+      "evidenceLinks": [
+        "https://developers.openai.com/api/docs/guides/image-generation",
+        "https://developers.openai.com/api/docs/pricing"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "retired",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "unavailable for retired Videos API",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": null,
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "Official current guide says Sora 2 models and Videos API were shut down September 24, 2026. Old guide examples and third-party model lists do not establish availability. Exclude from enabled router."
+      ],
+      "provider": "OpenAI",
+      "model": "Sora 2 / Videos API",
+      "apiEndpointDocumentation": null,
+      "modalities": [
+        "historical video generation"
+      ],
+      "maximumDurationSeconds": null,
+      "resolutions": [],
+      "nativeAudio": null,
+      "startEndFrameSupport": null,
+      "referenceSupport": null,
+      "motionControl": null,
+      "asyncJobs": null,
+      "regions": "not verified for an eligible account",
+      "pricingUnits": null,
+      "publicPricing": [],
+      "evidenceLinks": [
+        "https://developers.openai.com/api/docs/guides/video-generation"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": null,
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "Volume/pitch/speed/sample-rate/bitrate controls documented; exact language/voice/speaker limits, output duration and endpoint schema remain unqualified. Arabic pronunciation needs actual listening tests. Voice design is $3/voice, rapid cloning $1.50/voice charged on first synthesis, with preview and synthesis charges separate; cloning requires consent."
+      ],
+      "provider": "MiniMax",
+      "model": "speech-2.8-hd / speech-2.8-turbo",
+      "apiEndpointDocumentation": "https://platform.minimax.io/docs/pricing/overview",
+      "modalities": [
+        "text-to-speech"
+      ],
+      "maximumDurationSeconds": null,
+      "resolutions": [],
+      "nativeAudio": null,
+      "startEndFrameSupport": null,
+      "referenceSupport": null,
+      "motionControl": null,
+      "asyncJobs": "sync and asynchronous long-form documented; up to 1M characters per async request",
+      "regions": "not verified for an eligible account",
+      "pricingUnits": "USD per million characters",
+      "publicPricing": [
+        {
+          "model": "speech-2.8-hd",
+          "amount": "100"
+        },
+        {
+          "model": "speech-2.8-turbo",
+          "amount": "60"
+        }
+      ],
+      "evidenceLinks": [
+        "https://platform.minimax.io/docs/pricing/overview"
+      ]
+    },
+    {
+      "sourceDate": "2026-10-11",
+      "verification": "documented_not_runtime_qualified",
+      "accountEligibility": "unknown",
+      "runtimeQualified": false,
+      "rateLimits": "account/model/region dependent; eligible account not verified",
+      "byok": "API credentials documented; Yamakan adapter not implemented or qualified",
+      "resellerProgram": "not_verified",
+      "resaleRights": "not_verified",
+      "whiteLabelRights": "not_verified",
+      "businessContact": null,
+      "pricingStatus": "public documentation snapshot; refresh before quote; taxes, promotions and account terms excluded",
+      "uncertainties": [
+        "No paid request or actual output benchmark conducted.",
+        "Public API documentation does not prove this user account or region is eligible.",
+        "API credentials do not establish reseller or white-label rights.",
+        "Streaming, speaker diarization and SRT/VTT export are documented in pricing overview; exact endpoint, rounding, input limits and Arabic quality need qualification."
+      ],
+      "provider": "MiniMax",
+      "model": "Speech Recognition",
+      "apiEndpointDocumentation": "https://platform.minimax.io/docs/pricing/overview",
+      "modalities": [
+        "speech-to-text",
+        "speaker diarization",
+        "subtitles"
+      ],
+      "maximumDurationSeconds": null,
+      "resolutions": [],
+      "nativeAudio": null,
+      "startEndFrameSupport": null,
+      "referenceSupport": null,
+      "motionControl": null,
+      "asyncJobs": null,
+      "regions": "not verified for an eligible account",
+      "pricingUnits": "USD per input audio hour",
+      "publicPricing": [
+        {
+          "amount": "0.38"
+        }
+      ],
+      "evidenceLinks": [
+        "https://platform.minimax.io/docs/pricing/overview"
+      ]
+    }
+  ]
+}

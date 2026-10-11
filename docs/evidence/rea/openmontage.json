@@ -1,0 +1,39 @@
+{
+  "target": "calesthio/OpenMontage",
+  "sha": "9327439db69021ab4b0e2776729bf3b58fdb5a87",
+  "version": "6.3.0",
+  "inputs": [
+    {
+      "path": "remotion-composer/src/CinematicRenderer.tsx",
+      "sha256": "bcc1ac21c1e52d63870ff373e2e6c02f5964094422c261e15c7628ee94ffb462"
+    },
+    {
+      "path": "remotion-composer/src/cinematic/types.ts",
+      "sha256": "a8fe55f89d274352bb08807cdfa84e0e2f048a78f7eba349346248293b748795"
+    },
+    {
+      "path": "remotion-composer/src/components/CaptionOverlay.tsx",
+      "sha256": "566543055b4e963c6edc7c8be541eab5ace9007b38bf5339b5e6ee8fce96b97b"
+    }
+  ],
+  "command": [
+    "rtk",
+    "proxy",
+    "node",
+    "C:/Users/Shehr/AppData/Local/npm-cache/_npx/ec0ab2283efe73f6/node_modules/rea-agents/scripts/rea.mjs",
+    "analyze-javascript-application",
+    "C:\\Users\\Shehr\\Documents\\Codex\\2026-10-11\\files-pasted-by-the-user-darzain\\work\\rea-bounded\\yamakan-openmontage",
+    "--json"
+  ],
+  "exit": 0,
+  "elapsedMs": 26304,
+  "evidence": "ev_a6186a4571bfa1d51f655ff025a5ded9e6d0038275a49551beb2fa246e3d4158",
+  "limitations": [
+    "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+    "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+    "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+    "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+    "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+  ],
+  "stderr": "[rtk] /!\\ No hook installed — run `rtk init -g` for automatic token savings\n{\"rea_progress\":{\"phase\":\"analyze_javascript_application\",\"completed\":0,\"total\":1,\"message\":\"Inventorying and parsing application artifacts\",\"sequence\":1}}\n{\"rea_progress\":{\"phase\":\"read_javascript_artifacts\",\"completed\":0,\"total\":1,\"message\":\"Reading inventoried JavaScript application sources\",\"sequence\":2}}\n{\"rea_progress\":{\"phase\":\"parse_javascript_sources\",\"completed\":0,\"total\":1,\"message\":\"Parsing and projecting 3 application source files\",\"sequence\":3}}\n{\"rea_progress\":{\"phase\":\"parse_javascript_source\",\"completed\":0,\"total\":1,\"message\":\"Parsing and projecting remotion-composer/src/CinematicRenderer.tsx (1/3)\",\"sequence\":4}}\n{\"rea_progress\":{\"phase\":\"parse_javascript_source\",\"completed\":0,\"total\":1,\"message\":\"Parsing and projecting remotion-composer/src/cinematic/types.ts (2/3)\",\"sequence\":5}}\n{\"rea_progress\":{\"phase\":\"parse_javascript_source\",\"completed\":0,\"total\":1,\"message\":\"Parsing and projecting remotion-composer/src/components/CaptionOverlay.tsx (3/3)\",\"sequence\":6}}\n{\"rea_progress\":{\"phase\":\"build_javascript_application_graph\",\"completed\":0,\"total\":1,\"message\":\"Constructing application and Electron boundary relationships\",\"sequence\":7}}\n{\"rea_progress\":{\"phase\":\"seal_javascript_application_graph\",\"completed\":0,\"total\":1,\"message\":\"Sealing the validated application graph\",\"sequence\":8}}\n{\"rea_progress\":{\"phase\":\"build_javascript_semantic_graph\",\"completed\":0,\"total\":1,\"message\":\"Binding and validating static semantic relationships\",\"sequence\":9}}\n{\"rea_progress\":{\"phase\":\"seal_javascript_semantic_graph\",\"completed\":0,\"total\":1,\"message\":\"Validating and sealing the semantic graph\",\"sequence\":10}}\n{\"rea_progress\":{\"phase\":\"validate_javascript_application_result\",\"completed\":0,\"total\":1,\"message\":\"Validating result metadata and cross-graph bindings\",\"sequence\":11}}\n{\"rea_progress\":{\"phase\":\"create_javascript_application_evidence\",\"completed\":0,\"total\":1,\"message\":\"Creating and hashing application analysis Evidence\",\"sequence\":12}}\n{\"rea_progress\":{\"phase\":\"seal_javascript_application_result\",\"completed\":0,\"total\":1,\"message\":\"Sealing the complete application analysis result\",\"sequence\":13}}\n{\"rea_progress\":{\"phase\":\"validate_javascript_application_evidence\",\"completed\":0,\"total\":1,\"message\":\"Validating the immutable application Evidence JSON\",\"sequence\":14}}\n{\"rea_progress\":{\"phase\":\"hash_javascript_application_evidence\",\"completed\":0,\"total\":1,\"message\":\"Hashing the complete application analysis Evidence\",\"sequence\":15}}\n{\"rea_progress\":{\"phase\":\"analyze_javascript_application\",\"completed\":1,\"total\":1,\"message\":\"Application graph and Electron boundaries reconstructed\",\"terminal\":true,\"sequence\":16}}\n"
+}

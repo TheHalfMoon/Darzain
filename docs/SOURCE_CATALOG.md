@@ -1,60 +1,68 @@
 # Source catalog
 
-Snapshots below were cloned and inventoried on 2026-10-11. Inspection depth is explicit; a clone is not qualification. No donor remote was modified. Private owner source remains local except the authorized attributed Ninerr module import.
+Observed 2026-10-11: 58 pinned snapshots, not 58 fully qualified products. Inspection ranges from root inventory to targeted implementation boundaries, bounded original tests, frontend builds and historical integration. Actual retrieved module paths/hashes are in [source-module receipts](evidence/yamakan/source-modules.json); root license/document hashes and commit dates in [source facts](evidence/yamakan/source-facts.json).
 
-| Source | Exact snapshot | Inspection and decision |
+| Source | Exact SHA | Finding / disposition |
 |---|---|---|
-| [Ascout](https://github.com/TheHalfMoon/Ascout) | ca6b6f514e5a8881e2cfa2789b5e5ea43e3aaaad | Inventory only; select narrow verification modules later |
-| [Diffcipline](https://github.com/TheHalfMoon/Diffcipline) | 1e6d14f77b95bb132b42276f10d67f1018ab5bb6 | Inventory only |
-| [Ecra](https://github.com/TheHalfMoon/Ecra) | 0e2ff8c687c93e6f158da6984a7a6915339b5f3f | Inventory only |
-| [Gomrey](https://github.com/TheHalfMoon/Gomrey) | 5f299a7a6174ad3a1180f827778db5f4400a4d71 | Evidence schema inspected; no model cache copied |
-| [Inercative](https://github.com/TheHalfMoon/Inercative) | 3a4713c47d36722c564f185bc4a8c02ad57da05c | Inventory only; Ineractive spelling did not resolve |
-| [kernux](https://github.com/TheHalfMoon/kernux) | 2085b6ed1121b1a94c66c076bdd6b578da4dad0d | Inventory only |
-| [Kodac](https://github.com/TheHalfMoon/Kodac) | 406b335277f2df1e3dedf24cdb45847dff919d44 | Compatibility catalog inspected; runtime integration deferred |
-| [Morize](https://github.com/TheHalfMoon/Morize) | 62fc04d01d398da93b4dacf0ab2f33e3f1440462 | Rust core inspected; no runtime import |
-| [Ninerr](https://github.com/TheHalfMoon/Ninerr) | bec85aa7ee8f1b1695c689aff1631c165baa09fa | Canonical serialization imported; direct tests |
-| [Orcel](https://github.com/TheHalfMoon/Orcel) | 961befc1547cf7e947ad33e915c33d52c38e6977 | Cancellation classification inspected; runtime coupling deferred |
-| [Pluma](https://github.com/TheHalfMoon/Pluma) | a5c0ff3e9bf1ce7ef5c7770c8a2658ce2edd4682 | Experimental text core inspected; publishing claims not a Darzain qualification |
-| [Skelet](https://github.com/TheHalfMoon/Skelet) | 5d4778636de8fbb3c8ef71efbfe46d473f8e97e3 | Storage implementation inspected; qualify durable media reuse in P02 |
-| [SpecGrain](https://github.com/TheHalfMoon/SpecGrain) | 5de7d6499bb0a9e3a191fc0934399cf099d1980a | Inventory only |
-| [ai-video-production-editor](https://github.com/LudwigKienle/ai-video-production-editor) | 752cd43d3af6421d2bd6d4ce27f2d9815f7acba3 | Web build and 145 tests passed; bounded editor modules adopted |
-| [artcraft](https://github.com/storytold/artcraft) | 28a39a0de4a2fc2eccc237df2046c24245bd12ab | Web build passed; scoped scene extraction later |
-| [ComfyUI](https://github.com/Comfy-Org/ComfyUI) | 7f7fd918ed0815c5d5ef2ccfe44bfc8e72cfd217 | Server queue/history/API source inspected; no generation run |
-| [InvokeAI](https://github.com/invoke-ai/InvokeAI) | ffe9e1a98b19640388d72f88ae0ecadf1bee1717 | Persistence implementation inspected; no inference run |
-| [Open-Generative-AI](https://github.com/Anil-matcha/Open-Generative-AI) | d8d624dcf48a581fde18102f53d76a01a95ec58c | Vite build passed; isolated provider adapters later |
-| [OpenCut](https://github.com/OpenCut-app/OpenCut) | e668010778568641babef2cc40be4703ae6916d6 | Timeline source is a placeholder; rejected as initial editor |
-| [opencut-classic](https://github.com/OpenCut-app/opencut-classic) | cf5e79e919144200294fb9fed22a222592a0aeea | Timeline/render command inventory; Bun build unavailable |
+| [Ascout](https://github.com/TheHalfMoon/Ascout/tree/ca6b6f514e5a8881e2cfa2789b5e5ea43e3aaaad) | ca6b6f514e5a8881e2cfa2789b5e5ea43e3aaaad | Assurance policy/review lineage inspected; useful governance contracts, not proof of independent verification. |
+| [Diffcipline](https://github.com/TheHalfMoon/Diffcipline/tree/1e6d14f77b95bb132b42276f10d67f1018ab5bb6) | 1e6d14f77b95bb132b42276f10d67f1018ab5bb6 | Docker verification harness inspected. Docker/runtime containment not qualified. |
+| [Ecra](https://github.com/TheHalfMoon/Ecra/tree/0e2ff8c687c93e6f158da6984a7a6915339b5f3f) | 0e2ff8c687c93e6f158da6984a7a6915339b5f3f | Safe-integer budgets/prepared-attempt recovery inspected. Rust runtime not built; semantic candidate only. |
+| [Gomrey](https://github.com/TheHalfMoon/Gomrey/tree/5f299a7a6174ad3a1180f827778db5f4400a4d71) | 5f299a7a6174ad3a1180f827778db5f4400a4d71 | Eight pure job tests passed; donor rules are in-memory. Transition port only in unmerged draft; no donor durable database/worker. |
+| [Inercative](https://github.com/TheHalfMoon/Inercative/tree/3a4713c47d36722c564f185bc4a8c02ad57da05c) | 3a4713c47d36722c564f185bc4a8c02ad57da05c | README reports P00 foundation in progress; limited control-plane inventory. Not a production foundation. |
+| [kernux](https://github.com/TheHalfMoon/kernux/tree/2085b6ed1121b1a94c66c076bdd6b578da4dad0d) | 2085b6ed1121b1a94c66c076bdd6b578da4dad0d | Egress/deny policy types inspected. OS sandbox enforcement not qualified. |
+| [Kodac](https://github.com/TheHalfMoon/Kodac/tree/406b335277f2df1e3dedf24cdb45847dff919d44) | 406b335277f2df1e3dedf24cdb45847dff919d44 | Inspected auth uses development-secret fallback and injected context. Reject as authentication authority; evaluate other bounded catalogs separately. |
+| [Morize](https://github.com/TheHalfMoon/Morize/tree/62fc04d01d398da93b4dacf0ab2f33e3f1440462) | 62fc04d01d398da93b4dacf0ab2f33e3f1440462 | Bounded core types/version-aware memory design inspected. Retrieval runtime unqualified; indexes stay derived. |
+| [Ninerr](https://github.com/TheHalfMoon/Ninerr/tree/bec85aa7ee8f1b1695c689aff1631c165baa09fa) | bec85aa7ee8f1b1695c689aff1631c165baa09fa | Canonical serialization already imported/tested. Session/network policy inspected; bounded transport reuse candidate. |
+| [Orcel](https://github.com/TheHalfMoon/Orcel/tree/961befc1547cf7e947ad33e915c33d52c38e6977) | 961befc1547cf7e947ad33e915c33d52c38e6977 | Conversation input routing inspected; not a durable media scheduler. Avoid inherited shell authority. |
+| [Pluma](https://github.com/TheHalfMoon/Pluma/tree/a5c0ff3e9bf1ce7ef5c7770c8a2658ce2edd4682) | a5c0ff3e9bf1ce7ef5c7770c8a2658ce2edd4682 | SQLite recovery preserves originals/new root; incompatible with current JSON store. Reuse discipline, not a competing database. |
+| [Skelet](https://github.com/TheHalfMoon/Skelet/tree/5d4778636de8fbb3c8ef71efbfe46d473f8e97e3) | 5d4778636de8fbb3c8ef71efbfe46d473f8e97e3 | Content-addressed storage already integrated: 10 donor tests passed, one POSIX-only Windows skip. Platform fsync limits retained. |
+| [SpecGrain](https://github.com/TheHalfMoon/SpecGrain/tree/5de7d6499bb0a9e3a191fc0934399cf099d1980a) | 5de7d6499bb0a9e3a191fc0934399cf099d1980a | Revision/scope-bound verification contract inspected. No full executor qualification. |
+| [ai-video-production-editor](https://github.com/LudwigKienle/ai-video-production-editor/tree/752cd43d3af6421d2bd6d4ce27f2d9815f7acba3) | 752cd43d3af6421d2bd6d4ce27f2d9815f7acba3 | Qualified bounded editing/preview/export modules; web build and 145 tests passed. Unrestricted Electron/file IPC excluded. |
+| [artcraft](https://github.com/storytold/artcraft/tree/28a39a0de4a2fc2eccc237df2046c24245bd12ab) | 28a39a0de4a2fc2eccc237df2046c24245bd12ab | Scene/camera/posing donor. Frontend build passed; native desktop and applied camera behavior unqualified. |
+| [ComfyUI](https://github.com/Comfy-Org/ComfyUI/tree/7f7fd918ed0815c5d5ef2ccfe44bfc8e72cfd217) | 7f7fd918ed0815c5d5ef2ccfe44bfc8e72cfd217 | Preferred first local generation protocol. Queue/history/interrupt inspected; no inference run. Global interrupt requires exclusive ownership. |
+| [InvokeAI](https://github.com/invoke-ai/InvokeAI/tree/ffe9e1a98b19640388d72f88ae0ecadf1bee1717) | ffe9e1a98b19640388d72f88ae0ecadf1bee1717 | Canvas/inpaint alternative; persistence inspected. No installed inference qualification. |
+| [Open-Generative-AI](https://github.com/Anil-matcha/Open-Generative-AI/tree/d8d624dcf48a581fde18102f53d76a01a95ec58c) | d8d624dcf48a581fde18102f53d76a01a95ec58c | Provider/studio reference. Vite build passed; full Next/provider runtime unqualified. |
+| [OpenCut](https://github.com/OpenCut-app/OpenCut/tree/e668010778568641babef2cc40be4703ae6916d6) | e668010778568641babef2cc40be4703ae6916d6 | Pinned timeline placeholder; reject initial foundation. |
+| [opencut-classic](https://github.com/OpenCut-app/opencut-classic/tree/cf5e79e919144200294fb9fed22a222592a0aeea) | cf5e79e919144200294fb9fed22a222592a0aeea | Timeline/render reference; earlier Bun build unavailable. Not qualified as replacement. |
+| [auto-editor](https://github.com/WyattBlue/auto-editor/tree/4928ad4201126973ca38e5b09c245b9e75219cf0) | 4928ad4201126973ca38e5b09c245b9e75219cf0 | Current timeline implementation is Nim. Adapt edit decisions into canonical model; no second editor state engine. |
+| [blender](https://github.com/Blender/blender/tree/754ebe3c4b4e1402a159df6e1e58823cc93ef887) | 754ebe3c4b4e1402a159df6e1e58823cc93ef887 | Sequencer/camera source inspected. Separate optional headless 3D worker; no Blender runtime qualification. |
+| [ComfyUI-Manager](https://github.com/Comfy-Org/ComfyUI-Manager/tree/45c3fb68373e4dc09f5cf8cf221e2b56d0b27164) | 45c3fb68373e4dc09f5cf8cf221e2b56d0b27164 | Installation/custom-node execution boundary inspected. Administrator setup only; no agent automatic code installation. |
+| [diffusers](https://github.com/huggingface/diffusers/tree/85c9fa4caee33d1c5b473395784471d2d7957c1b) | 85c9fa4caee33d1c5b473395784471d2d7957c1b | Reusable optional inference library. Wan/Flux2 pipelines inspected; model/environment/output tests remain. |
+| [faster-whisper](https://github.com/SYSTRAN/faster-whisper/tree/a52b026ac844c02117865e61968547639b60a6f8) | a52b026ac844c02117865e61968547639b60a6f8 | CPU/int8 transcription candidate; CTranslate2/PyAV/model compatibility and Arabic accuracy untested. |
+| [FFmpeg](https://github.com/FFmpeg/FFmpeg/tree/b5902e69c71bf556958f9fded99d1bcea2d7298c) | b5902e69c71bf556958f9fded99d1bcea2d7298c | Selected offline renderer/prober: installed 8.1.1 produced real MP4s. Latest source filters inspected; source pin is not the installed binary build. |
+| [flux2](https://github.com/black-forest-labs/flux2/tree/50fe5162777813d869182b139e83b10743caef15) | 50fe5162777813d869182b139e83b10743caef15 | Multi-reference image pipeline inspected; CUDA use. Code Apache, several weight variants non-commercial; exact variant entitlement required. |
+| [FramePack](https://github.com/lllyasviel/FramePack/tree/97fe5dbe06ac1f337ece08935b1076a35eefeeb9) | 97fe5dbe06ac1f337ece08935b1076a35eefeeb9 | NVIDIA workflow and at least 6 GB VRAM documented; source uses CUDA. Not qualified on this host. |
+| [GroundingDINO](https://github.com/IDEA-Research/GroundingDINO/tree/856dde20aee659246248e20734ef9ba5214f5e44) | 856dde20aee659246248e20734ef9ba5214f5e44 | CPU option/device/checkpoint boundary inspected; detections are suggestions. No model output qualification. |
+| [Hunyuan3D-2](https://github.com/Tencent-Hunyuan/Hunyuan3D-2/tree/f8db63096c8282cb27354314d896feba5ba6ff8a) | f8db63096c8282cb27354314d896feba5ba6ff8a | Shape pipeline/community terms inspected; CUDA/rasterizer/distribution qualification outstanding. |
+| [HunyuanVideo-1.5](https://github.com/Tencent-Hunyuan/HunyuanVideo-1.5/tree/60783e704160023913bee78f0b47036d393d4dfa) | 60783e704160023913bee78f0b47036d393d4dfa | Pipeline/community license inspected; separate model/hardware/territory qualification. |
+| [kdenlive](https://github.com/KDE/kdenlive/tree/89de732c70117ebb4b54bb2c6de97946cd26e3fd) | 89de732c70117ebb4b54bb2c6de97946cd26e3fd | Native Qt/KDE editor and MLT interchange reference. Timeline/render source inspected; native build unqualified. |
+| [langgraph](https://github.com/langchain-ai/langgraph/tree/799c2f04fd3a56186e24e9fb8bbf3568e543cfbe) | 799c2f04fd3a56186e24e9fb8bbf3568e543cfbe | Additional discovery: durable graph/checkpoint abstractions. Defer Python/serializer coupling until measured need. |
+| [LatentSync](https://github.com/bytedance/LatentSync/tree/a229c3948406bc2cf6eaf4873e662e70c6a04746) | a229c3948406bc2cf6eaf4873e662e70c6a04746 | CUDA lip-sync pipeline inspected; actual sync/quality and consent/weight gates remain. |
+| [LivePortrait](https://github.com/KlingAIResearch/LivePortrait/tree/9b294b3d0536135442ea73cb01e6cb3ca7029dd3) | 9b294b3d0536135442ea73cb01e6cb3ca7029dd3 | Portrait motion source inspected; likeness consent and separate face-analysis/model asset rights required. |
+| [LTX-2](https://github.com/Lightricks/LTX-2/tree/9ec55f9f22798a3198d9c923856824821bc3317e) | 9ec55f9f22798a3198d9c923856824821bc3317e | Current source describes LTX-2.5 audio/video/keyframe conditioning. Community terms/gated model files; no weights/runtime qualification. |
+| [mediabunny](https://github.com/Vanilagy/mediabunny/tree/9d36fc5779b254904bc609e66f2cd80ed8390b4b) | 9d36fc5779b254904bc609e66f2cd80ed8390b4b | Additional discovery: browser demux/mux and streaming candidate for preview memory. MPL-2.0; no browser export test. |
+| [MiniMax-MCP](https://github.com/MiniMax-AI/MiniMax-MCP/tree/0856b9aef8a9d676bb63bdd6b6426d7b640a3b7a) | 0856b9aef8a9d676bb63bdd6b6426d7b640a3b7a | Official wrapper source inspected but old v1/Hailuo video contract. Current H3 is v2; do not inherit blocking polling/broad uploads. |
+| [mlt](https://github.com/mltframework/mlt/tree/77ae5f8f8cb4e2f502c5dc868d6c7cf7b45bfc54) | 77ae5f8f8cb4e2f502c5dc868d6c7cf7b45bfc54 | Playlist/producer source inspected; optional professional native render adapter pending distribution/parity tests. |
+| [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo/tree/4204d0f39afa8ada6f3edc31604141f959fe254e) | 4204d0f39afa8ada6f3edc31604141f959fe254e | Task/MoviePy/audio/subtitle reference. External stock/TTS/social publishing must be opt-in; no full workflow execution. |
+| [OpenMontage](https://github.com/calesthio/OpenMontage/tree/9327439db69021ab4b0e2776729bf3b58fdb5a87) | 9327439db69021ab4b0e2776729bf3b58fdb5a87 | Production manifests and gate rules recommended through adapter. Six original gate tests passed; bounded composer REA. Full pipeline not run. |
+| [OpenTimelineIO](https://github.com/AcademySoftwareFoundation/OpenTimelineIO/tree/00c22fa3a64256d8d3dcafbc7276492185dd970d) | 00c22fa3a64256d8d3dcafbc7276492185dd970d | Additional discovery: rational-time professional interchange. Complements, does not own, canonical creative project. Native build unqualified. |
+| [OpenVideoStudio](https://github.com/mne03005-png/OpenVideoStudio/tree/175da9960411fbe740932b0a08d57e32a4a36a18) | 175da9960411fbe740932b0a08d57e32a4a36a18 | Identity metadata/provider contracts recommended. 22 original tests passed with fake LLM fixtures. GPU production unqualified; Edge TTS is cloud. |
+| [piper1-gpl](https://github.com/OHF-voice/piper1-gpl/tree/35b0f1ec67b289de553555645140e48f1f104b2d) | 35b0f1ec67b289de553555645140e48f1f104b2d | Additional discovery: maintained local TTS successor. Root source/license inventory only; voice weights/Arabic quality unqualified. |
+| [Practical-RIFE](https://github.com/hzwer/Practical-RIFE/tree/bbfd2ea90910789a860ea3e2b32a240cd577b75e) | bbfd2ea90910789a860ea3e2b32a240cd577b75e | CPU path exists; README Python <=3.11, research Python 3.14 does not qualify its stack. |
+| [react-three-fiber](https://github.com/pmndrs/react-three-fiber/tree/9e53355ce499ea518ac3729de7fd4dcc06d8cdb9) | 9e53355ce499ea518ac3729de7fd4dcc06d8cdb9 | Preferred scene viewport candidate; renderer construction/disposal inspected. GPU/context-loss tests required. |
+| [react-video-editor](https://github.com/openvideodev/react-video-editor/tree/9a8c5296da4b258f66dfb7ad73de96be62478bca) | 9a8c5296da4b258f66dfb7ad73de96be62478bca | OpenVideo 1.3.1 core/timeline/Pixi engine boundary inspected; linked engine repository unavailable. Company-size license; full build/export unqualified. |
+| [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN/tree/a4abfb2979a7bbff3f69f58f58ae324608821e27) | a4abfb2979a7bbff3f69f58f58ae324608821e27 | Device/CPU/tiling implementation inspected; weights and latency unqualified; older source merits dependency review. |
+| [remotion](https://github.com/remotion-dev/remotion/tree/9fdd1fc403b4f6b9231860b714285e99d18d5940) | 9fdd1fc403b4f6b9231860b714285e99d18d5940 | Declarative composition/render source inspected. Optional motion-graphics worker; commercial/company-size terms. Arbitrary JSX cannot run in trusted host. |
+| [sam2](https://github.com/facebookresearch/sam2/tree/2b90b9f5ceec907a1c18123530e92e794ad901a4) | 2b90b9f5ceec907a1c18123530e92e794ad901a4 | Stateful mask/object propagation inspected; derived masks must bind source hash/frame timing. No inference run. |
+| [storyboard](https://github.com/crashtestoz/storyboard/tree/f804e2a16018d927a4123bc2a47db9bd4eb2bf19) | f804e2a16018d927a4123bc2a47db9bd4eb2bf19 | Refinement/takes/continuity concepts. macOS/vpipe coupling; CC BY-NC-SA terms recorded. Windows generation unqualified. |
+| [StoryMind](https://github.com/LinHao-city/StoryMind/tree/00f9a0c7f67eeb3a076cf0a4a449ae7c856739ac) | 00f9a0c7f67eeb3a076cf0a4a449ae7c856739ac | Planner and continuity source inspected. Planner defaults to a third-party LLM endpoint. Prompt suffixes are not proven identity preservation. |
+| [tldraw](https://github.com/tldraw/tldraw/tree/7937be360bcb8239d89e420850843f81313fc07b) | 7937be360bcb8239d89e420850843f81313fc07b | Storyboard canvas/history reference; snapshot and LicenseManager coupling inspected. Commercial terms/distribution and data mapping unresolved. |
+| [TRELLIS](https://github.com/microsoft/TRELLIS/tree/442aa1e1afb9014e80681d3bf604e8d728a86ee7) | 442aa1e1afb9014e80681d3bf604e8d728a86ee7 | 3D pipeline inspected; documented Linux/NVIDIA 16 GB baseline exceeds current host. No geometry/render tests. |
+| [Wan-Move](https://github.com/ali-vilab/Wan-Move/tree/80c58a7d2ad175fa82a4d57f79f2a1415317dcfa) | 80c58a7d2ad175fa82a4d57f79f2a1415317dcfa | Trajectory-conditioning CUDA source inspected; 5-second/480p documented workflow. Motion trajectories differ from general camera text. |
+| [Wan2.2](https://github.com/Wan-Video/Wan2.2/tree/1ea34ff48f87168174e12956e200b1d908b1c5ff) | 1ea34ff48f87168174e12956e200b1d908b1c5ff | Optional open-model implementation inspected; separate from cloud Wan 3.0, weight and GPU qualification still required. |
+| [Wan2GP](https://github.com/deepbeepmeep/Wan2GP/tree/6479db36bdc2619a904a852bba9c2d78e1a83f82) | 6479db36bdc2619a904a852bba9c2d78e1a83f82 | Low-VRAM optional worker. API/application coupling inspected; current WanGP Community License, not assumed Apache. No supported GPU here. |
+| [xyflow](https://github.com/xyflow/xyflow/tree/3d35b57317576b0916c0bfeaaedd573aaacc2839) | 3d35b57317576b0916c0bfeaaedd573aaacc2839 | Preferred graph UI candidate. Node types inspected; visual graph is not a durable scheduler or permission boundary. |
 
-## Remaining nominated sources
+Additional discovery addresses gaps: OpenTimelineIO for interchange, Mediabunny for browser streaming, LangGraph for durable graph abstractions, maintained Piper for local speech. None was added to application dependencies. Two attempted locators failed: openvideodev/openvideo and OHF-Voice/piper; Piper was resolved as OHF-voice/piper1-gpl through public source discovery. Commit timestamps may be author-supplied or later than the local clock, so they are not maintenance/availability proof by themselves.
 
-- https://github.com/openvideodev/react-video-editor: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/LinHao-city/StoryMind: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/crashtestoz/storyboard: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/KDE/kdenlive: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/mltframework/mlt: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/remotion-dev/remotion: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/FFmpeg/FFmpeg: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/Blender/blender: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/deepbeepmeep/Wan2GP: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/huggingface/diffusers: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/Lightricks/LTX-2: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/Tencent-Hunyuan/HunyuanVideo-1.5: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/lllyasviel/FramePack: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/black-forest-labs/flux2: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/ali-vilab/Wan-Move: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/KlingAIResearch/LivePortrait: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/bytedance/LatentSync: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/facebookresearch/sam2: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/Tencent-Hunyuan/Hunyuan3D-2: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/microsoft/TRELLIS: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/pmndrs/react-three-fiber: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/tldraw/tldraw: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/xyflow/xyflow: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/xinntao/Real-ESRGAN: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/hzwer/Practical-RIFE: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/SYSTRAN/faster-whisper: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/WyattBlue/auto-editor: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/IDEA-Research/GroundingDINO: pending source/license/runtime qualification; no adopted feature claim.
-- https://github.com/harry0703/MoneyPrinterTurbo: pending source/license/runtime qualification; no adopted feature claim.
-
-Code licensing, model-weight terms and service entitlements are separate. Founder authorization does not silently extend to external hosted services or separately owned weights. A dependency audit found 31 vulnerable versions in the full filmmaker donor; its entire dependency tree and insecure Electron shell were not imported.
+Complete source/model quality qualification remains partial, particularly native distributions, browser engine export, weights and all GPU inference. Each selected module has a bounded qualification gate in the master plan. No donor repositories were modified.

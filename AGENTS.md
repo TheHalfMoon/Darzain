@@ -1,13 +1,9 @@
-# Darzain engineering instructions
+# Yamakan planning authority
 
-Read specs/CURRENT.md first. It is the sole current frontier; docs/ROADMAP.md owns phase scope. Continue the user-authorized roadmap without routine permission requests. Preserve founder changes, source notices and provenance.
+@C:\Users\Shehr\.codex\RTK.md
 
-Use normal merge commits and never force push. Check CI on the exact PR head and verify main after merging. Do not change donor remotes. Do not merge unresolved critical correctness or security defects.
+Read specs/CURRENT.md and docs/IMPLEMENTATION_PLAN.md. Stop at independent Claude plan review. Full production implementation, durable-jobs integration, whole-application imports and repository renaming require founder approval of the reviewed plan. Bounded reversible qualification and documentation corrections are authorized.
 
-Prefer qualified existing source over rebuilding a capability. Inspect real code and run real checks. REA 6.3.0 is qualified for bounded static investigations; record exact inputs and limitations. Never equate static relationships with runtime correctness.
+Use English for engineering; plan Arabic/English product support. Keep one canonical project/timeline model and one current frontier. Preserve previous work, required notices and source attribution. Record exact SHA/path/hash/modifications for imports. Founder source rights do not grant model-weight/dataset/trademark/hosted capacity rights.
 
-No fake generation, mock export, misleading capability toggles, paid mandatory infrastructure or secrets in evidence. Assets remain local by default. Capability availability must reflect an actual backend and hardware check.
-
-Run npm run lint, npm run format:check, npm run provenance:check, npm test and npm run build for core changes. Run browser E2E for user workflow changes. Independent review and exact-head CI are integration gates. Update ledger hashes intentionally after source changes. Do not reformat preserved donor files without recording that modification.
-
-On Windows prefix shell commands with rtk. Keep local analysis artifacts out of commits; publish bounded, redacted receipts. Never copy owner model caches, private credentials, copyrighted binaries or licensed fonts into this repository.
+Prefix shell commands with rtk. Do not change donor source/remotes. Keep secrets/private raw donor source/large analysis captures out of public evidence. Never turn failed/skipped scans into passes. After approval use bounded branches, mechanical checks, actual E2E, fresh independent correctness/security review, exact-head CI, normal pinned-head merge commits and verified post-merge main. Never force push.

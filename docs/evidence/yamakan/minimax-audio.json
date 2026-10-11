@@ -1,0 +1,15 @@
+{
+  "url": "https://platform.minimax.io/docs/pricing/overview",
+  "date": "2026-10-11",
+  "scope": "official pricing documentation only",
+  "excerpts": [
+    "[Recharge Now](https://platform.minimax.io/user-center/payment/balance)**Automatic Speech Recognition (ASR)**",
+    "| Speech Recognition | Speech-to-Text | Audio-to-text transcription with streaming, speaker diarization, and subtitle (srt/vtt) export. | $0.38 / hour |",
+    "| **T2A** (Sync) | speech-2.8-hd | Real-time synthesis with volume/pitch/speed/mixing controls and bitrate/sample-rate options. Best for short-form conversational audio. | $100 / M characters |",
+    "| **T2A** (Sync) | speech-2.8-turbo | Same capabilities as hd, optimized for speed and cost. | $60 / M characters |",
+    "| **T2A Async** | speech-2.8-hd | Asynchronous long-form synthesis, up to 1M characters per request, retrieved asynchronously. | $100 / M characters |",
+    "| **T2A Async** | speech-2.8-turbo | Same capabilities as hd, optimized for speed and cost. | $60 / M characters |",
+    "| **Voice Design** | Generate a voice (voice\\_id) from a natural-language description; usable in both sync and async T2A endpoints. | $3 per voice | Charged when the designed voice is first used for synthesis, not at generation time. In-API preview synthesis is billed at $60 / M characters. |",
+    "| **Rapid Voice Cloning** | LLM-powered voice cloning that produces a high-fidelity replica in seconds, without long high-quality reference audio. | $1.5 per voice | Charged when the cloned voice is first used for synthesis, not at cloning time. Preview characters are billed at the selected preview model’s rate. |"
+  ]
+}

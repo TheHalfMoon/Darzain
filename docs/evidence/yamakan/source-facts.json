@@ -1,0 +1,1140 @@
+[
+  {
+    "name": "auto-editor",
+    "repo": "WyattBlue/auto-editor",
+    "sha": "4928ad4201126973ca38e5b09c245b9e75219cf0",
+    "commitDate": "2026-10-09T23:57:35-04:00",
+    "fileCount": 184,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "ca2abdf695884c77ea4b4a5b64ca7b732d9d9dbade4eebc1c2e76c53e9e3bc83"
+      },
+      {
+        "path": "README.md",
+        "sha256": "5f83405b988edc0972bb2d0e083159aae3b2e422c2d70f2563e04100900ec7c4"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "This is free and unencumbered software released into the public domain.\n\nAnyone is free to copy, modify, publish, use, compile, sell, or\ndistribute this software, either in source code form or as a compiled\nbinary, for any purpose, commercial or non-commercial, and by any\nmeans.\n\nIn jurisdictions that recognize copyright laws, the author or authors\nof this software dedicate any and all copyright interest in the\nsoftware to the public domain. We make this dedication for the benefit\nof the public at large and to the detriment of our heirs and\nsuccessors. We intend this dedication to be an overt act of\nrelinquishment in perpetuity of all present and future rights to this\nsoftware under copyright law.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.\nIN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR\nOTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,\nARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR\nOTHER DEALINGS IN THE SOFTWARE.\n\nFor more information, please refer to <http://unlicense.org/>"
+      }
+    ]
+  },
+  {
+    "name": "blender",
+    "repo": "Blender/blender",
+    "sha": "754ebe3c4b4e1402a159df6e1e58823cc93ef887",
+    "commitDate": "2026-10-11T00:39:30+02:00",
+    "fileCount": 20720,
+    "rootDocuments": [
+      {
+        "path": "COPYING",
+        "sha256": "19e6f4b541772f9d7b98a52bdbca3ebd5ef9e404956a9a6de68bfc3c1a178387"
+      },
+      {
+        "path": "README.md",
+        "sha256": "1bbb333e5196ba3d5cdc42830e5f1db6b77c311da96d4ff4d9a6f8143d9821e1"
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "1e4932558790801fb629c9bc17c12c2484dae8c90cf4c50d9ddc827486983f4b"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "COPYING",
+        "text": "Blender uses the GNU General Public License, which describes the rights\nto distribute or change the code. \n\nPlease read this file for the full license.\ndoc/license/GPL-license.txt\n\nApart from the GNU GPL, Blender is not available under other licenses.\n\n2010, Blender Foundation\nfoundation@blender.org\n\n"
+      }
+    ]
+  },
+  {
+    "name": "ComfyUI-Manager",
+    "repo": "Comfy-Org/ComfyUI-Manager",
+    "sha": "45c3fb68373e4dc09f5cf8cf221e2b56d0b27164",
+    "commitDate": "2026-10-11T22:31:15+09:00",
+    "fileCount": 127,
+    "rootDocuments": [
+      {
+        "path": "LICENSE.txt",
+        "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+      },
+      {
+        "path": "README.md",
+        "sha256": "cf4598a83b191d6714b57af294d5fde2762c666b8db7535b68e1b2d35f86a931"
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "2ff1a20107bc968d374fe5fc2fc24caf5497315acf7d6fe1ff6e50ae14cbce78"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "84cb9401a3019c41e44c820c0a44aae5cabd5139c6ddb5e544efc55d9573b9d3"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE.txt",
+        "text": "                    GNU GENERAL PUBLIC LICENSE\n                       Version 3, 29 June 2007\n\n Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>\n Everyone is permitted to copy and distribute verbatim copies\n of this license document, but changing it is not allowed.\n\n                            Preamble\n\n  The GNU General Public License is a free, copyleft license for\nsoftware and other kinds of works.\n\n  The licenses for most software and other practical works are designed\nto take away your freedom to share and change the works.  By contrast,\nthe GNU General Public License is intended to guarantee your freedom to\nshare and change all versions of a program--to make sure it remains free\nsoftware for all its users.  We, the Free Software Foundation, use the\nGNU General Public License for most of our software; it applies also to\nany other work released this way by its authors.  You can apply it to\nyour programs, too.\n\n  When we speak of free software, we are referring to freedom, not\nprice.  Our General Public Licenses are designed to make sure that you\nhave the freedom to distribute copies of free software (and charge for\nthem if you wish), that you receive source code or can get it if you\nwant it, that you can change the software or use pieces of it in new\nfree programs, and that you know you can do these things.\n\n  To protect your rights, we need to prevent others from denying you\nthese rights or asking you to surrender the rights.  Therefore, you have\ncertain responsibilities if you distribute copies of the software, or if\nyou modify it: responsibilities to respect the freedom of others.\n\n  For example, if you distribute copies of such a program, whether\ngratis or for a fee, you must pass on to the recipients the same\nfreedoms that you received.  You"
+      }
+    ]
+  },
+  {
+    "name": "diffusers",
+    "repo": "huggingface/diffusers",
+    "sha": "85c9fa4caee33d1c5b473395784471d2d7957c1b",
+    "commitDate": "2026-10-10T08:40:11-10:00",
+    "fileCount": 2895,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "f9e2070c247517b1ddf65f7b11b393484a18da91a958fd18a97bd0f241c3125c"
+      },
+      {
+        "path": "README.md",
+        "sha256": "7983ae4d23ec43664c587027d7462ba8a742ddff784430dfb7fd3cea8ba5523c"
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "a953e1ebce5fbaf19f7329742ca45b0f6a0b20d22613473a179dfb8ba4150db5"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an exampl"
+      }
+    ]
+  },
+  {
+    "name": "faster-whisper",
+    "repo": "SYSTRAN/faster-whisper",
+    "sha": "a52b026ac844c02117865e61968547639b60a6f8",
+    "commitDate": "2026-10-10T04:39:41+01:00",
+    "fileCount": 40,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "af6798135e729f8aa6c853936d037dfdea449734d26b8ea6a89805fca758c0d5"
+      },
+      {
+        "path": "README.md",
+        "sha256": "43efe4a6eb9046d5ba4dcdcf2abcc27ad9e021f3edfc00bd6eb4913a9abe065b"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "32896d8045e27cff269fa9005fb42bcf064b83d6d358544b8f7266ef6ea0e4a3"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "MIT License\n\nCopyright (c) 2023 SYSTRAN\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+      }
+    ]
+  },
+  {
+    "name": "FFmpeg",
+    "repo": "FFmpeg/FFmpeg",
+    "sha": "b5902e69c71bf556958f9fded99d1bcea2d7298c",
+    "commitDate": "2026-10-11T02:37:58Z",
+    "fileCount": 10850,
+    "rootDocuments": [
+      {
+        "path": "COPYING.GPLv2",
+        "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+      },
+      {
+        "path": "COPYING.GPLv3",
+        "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+      },
+      {
+        "path": "COPYING.LGPLv2.1",
+        "sha256": "246041b6ecf9bc32d718a62c57877c78b5eb397b6467e74ed7ae2626ab189c30"
+      },
+      {
+        "path": "COPYING.LGPLv3",
+        "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768"
+      },
+      {
+        "path": "LICENSE.md",
+        "sha256": "e6dc72d5665a1ebd6dcc841de59278dad4ca77ecc47b03f1064a55c3e9ea8bb8"
+      },
+      {
+        "path": "README.md",
+        "sha256": "7e30f809d40454ebc467cf473a063d7306f5eb836dca6b80668c4427d8845914"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "COPYING.GPLv2",
+        "text": "                    GNU GENERAL PUBLIC LICENSE\n                       Version 2, June 1991\n\n Copyright (C) 1989, 1991 Free Software Foundation, Inc.,\n 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA\n Everyone is permitted to copy and distribute verbatim copies\n of this license document, but changing it is not allowed.\n\n                            Preamble\n\n  The licenses for most software are designed to take away your\nfreedom to share and change it.  By contrast, the GNU General Public\nLicense is intended to guarantee your freedom to share and change free\nsoftware--to make sure the software is free for all its users.  This\nGeneral Public License applies to most of the Free Software\nFoundation's software and to any other program whose authors commit to\nusing it.  (Some other Free Software Foundation software is covered by\nthe GNU Lesser General Public License instead.)  You can apply it to\nyour programs, too.\n\n  When we speak of free software, we are referring to freedom, not\nprice.  Our General Public Licenses are designed to make sure that you\nhave the freedom to distribute copies of free software (and charge for\nthis service if you wish), that you receive source code or can get it\nif you want it, that you can change the software or use pieces of it\nin new free programs; and that you know you can do these things.\n\n  To protect your rights, we need to make restrictions that forbid\nanyone to deny you these rights or to ask you to surrender the rights.\nThese restrictions translate to certain responsibilities for you if you\ndistribute copies of the software, or if you modify it.\n\n  For example, if you distribute copies of such a program, whether\ngratis or for a fee, you must give the recipients all the rights that\nyou have.  You must make sure that they, too, r"
+      },
+      {
+        "path": "COPYING.GPLv3",
+        "text": "                    GNU GENERAL PUBLIC LICENSE\n                       Version 3, 29 June 2007\n\n Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>\n Everyone is permitted to copy and distribute verbatim copies\n of this license document, but changing it is not allowed.\n\n                            Preamble\n\n  The GNU General Public License is a free, copyleft license for\nsoftware and other kinds of works.\n\n  The licenses for most software and other practical works are designed\nto take away your freedom to share and change the works.  By contrast,\nthe GNU General Public License is intended to guarantee your freedom to\nshare and change all versions of a program--to make sure it remains free\nsoftware for all its users.  We, the Free Software Foundation, use the\nGNU General Public License for most of our software; it applies also to\nany other work released this way by its authors.  You can apply it to\nyour programs, too.\n\n  When we speak of free software, we are referring to freedom, not\nprice.  Our General Public Licenses are designed to make sure that you\nhave the freedom to distribute copies of free software (and charge for\nthem if you wish), that you receive source code or can get it if you\nwant it, that you can change the software or use pieces of it in new\nfree programs, and that you know you can do these things.\n\n  To protect your rights, we need to prevent others from denying you\nthese rights or asking you to surrender the rights.  Therefore, you have\ncertain responsibilities if you distribute copies of the software, or if\nyou modify it: responsibilities to respect the freedom of others.\n\n  For example, if you distribute copies of such a program, whether\ngratis or for a fee, you must pass on to the recipients the same\nfreedoms that you received.  You "
+      },
+      {
+        "path": "COPYING.LGPLv2.1",
+        "text": "                  GNU LESSER GENERAL PUBLIC LICENSE\n                       Version 2.1, February 1999\n\n Copyright (C) 1991, 1999 Free Software Foundation, Inc.\n 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA\n Everyone is permitted to copy and distribute verbatim copies\n of this license document, but changing it is not allowed.\n\n[This is the first released version of the Lesser GPL.  It also counts\n as the successor of the GNU Library Public License, version 2, hence\n the version number 2.1.]\n\n                            Preamble\n\n  The licenses for most software are designed to take away your\nfreedom to share and change it.  By contrast, the GNU General Public\nLicenses are intended to guarantee your freedom to share and change\nfree software--to make sure the software is free for all its users.\n\n  This license, the Lesser General Public License, applies to some\nspecially designated software packages--typically libraries--of the\nFree Software Foundation and other authors who decide to use it.  You\ncan use it too, but we suggest you first think carefully about whether\nthis license or the ordinary General Public License is the better\nstrategy to use in any particular case, based on the explanations below.\n\n  When we speak of free software, we are referring to freedom of use,\nnot price.  Our General Public Licenses are designed to make sure that\nyou have the freedom to distribute copies of free software (and charge\nfor this service if you wish); that you receive source code or can get\nit if you want it; that you can change the software and use pieces of\nit in new free programs; and that you are informed that you can do\nthese things.\n\n  To protect your rights, we need to make restrictions that forbid\ndistributors to deny you these rights or to ask you to surrender"
+      },
+      {
+        "path": "COPYING.LGPLv3",
+        "text": "                   GNU LESSER GENERAL PUBLIC LICENSE\n                       Version 3, 29 June 2007\n\n Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>\n Everyone is permitted to copy and distribute verbatim copies\n of this license document, but changing it is not allowed.\n\n\n  This version of the GNU Lesser General Public License incorporates\nthe terms and conditions of version 3 of the GNU General Public\nLicense, supplemented by the additional permissions listed below.\n\n  0. Additional Definitions.\n\n  As used herein, \"this License\" refers to version 3 of the GNU Lesser\nGeneral Public License, and the \"GNU GPL\" refers to version 3 of the GNU\nGeneral Public License.\n\n  \"The Library\" refers to a covered work governed by this License,\nother than an Application or a Combined Work as defined below.\n\n  An \"Application\" is any work that makes use of an interface provided\nby the Library, but which is not otherwise based on the Library.\nDefining a subclass of a class defined by the Library is deemed a mode\nof using an interface provided by the Library.\n\n  A \"Combined Work\" is a work produced by combining or linking an\nApplication with the Library.  The particular version of the Library\nwith which the Combined Work was made is also called the \"Linked\nVersion\".\n\n  The \"Minimal Corresponding Source\" for a Combined Work means the\nCorresponding Source for the Combined Work, excluding any source code\nfor portions of the Combined Work that, considered in isolation, are\nbased on the Application, and not on the Linked Version.\n\n  The \"Corresponding Application Code\" for a Combined Work means the\nobject code and/or source code for the Application, including any data\nand utility programs needed for reproducing the Combined Work from the\nApplication, but excluding the Syste"
+      },
+      {
+        "path": "LICENSE.md",
+        "text": "# License\n\nMost files in FFmpeg are under the GNU Lesser General Public License version 2.1\nor later (LGPL v2.1+). Read the file `COPYING.LGPLv2.1` for details. Some other\nfiles have MIT/X11/BSD-style licenses. In combination the LGPL v2.1+ applies to\nFFmpeg.\n\nSome optional parts of FFmpeg are licensed under the GNU General Public License\nversion 2 or later (GPL v2+). See the file `COPYING.GPLv2` for details. None of\nthese parts are used by default, you have to explicitly pass `--enable-gpl` to\nconfigure to activate them. In this case, FFmpeg's license changes to GPL v2+.\n\nSpecifically, the GPL parts of FFmpeg are:\n\n- optional x86 optimization in the files\n    - `libavcodec/x86/flac_dsp_gpl.asm`\n    - `libavcodec/x86/idct_mmx.c`\n    - `libavfilter/x86/vf_removegrain.asm`\n- the following building and testing tools\n    - `compat/solaris/make_sunver.pl`\n    - `doc/t2h.pm`\n    - `doc/texi2pod.pl`\n    - `libswresample/tests/swresample.c`\n    - `tests/checkasm/*`\n    - `tests/tiny_ssim.c`\n- the following filters in libavfilter:\n    - `signature_lookup.c`\n    - `vf_blackframe.c`\n    - `vf_boxblur.c`\n    - `vf_colormatrix.c`\n    - `vf_cover_rect.c`\n    - `vf_cropdetect.c`\n    - `vf_delogo.c`\n    - `vf_eq.c`\n    - `vf_find_rect.c`\n    - `vf_fspp.c`\n    - `vf_histeq.c`\n    - `vf_hqdn3d.c`\n    - `vf_kerndeint.c`\n    - `vf_lensfun.c` (GPL version 3 or later)\n    - `vf_mcdeint.c`\n    - `vf_mpdecimate.c`\n    - `vf_nnedi.c`\n    - `vf_owdenoise.c`\n    - `vf_perspective.c`\n    - `vf_phase.c`\n    - `vf_pp7.c`\n    - `vf_pullup.c`\n    - `vf_repeatfields.c`\n    - `vf_sab.c`\n    - `vf_signature.c`\n    - `vf_smartblur.c`\n    - `vf_spp.c`\n    - `vf_stereo3d.c`\n    - `vf_super2xsai.c`\n    - `vf_tinterlace.c`\n    - `vf_uspp.c`\n    - `vf_vaguedenoiser.c`\n    - `vsrc_mptestsrc.c`\n\nShould you, for "
+      }
+    ]
+  },
+  {
+    "name": "flux2",
+    "repo": "black-forest-labs/flux2",
+    "sha": "50fe5162777813d869182b139e83b10743caef15",
+    "commitDate": "2026-03-12T16:00:27+01:00",
+    "fileCount": 31,
+    "rootDocuments": [
+      {
+        "path": "LICENSE.md",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      },
+      {
+        "path": "README.md",
+        "sha256": "435753749320bbb395c15983e63e3dc73936c03f0f1870c628e7bf922c55eef7"
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "f119f102933c6e5d6ee4088d6c2d6de68edcb4b60f886c574be0c469d42e7766"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE.md",
+        "text": "                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an exampl"
+      }
+    ]
+  },
+  {
+    "name": "FramePack",
+    "repo": "lllyasviel/FramePack",
+    "sha": "97fe5dbe06ac1f337ece08935b1076a35eefeeb9",
+    "commitDate": "2025-10-15T18:28:50-07:00",
+    "fileCount": 19,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      },
+      {
+        "path": "README.md",
+        "sha256": "9aab6552d522b9abd364771bf129e2ec7ac80812b4c5930d99b96f5fa9ae1f6a"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "a5a8dafd3391ec4ca25765c724d266a021f658f35b3ffcb8e25b0b76831a9ec3"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an exampl"
+      }
+    ]
+  },
+  {
+    "name": "GroundingDINO",
+    "repo": "IDEA-Research/GroundingDINO",
+    "sha": "856dde20aee659246248e20734ef9ba5214f5e44",
+    "commitDate": "2024-08-12T16:52:02+08:00",
+    "fileCount": 67,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "b403c98ec1ffaccb0124632592a3d99642cddc3031ca412b402568e6c06c202a"
+      },
+      {
+        "path": "README.md",
+        "sha256": "d69cf3fd022661e6be19c56a421020f3ee9e027375020ef6a3def0149ddf9595"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "3e7e7883223695d9f66fc913b04543cc3a05b2fd2a2386a3fe4060c60ce0c0e4"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an exampl"
+      }
+    ]
+  },
+  {
+    "name": "Hunyuan3D-2",
+    "repo": "Tencent-Hunyuan/Hunyuan3D-2",
+    "sha": "f8db63096c8282cb27354314d896feba5ba6ff8a",
+    "commitDate": "2025-10-28T17:58:12+08:00",
+    "fileCount": 226,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "94259df223918a5733677965c1bfe1774a2dba25042d9c3b47a3418ea6c1f324"
+      },
+      {
+        "path": "NOTICE",
+        "sha256": "9ef89c88faf6fa97a7cc9ffc15deec7a8c27fb7ac9bca1f57e2884a5f8d48f42"
+      },
+      {
+        "path": "README.md",
+        "sha256": "edc4d006b977c8e28a0d3135ffc22b0dcad8e8dcb31fc9152c906eb21e29a886"
+      },
+      {
+        "path": "README_ja_jp.md",
+        "sha256": "f8ed6d822a05111dcda064253565288a09496ab0f207ce5b6b07c5f57b385aba"
+      },
+      {
+        "path": "README_zh_cn.md",
+        "sha256": "d30a0e528a3c94f5af92b9e16e084f4cc6683d29e2f26192ab5cd1acfd68d49d"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "b09104f55ee2f22438b2944b164125e88a0366a3434d703aa3f33115e1b21632"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "TENCENT HUNYUAN 3D 2.0 COMMUNITY LICENSE AGREEMENT\nTencent Hunyuan 3D 2.0 Release Date: January 21, 2025\nTHIS LICENSE AGREEMENT DOES NOT APPLY IN THE EUROPEAN UNION, UNITED KINGDOM AND SOUTH KOREA AND IS EXPRESSLY LIMITED TO THE TERRITORY, AS DEFINED BELOW.\nBy clicking to agree or by using, reproducing, modifying, distributing, performing or displaying any portion or element of the Tencent Hunyuan 3D 2.0 Works, including via any Hosted Service, You will be deemed to have recognized and accepted the content of this Agreement, which is effective immediately.\n1.\tDEFINITIONS.\na.\t“Acceptable Use Policy” shall mean the policy made available by Tencent as set forth in the Exhibit A.\nb.\t“Agreement” shall mean the terms and conditions for use, reproduction, distribution, modification, performance and displaying of Tencent Hunyuan 3D 2.0 Works or any portion or element thereof set forth herein.\nc.\t“Documentation” shall mean the specifications, manuals and documentation for Tencent Hunyuan 3D 2.0 made publicly available by Tencent.\nd.\t“Hosted Service” shall mean a hosted service offered via an application programming interface (API), web access, or any other electronic or remote means.\ne.\t“Licensee,” “You” or “Your” shall mean a natural person or legal entity exercising the rights granted by this Agreement and/or using the Tencent Hunyuan 3D 2.0 Works for any purpose and in any field of use.\nf.\t“Materials” shall mean, collectively, Tencent’s proprietary Tencent Hunyuan 3D 2.0 and Documentation (and any portion thereof) as made available by Tencent under this Agreement.\ng.\t“Model Derivatives” shall mean all: (i) modifications to Tencent Hunyuan 3D 2.0 or any Model Derivative of Tencent Hunyuan 3D 2.0; (ii) works based on Tencent Hunyuan 3D 2.0 or any Model Derivative of Tencent Hun"
+      }
+    ]
+  },
+  {
+    "name": "HunyuanVideo-1.5",
+    "repo": "Tencent-Hunyuan/HunyuanVideo-1.5",
+    "sha": "60783e704160023913bee78f0b47036d393d4dfa",
+    "commitDate": "2026-04-10T14:14:58+08:00",
+    "fileCount": 60,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "c38236952096107a4adbc164f44cd1768745b0a20090ea858e0954c96a6b8391"
+      },
+      {
+        "path": "NOTICE",
+        "sha256": "534cc588b18839005089731fd3907af266386d18288b4349be4d75a7705bbfdf"
+      },
+      {
+        "path": "README.md",
+        "sha256": "57eed52d56216c2e0b60f0e926267a0708fc18de2109e5a60a01d8ccac6e49dc"
+      },
+      {
+        "path": "README_CN.md",
+        "sha256": "62af1b123cc7ddb37c6c7f7a276967954288bad99e8399a43acf05d3a901bf45"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "ba21fb0068950611023b8c12583ffb7364ca11d587a1773539d2f8b44fe3d90b"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "TENCENT HUNYUAN COMMUNITY LICENSE AGREEMENT\r\nTencent HunyuanVideo 1.5 Release Date: November 21, 2025\r\nTHIS LICENSE AGREEMENT DOES NOT APPLY IN THE EUROPEAN UNION, UNITED KINGDOM AND SOUTH KOREA AND IS EXPRESSLY LIMITED TO THE TERRITORY, AS DEFINED BELOW.\r\nBy clicking to agree or by using, reproducing, modifying, distributing, performing or displaying any portion or element of the Tencent Hunyuan Works, including via any Hosted Service, You will be deemed to have recognized and accepted the content of this Agreement, which is effective immediately.\r\n1.\tDEFINITIONS.\r\na.\t“Acceptable Use Policy” shall mean the policy made available by Tencent as set forth in the Exhibit A.\r\nb.\t“Agreement” shall mean the terms and conditions for use, reproduction, distribution, modification, performance and displaying of Tencent Hunyuan Works or any portion or element thereof set forth herein.\r\nc.\t“Documentation” shall mean the specifications, manuals and documentation for Tencent Hunyuan made publicly available by Tencent.\r\nd.\t“Hosted Service” shall mean a hosted service offered via an application programming interface (API), web access, or any other electronic or remote means.\r\ne.\t“Licensee,” “You” or “Your” shall mean a natural person or legal entity exercising the rights granted by this Agreement and/or using the Tencent Hunyuan Works for any purpose and in any field of use.\r\nf.\t“Materials” shall mean, collectively, Tencent’s proprietary Tencent Hunyuan and Documentation (and any portion thereof) as made available by Tencent under this Agreement.\r\ng.\t“Model Derivatives” shall mean all: (i) modifications to Tencent Hunyuan or any Model Derivative of Tencent Hunyuan; (ii) works based on Tencent Hunyuan or any Model Derivative of Tencent Hunyuan; or (iii) any other machine learning model w"
+      }
+    ]
+  },
+  {
+    "name": "kdenlive",
+    "repo": "KDE/kdenlive",
+    "sha": "89de732c70117ebb4b54bb2c6de97946cd26e3fd",
+    "commitDate": "2026-10-11T16:33:01+02:00",
+    "fileCount": 1930,
+    "rootDocuments": [
+      {
+        "path": "COPYING",
+        "sha256": "b6a8bf63ae2c95b0aa256ee774680d7bd18f21f457da75466f7610b3b16acc4e"
+      },
+      {
+        "path": "README.md",
+        "sha256": "86f55bc195dc5ff81d82f52d1c4b10a17c411e6fc43a629be0c2a74708084f36"
+      },
+      {
+        "path": "README.md.license",
+        "sha256": "53bf990a0b007e8d9531853e2e34a375b898aded382fbc7ec7596ec7e62560b1"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "COPYING",
+        "text": "GNU GENERAL PUBLIC LICENSE\nVersion 3, 29 June 2007\n\nCopyright © 2007 Free Software Foundation, Inc. <http://fsf.org/>\n\nEveryone is permitted to copy and distribute verbatim copies of this license document, but changing it is not allowed.\n\nPreamble\n\nThe GNU General Public License is a free, copyleft license for software and other kinds of works.\n\nThe licenses for most software and other practical works are designed to take away your freedom to share and change the works. By contrast, the GNU General Public License is intended to guarantee your freedom to share and change all versions of a program--to make sure it remains free software for all its users. We, the Free Software Foundation, use the GNU General Public License for most of our software; it applies also to any other work released this way by its authors. You can apply it to your programs, too.\n\nWhen we speak of free software, we are referring to freedom, not price. Our General Public Licenses are designed to make sure that you have the freedom to distribute copies of free software (and charge for them if you wish), that you receive source code or can get it if you want it, that you can change the software or use pieces of it in new free programs, and that you know you can do these things.\n\nTo protect your rights, we need to prevent others from denying you these rights or asking you to surrender the rights. Therefore, you have certain responsibilities if you distribute copies of the software, or if you modify it: responsibilities to respect the freedom of others.\n\nFor example, if you distribute copies of such a program, whether gratis or for a fee, you must pass on to the recipients the same freedoms that you received. You must make sure that they, too, receive or can get the source code. And you must show them t"
+      },
+      {
+        "path": "README.md.license",
+        "text": "SPDX-FileCopyrightText: none\nSPDX-License-Identifier: CC0-1.0\n"
+      }
+    ]
+  },
+  {
+    "name": "langgraph",
+    "repo": "langchain-ai/langgraph",
+    "sha": "799c2f04fd3a56186e24e9fb8bbf3568e543cfbe",
+    "commitDate": "2026-10-11T08:51:09-04:00",
+    "fileCount": 687,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "d9bb52f2e3540d60ff50d8f0f5b6ba649b7fd346948c4c3d086c8afb120763c7"
+      },
+      {
+        "path": "README.md",
+        "sha256": "3a13e257af1216962d53d72414a7f44ac1fc5cea34d994bdff60ea2a3b045933"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "MIT License\n\nCopyright (c) 2024 LangChain, Inc.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+      }
+    ]
+  },
+  {
+    "name": "LatentSync",
+    "repo": "bytedance/LatentSync",
+    "sha": "a229c3948406bc2cf6eaf4873e662e70c6a04746",
+    "commitDate": "2025-06-20T15:36:51+08:00",
+    "fileCount": 124,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1"
+      },
+      {
+        "path": "README.md",
+        "sha256": "f4efe6ac062511b5de6ff65db110aa3d755fef662277c3bb4dd16dbfa02362b1"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "087132f23b8faf8d60fbd3b43d40599b4e52c9a10b949aacd3675f04f5c72348"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an exampl"
+      }
+    ]
+  },
+  {
+    "name": "LivePortrait",
+    "repo": "KlingAIResearch/LivePortrait",
+    "sha": "9b294b3d0536135442ea73cb01e6cb3ca7029dd3",
+    "commitDate": "2026-06-02T01:24:54+08:00",
+    "fileCount": 213,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "75fcad03ad21369e9eeb369b97b73fc0bba7f7f3243d0a661f968bd1478207bb"
+      },
+      {
+        "path": "readme.md",
+        "sha256": "ba9144f3a57c4acdeae3e51cdaf379b41c32ffe27ec7ff4b279265995ad01878"
+      },
+      {
+        "path": "readme_zh_cn.md",
+        "sha256": "2536d88697f2ecaa91a73bc3fd08c050eadbccc9977b57c4a9a7df9838b271b9"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "ae4d841084f815e219adfd26031599e698a2c0ae26bcd24355e6ac37d314c4b2"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "MIT License\n\nCopyright (c) 2024 Kuaishou Visual Generation and Interaction Center\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\n---\n\nThe code of InsightFace is released under the MIT License.\nThe models of InsightFace are for non-commercial research purposes only.\n\nIf you want to use the LivePortrait project for commercial purposes, you \nshould remove and replace InsightFace’s detection models to fully comply with \nthe MIT license.\n"
+      }
+    ]
+  },
+  {
+    "name": "LTX-2",
+    "repo": "Lightricks/LTX-2",
+    "sha": "9ec55f9f22798a3198d9c923856824821bc3317e",
+    "commitDate": "2026-10-02T09:56:11Z",
+    "fileCount": 454,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "ac628c687b48adb26d8523b967e7f0573590a166157c99c95eb8d070805e739a"
+      },
+      {
+        "path": "LICENSE-2",
+        "sha256": "c325da090976a313b214bf0d6a1738003b96505c01c46043e80edc200a72c147"
+      },
+      {
+        "path": "LICENSE-2_x",
+        "sha256": "be75acae5c99b0fb16ed6cfbf8f731e5121a729bef112d20337699407e796451"
+      },
+      {
+        "path": "README.md",
+        "sha256": "70de7a69235fc5599b693af4c9a46ba779024a5219783f7cbe17ecf6bacc99c4"
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "b99d90710109f170c678191b99045c0f4074b1849ea03d1873bb7e8c4feb56cc"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "LTX Community License Agreements\n\nLTX-2.x Community License Agreement [https://github.com/Lightricks/LTX-2/blob/main/LICENSE-2_x]     Dated August 11, 2026.\nThis license is applicable to all LTX-2.5 versions released since August 11, 2026, and all future releases of LTX-2.x under this license.\n\nLTX-2 Community License Agreement [https://github.com/Lightricks/LTX-2/blob/main/LICENSE-2]     Dated January 5, 2026.\nThis license is applicable to all LTX-2 versions released since January 5, 2026, including LTX-2.3 until August 11, 2026.\n"
+      },
+      {
+        "path": "LICENSE-2",
+        "text": "LTX-2 Community License Agreement\nLicense date: January 5, 2026\n\n\nBy using or distributing any portion or element of LTX-2, you agree\nto be bound by this Agreement.\n\n1. Definitions.\n\n\"Agreement\" means the terms and conditions for the license, use,\nreproduction, and distribution of LTX-2 and the Complementary\nMaterials, as specified in this document.\n\n\"Control\" means the direct or indirect ownership of more than\nfifty percent (50%) of the voting securities or other ownership\ninterests, or the power to direct the management and policies of\nsuch Entity through voting rights, contract, or otherwise.\n\n\"Data\" means a collection of information and/or content extracted\nfrom the dataset used with LTX-2, including to train, pretrain,\nor otherwise evaluate LTX-2. The Data is not licensed under this\nAgreement.\n\n\"Derivatives of LTX-2\" means all modifications to LTX-2, works\nbased on LTX-2, or any other model which is created or initialized\nby transfer of patterns of the weights, parameters, activations or\noutput of LTX-2, to the other model, in order to cause the other\nmodel to perform similarly to LTX-2, including – but not limited\nto - distillation methods entailing the use of intermediate data\nrepresentations or methods based on the generation of synthetic\ndata by LTX-2 for training the other model. For clarity, Derivatives\nof LTX-2 include: (i) any fine-tuned or adapted weights, parameters,\nor checkpoints derived from LTX-2; (ii) derivative model architectures\nthat incorporate or are based upon LTX-2's architecture; and\n(iii) any modified or extended versions of the Complementary\nMaterials. All intellectual property rights in Derivatives of LTX-2\nshall be subject to the terms of this Agreement, and you may not\nclaim exclusive ownership rights in any Derivatives of LTX-2 that\nwou"
+      },
+      {
+        "path": "LICENSE-2_x",
+        "text": "LTX-2.x Community License Agreement\nLicense date: August 11, 2026\n\n\nBy downloading, using, accessing or distributing any portion or\nelement of LTX-2.x, you agree that you have read and accepted to be\nbound by this Agreement.\n\n1. Definitions\n\n1.1 \"Agreement\" means the terms and conditions for this LTX-2.x\nCommunity License Agreement and the exhibits, attachments, and\nComplementary Materials, as specified in this document.\n\n1.2 \"Complementary Materials\" means the accompanying\ndocumentation, tutorials, examples, configuration files and\nother materials made available by Licensor together with the\nLTX-2.x model weights and parameters, in each case as\ndistributed by Licensor.\n\n1.3 \"Control\" means the direct or indirect ownership of more than\nfifty percent (50%) of the voting securities or other\nownership interests, or the power to direct the management and\npolicies of such Entity through voting rights, contract, or\notherwise.\n\n1.4 \"Data\" means a collection of information and/or content\nextracted from the dataset used with LTX-2.x, including to\ntrain, pretrain, or otherwise evaluate LTX-2.x. The Data is\nnot licensed under this Agreement.\n\n1.5 \"Derivatives of LTX-2.x\" means all modifications to LTX-2.x,\nworks based on LTX-2.x, or any other model which is created or\ninitialized by transfer of patterns of the weights,\nparameters, activations or output of LTX-2.x, to the other\nmodel, in order to cause the other model to perform similarly\nto LTX-2.x, including - but not limited to - distillation\nmethods entailing the use of intermediate data representations\nor methods based on the generation of synthetic data by\nLTX-2.x for training the other model. For clarity, Derivatives\nof LTX-2.x include: (i) any fine-tuned or adapted weights,\nparameters, or checkpoints derived from LTX-2.x; ("
+      }
+    ]
+  },
+  {
+    "name": "mediabunny",
+    "repo": "Vanilagy/mediabunny",
+    "sha": "9d36fc5779b254904bc609e66f2cd80ed8390b4b",
+    "commitDate": "2026-10-05T15:27:10+02:00",
+    "fileCount": 432,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
+      },
+      {
+        "path": "README.md",
+        "sha256": "e8f4438d0f47eeee2bde157e6b5f7376ac4cfbb4db92b71e2163457c9e43fa8d"
+      },
+      {
+        "path": "package.json",
+        "sha256": "f8cf1d42f0f505230f146a8af0d5097655636a149d5496d128a23d9d23a98f43"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "Mozilla Public License Version 2.0\n==================================\n\n1. Definitions\n--------------\n\n1.1. \"Contributor\"\n    means each individual or legal entity that creates, contributes to\n    the creation of, or owns Covered Software.\n\n1.2. \"Contributor Version\"\n    means the combination of the Contributions of others (if any) used\n    by a Contributor and that particular Contributor's Contribution.\n\n1.3. \"Contribution\"\n    means Covered Software of a particular Contributor.\n\n1.4. \"Covered Software\"\n    means Source Code Form to which the initial Contributor has attached\n    the notice in Exhibit A, the Executable Form of such Source Code\n    Form, and Modifications of such Source Code Form, in each case\n    including portions thereof.\n\n1.5. \"Incompatible With Secondary Licenses\"\n    means\n\n    (a) that the initial Contributor has attached the notice described\n        in Exhibit B to the Covered Software; or\n\n    (b) that the Covered Software was made available under the terms of\n        version 1.1 or earlier of the License, but not also under the\n        terms of a Secondary License.\n\n1.6. \"Executable Form\"\n    means any form of the work other than Source Code Form.\n\n1.7. \"Larger Work\"\n    means a work that combines Covered Software with other material, in\n    a separate file or files, that is not Covered Software.\n\n1.8. \"License\"\n    means this document.\n\n1.9. \"Licensable\"\n    means having the right to grant, to the maximum extent possible,\n    whether at the time of the initial grant or subsequently, any and\n    all of the rights conveyed by this License.\n\n1.10. \"Modifications\"\n    means any of the following:\n\n    (a) any file in Source Code Form that results from an addition to,\n        deletion from, or modification of the contents of Covered\n        Software;"
+      }
+    ]
+  },
+  {
+    "name": "MiniMax-MCP",
+    "repo": "MiniMax-AI/MiniMax-MCP",
+    "sha": "0856b9aef8a9d676bb63bdd6b6426d7b640a3b7a",
+    "commitDate": "2026-08-20T20:06:49+08:00",
+    "fileCount": 28,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "a9138c01f3c22641ac8f8fe2f3ec75de0b4a0494ff81e8da43b3cc2091935ac3"
+      },
+      {
+        "path": "README-CN.md",
+        "sha256": "e9c0b6ad26de688f37e7689cdfef1327806d10a051212627fd303e158cbe85dc"
+      },
+      {
+        "path": "README.md",
+        "sha256": "46fd66aa807a33554aff71cdd308b86e15e58cb07682883beba2f12cc93f0619"
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "68517efaf346c5e592b9123e36d583733f5ea6dc2037e02c01e3d2cf170f1537"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "MIT License\n\nCopyright 2025 MiniMax AI.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+      }
+    ]
+  },
+  {
+    "name": "mlt",
+    "repo": "mltframework/mlt",
+    "sha": "77ae5f8f8cb4e2f502c5dc868d6c7cf7b45bfc54",
+    "commitDate": "2026-10-06T12:35:16-07:00",
+    "fileCount": 1124,
+    "rootDocuments": [
+      {
+        "path": "COPYING",
+        "sha256": "592987e8510228d546540b84a22444bde98e48d03078d3b2eefcd889bec5ce8c"
+      },
+      {
+        "path": "README.md",
+        "sha256": "a3ba39a8237b057be12dd8e439204982fc76ab628a1d4ec08633db51f60f8035"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "COPYING",
+        "text": "                  GNU LESSER GENERAL PUBLIC LICENSE\n                       Version 2.1, February 1999\n\n Copyright (C) 1991, 1999 Free Software Foundation, Inc.\n 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA\n Everyone is permitted to copy and distribute verbatim copies\n of this license document, but changing it is not allowed.\n\n[This is the first released version of the Lesser GPL.  It also counts\n as the successor of the GNU Library Public License, version 2, hence\n the version number 2.1.]\n\n                            Preamble\n\n  The licenses for most software are designed to take away your\nfreedom to share and change it.  By contrast, the GNU General Public\nLicenses are intended to guarantee your freedom to share and change\nfree software--to make sure the software is free for all its users.\n\n  This license, the Lesser General Public License, applies to some\nspecially designated software packages--typically libraries--of the\nFree Software Foundation and other authors who decide to use it.  You\ncan use it too, but we suggest you first think carefully about whether\nthis license or the ordinary General Public License is the better\nstrategy to use in any particular case, based on the explanations below.\n\n  When we speak of free software, we are referring to freedom of use,\nnot price.  Our General Public Licenses are designed to make sure that\nyou have the freedom to distribute copies of free software (and charge\nfor this service if you wish); that you receive source code or can get\nit if you want it; that you can change the software and use pieces of\nit in new free programs; and that you are informed that you can do\nthese things.\n\n  To protect your rights, we need to make restrictions that forbid\ndistributors to deny you these rights or to ask you to surrend"
+      }
+    ]
+  },
+  {
+    "name": "MoneyPrinterTurbo",
+    "repo": "harry0703/MoneyPrinterTurbo",
+    "sha": "4204d0f39afa8ada6f3edc31604141f959fe254e",
+    "commitDate": "2026-10-10T18:11:54+08:00",
+    "fileCount": 342,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "87dd19b6a0779e14a91c1b06423ef251df37e89666160c031130a26bae68c229"
+      },
+      {
+        "path": "README-en.md",
+        "sha256": "2fa9ebb98f45bf577c00551e12469234cd457b01c1db2733c821a3df40cb4589"
+      },
+      {
+        "path": "README-ja.md",
+        "sha256": "dba67311e9d0964066f791e4d1e320efa3c49e7c51c7de1ac77836eb946b3da5"
+      },
+      {
+        "path": "README.md",
+        "sha256": "22bf2ee5c1d842b095631160e2e7439c6b9adb7755fca20e5ed3035b2abb838e"
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "175c7563be70d783d57986a15b446bdae2bb1582d57eb0ef7403bb5f43139f73"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "f2b63b7d7a10981a64e90058aa34ec172fa4dcc1607a3bd4e8976b6bce86ca7c"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "MIT License\n\nCopyright (c) 2024 Harry\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE."
+      }
+    ]
+  },
+  {
+    "name": "OpenMontage",
+    "repo": "calesthio/OpenMontage",
+    "sha": "9327439db69021ab4b0e2776729bf3b58fdb5a87",
+    "commitDate": "2026-10-03T12:28:55-04:00",
+    "fileCount": 2143,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+      },
+      {
+        "path": "README.md",
+        "sha256": "0431403a913bb4a132e090f4dbd0343852473aa62d67a3a3912294129482906b"
+      },
+      {
+        "path": "README_zh-CN.md",
+        "sha256": "cbc82f18d2cfd5d671805afe38f65b5f593239b72ee3ebe9a37931d453a685d5"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "074f662d6b98493488027b7a8fce9f6e7fc6ec5b74d6a5f0ba0202908cebf286"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "                    GNU AFFERO GENERAL PUBLIC LICENSE\n                       Version 3, 19 November 2007\n\n Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>\n Everyone is permitted to copy and distribute verbatim copies\n of this license document, but changing it is not allowed.\n\n                            Preamble\n\n  The GNU Affero General Public License is a free, copyleft license for\nsoftware and other kinds of works, specifically designed to ensure\ncooperation with the community in the case of network server software.\n\n  The licenses for most software and other practical works are designed\nto take away your freedom to share and change the works.  By contrast,\nour General Public Licenses are intended to guarantee your freedom to\nshare and change all versions of a program--to make sure it remains free\nsoftware for all its users.\n\n  When we speak of free software, we are referring to freedom, not\nprice.  Our General Public Licenses are designed to make sure that you\nhave the freedom to distribute copies of free software (and charge for\nthem if you wish), that you receive source code or can get it if you\nwant it, that you can change the software or use pieces of it in new\nfree programs, and that you know you can do these things.\n\n  Developers that use our General Public Licenses protect your rights\nwith two steps: (1) assert copyright on the software, and (2) offer\nyou this License which gives you legal permission to copy, distribute\nand/or modify the software.\n\n  A secondary benefit of defending all users' freedom is that\nimprovements made in alternate versions of the program, if they\nreceive widespread use, become available for other developers to\nincorporate.  Many developers of free software are heartened and\nencouraged by the resulting cooperation"
+      }
+    ]
+  },
+  {
+    "name": "OpenTimelineIO",
+    "repo": "AcademySoftwareFoundation/OpenTimelineIO",
+    "sha": "00c22fa3a64256d8d3dcafbc7276492185dd970d",
+    "commitDate": "2026-10-08T21:57:59-07:00",
+    "fileCount": 403,
+    "rootDocuments": [
+      {
+        "path": "LICENSE.txt",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      },
+      {
+        "path": "NOTICE.txt",
+        "sha256": "e5ca061ef053cb9fd1b7146da3b10d4e4f2ec218445c3ba7f7edb32ae9452543"
+      },
+      {
+        "path": "README.md",
+        "sha256": "3f89ac18a0e4ac4215960326721d37869917c301d9f75cc793468f9fbf53003d"
+      },
+      {
+        "path": "README_contrib.md",
+        "sha256": "c73a1800b9b357425f12e03cf623a8fd2ccbc850da2dedd6e54a44f081978397"
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "653877400a5ccc46ae37b3ddb36607d861beeefff90ba1a06bf003c6c4255dc0"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE.txt",
+        "text": "                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an exampl"
+      }
+    ]
+  },
+  {
+    "name": "OpenVideoStudio",
+    "repo": "mne03005-png/OpenVideoStudio",
+    "sha": "175da9960411fbe740932b0a08d57e32a4a36a18",
+    "commitDate": "2026-09-09T10:54:12+08:00",
+    "fileCount": 102,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      },
+      {
+        "path": "NOTICE",
+        "sha256": "c9ca32bdc98df49ec260271bcb20d1d5305f9ffe52130ca5c527b2a966c64da9"
+      },
+      {
+        "path": "README.md",
+        "sha256": "e27a4f93016d932f6cb2fc2479ab638c7948a29f6133ecc43862290b3f2a80d9"
+      },
+      {
+        "path": "README_CN.md",
+        "sha256": "6c7964993dc49420c017c72fda8301f833828b70a0179cf115d81af9fae9f6b4"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "\n                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an examp"
+      }
+    ]
+  },
+  {
+    "name": "piper1-gpl",
+    "repo": "OHF-voice/piper1-gpl",
+    "sha": "35b0f1ec67b289de553555645140e48f1f104b2d",
+    "commitDate": "2026-10-10T18:59:28-07:00",
+    "fileCount": 157,
+    "rootDocuments": [
+      {
+        "path": "COPYING",
+        "sha256": "0ae0485a5bd37a63e63603596417e4eb0e653334fa6c7f932ca3a0e85d4af227"
+      },
+      {
+        "path": "README.md",
+        "sha256": "a73f576020071a1d58701a40026a451385ef4dad4c9ba0a2499544d988d06e84"
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "3d8c160ff055260d06c2606caa6e5c90cc46fb5f72c9d49e42c3b050dc24ab43"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "COPYING",
+        "text": "                    GNU GENERAL PUBLIC LICENSE\n                       Version 3, 29 June 2007\n\n Copyright (C) 2007 Free Software Foundation, Inc. <http://fsf.org/>\n Everyone is permitted to copy and distribute verbatim copies\n of this license document, but changing it is not allowed.\n\n                            Preamble\n\n  The GNU General Public License is a free, copyleft license for\nsoftware and other kinds of works.\n\n  The licenses for most software and other practical works are designed\nto take away your freedom to share and change the works.  By contrast,\nthe GNU General Public License is intended to guarantee your freedom to\nshare and change all versions of a program--to make sure it remains free\nsoftware for all its users.  We, the Free Software Foundation, use the\nGNU General Public License for most of our software; it applies also to\nany other work released this way by its authors.  You can apply it to\nyour programs, too.\n\n  When we speak of free software, we are referring to freedom, not\nprice.  Our General Public Licenses are designed to make sure that you\nhave the freedom to distribute copies of free software (and charge for\nthem if you wish), that you receive source code or can get it if you\nwant it, that you can change the software or use pieces of it in new\nfree programs, and that you know you can do these things.\n\n  To protect your rights, we need to prevent others from denying you\nthese rights or asking you to surrender the rights.  Therefore, you have\ncertain responsibilities if you distribute copies of the software, or if\nyou modify it: responsibilities to respect the freedom of others.\n\n  For example, if you distribute copies of such a program, whether\ngratis or for a fee, you must pass on to the recipients the same\nfreedoms that you received.  You "
+      }
+    ]
+  },
+  {
+    "name": "Practical-RIFE",
+    "repo": "hzwer/Practical-RIFE",
+    "sha": "bbfd2ea90910789a860ea3e2b32a240cd577b75e",
+    "commitDate": "2026-08-27T16:13:42+08:00",
+    "fileCount": 19,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "7932fb49341512b959b1744a6d9cbb39e5a1ec89da438a34d0454d5d8df9fecd"
+      },
+      {
+        "path": "README.md",
+        "sha256": "b695ac5d4a69c2f551512678883f8234d784c286d805ca546f4873cb465959b4"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "b80c3f9007d7d6ca5b0427ef2c49a2e91b6a505a6a15f64ce9719df46c053e60"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "MIT License\n\nCopyright (c) 2021 hzwer\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+      }
+    ]
+  },
+  {
+    "name": "react-three-fiber",
+    "repo": "pmndrs/react-three-fiber",
+    "sha": "9e53355ce499ea518ac3729de7fd4dcc06d8cdb9",
+    "commitDate": "2026-10-10T19:17:24+09:00",
+    "fileCount": 227,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "9c35b5de7b7493a707fffe4eb23bd2f7f449153c1911f7c6eefb4e591fd5349a"
+      },
+      {
+        "path": "package.json",
+        "sha256": "5dad57461421ab01340c84904bf521c67ce74f19ba4b2399188f2631f10c28ba"
+      },
+      {
+        "path": "readme.md",
+        "sha256": "29c7319a41a30b95319e68d540672efaa31a2c3bd44bad6ef2e48b93d00d4ab6"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "MIT License\n\nCopyright (c) 2019-2025 Poimandres\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+      }
+    ]
+  },
+  {
+    "name": "react-video-editor",
+    "repo": "openvideodev/react-video-editor",
+    "sha": "9a8c5296da4b258f66dfb7ad73de96be62478bca",
+    "commitDate": "2026-06-29T23:39:33-05:00",
+    "fileCount": 290,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "633eb336c865e0a577bddb880654bd656ed3ed173fefb55e4590cc791ee87212"
+      },
+      {
+        "path": "README.md",
+        "sha256": "09be5207565225a429e1d907b1cc113c30850898de0dd8d0b78062434d922bcc"
+      },
+      {
+        "path": "package.json",
+        "sha256": "e1404f7ffc557958d973edfe35b009d9fab426f61a9ad91ac49398cfd77d7989"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "# OpenVideo License\n\nDepending on the type of your legal entity, you are granted permission to use OpenVideo for your project. Individuals and small companies are allowed to use OpenVideo for free (even commercially), while a company license is required for for-profit organizations of a certain size. This two-tier system was designed to ensure funding for this project while still allowing the source code to be available and the program to be free for most. Read below for the exact terms of use.\n\n- [Free License](#free-license)\n- [Company License](#company-license)\n\n## Free License\n\nCopyright © 2026 [OpenVideo](https://openvideo.dev)\n\n### Eligibility\n\nYou are eligible to use OpenVideo for free if you are:\n\n- an individual\n- a for-profit organization with up to 3 employees\n- a non-profit or not-for-profit organization\n- evaluating whether OpenVideo is a good fit, and are not yet using it in a commercial way\n\n### Allowed use cases\n\nPermission is hereby granted, free of charge, to any person eligible for the \"Free License\", to use the software non-commercially or commercially for the purpose of creating videos and images and to modify the software to their own liking, for the purpose of fulfilling their custom use case or to contribute bug fixes or improvements back to OpenVideo.\n\nThis license applies to all packages, applications, and services within the OpenVideo monorepo.\n\n### Disallowed use cases\n\nIt is not allowed to copy or modify OpenVideo code for the purpose of selling, renting, licensing, relicensing, or sublicensing your own derivative of OpenVideo.\n\n### Warranty notice\n\nThe software is provided \"as is\", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infri"
+      }
+    ]
+  },
+  {
+    "name": "Real-ESRGAN",
+    "repo": "xinntao/Real-ESRGAN",
+    "sha": "a4abfb2979a7bbff3f69f58f58ae324608821e27",
+    "commitDate": "2024-04-03T00:39:11+08:00",
+    "fileCount": 92,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "4a699ec4863d96a91fc265948a0c90033f7e8735d515524dcf3444736406e0c2"
+      },
+      {
+        "path": "README.md",
+        "sha256": "d0a13607913ea94e65a91ac864b969683a41a45b0aec16e0ae64271649d0364d"
+      },
+      {
+        "path": "README_CN.md",
+        "sha256": "198c2c1adcca96a6e88405ca0cfece8311b1da2138287843840c39016026cb67"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "5944cac4c2c4d8ae27ccaa88435e870898d9859394f3a3fd80b88393dba30e9d"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "BSD 3-Clause License\n\nCopyright (c) 2021, Xintao Wang\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are met:\n\n1. Redistributions of source code must retain the above copyright notice, this\n   list of conditions and the following disclaimer.\n\n2. Redistributions in binary form must reproduce the above copyright notice,\n   this list of conditions and the following disclaimer in the documentation\n   and/or other materials provided with the distribution.\n\n3. Neither the name of the copyright holder nor the names of its\n   contributors may be used to endorse or promote products derived from\n   this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\"\nAND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE\nIMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE\nDISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE\nFOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL\nDAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR\nSERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER\nCAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,\nOR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\nOF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n"
+      }
+    ]
+  },
+  {
+    "name": "remotion",
+    "repo": "remotion-dev/remotion",
+    "sha": "9fdd1fc403b4f6b9231860b714285e99d18d5940",
+    "commitDate": "2026-10-11T15:52:20+02:00",
+    "fileCount": 14964,
+    "rootDocuments": [
+      {
+        "path": "LICENSE.md",
+        "sha256": "bd65083b940f61904f6ef298aade918a7cad72a3e35bc406e36fab365844b673"
+      },
+      {
+        "path": "README.md",
+        "sha256": "c0aa4732decbd340d28ed59c805605820c3a6ade67b34933d2fad1c8bc0a603d"
+      },
+      {
+        "path": "package.json",
+        "sha256": "a2d663424f2cab0fcaef2c06e1c35e73b5cd043d388c5cd102d61b41d7b34cb1"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE.md",
+        "text": "# Remotion License\n\nIn Remotion 5.0, the license will slightly change. [View the changes here](https://github.com/remotion-dev/remotion/pull/3750).\n\n---\n\nDepending on the type of your legal entity, you are granted permission to use Remotion for your project. Individuals and small companies are allowed to use Remotion to create videos for free (even commercial), while a company license is required for for-profit organizations of a certain size. This two-tier system was designed to ensure funding for this project while still allowing the source code to be available and the program to be free for most. Read below for the exact terms of use.\n\n- [Free License](#free-license)\n- [Company License](#company-license)\n\n## Free License\n\nCopyright © 2026 [Remotion](https://www.remotion.dev)\n\n### Eligibility\n\nYou are eligible to use Remotion for free if you are:\n\n- an individual\n- a for-profit organization with up to 3 employees\n- a non-profit or not-for-profit organization\n- evaluating whether Remotion is a good fit, and are not yet using it in a commercial way\n\n### Allowed use cases\n\nPermission is hereby granted, free of charge, to any person eligible for the \"Free License\", to use the software non-commercially or commercially for the purpose of creating videos and images and to modify the software to their own liking, for the purpose of fulfilling their custom use case or to contribute bug fixes or improvements back to Remotion.\n\n### Disallowed use cases\n\nIt is not allowed to copy or modify Remotion code for the purpose of selling, renting, licensing, relicensing, or sublicensing your own derivate of Remotion.\n\n### Warranty notice\n\nThe software is provided \"as is\", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fit"
+      }
+    ]
+  },
+  {
+    "name": "sam2",
+    "repo": "facebookresearch/sam2",
+    "sha": "2b90b9f5ceec907a1c18123530e92e794ad901a4",
+    "commitDate": "2024-12-15T16:47:17-08:00",
+    "fileCount": 569,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      },
+      {
+        "path": "LICENSE_cctorch",
+        "sha256": "687d4f65ffe399358b170e22572564a16689e496f85a79dc5385fccf6bbc9558"
+      },
+      {
+        "path": "README.md",
+        "sha256": "eea69ee1042fb30933c5ca5019fbf0f6f9366cec5e792109281b5023a4f1589c"
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "c58230f78769620dcd11d15824d491b049be8f542eeb875d2e8091be797ec3f3"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an exampl"
+      },
+      {
+        "path": "LICENSE_cctorch",
+        "text": "BSD 3-Clause License\n\nCopyright (c) 2020, the respective contributors, as shown by the AUTHORS file.\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions are met:\n\n1. Redistributions of source code must retain the above copyright notice, this\n   list of conditions and the following disclaimer.\n\n2. Redistributions in binary form must reproduce the above copyright notice,\n   this list of conditions and the following disclaimer in the documentation\n   and/or other materials provided with the distribution.\n\n3. Neither the name of the copyright holder nor the names of its\n   contributors may be used to endorse or promote products derived from\n   this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\"\nAND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE\nIMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE\nDISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE\nFOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL\nDAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR\nSERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER\nCAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,\nOR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\nOF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n"
+      }
+    ]
+  },
+  {
+    "name": "storyboard",
+    "repo": "crashtestoz/storyboard",
+    "sha": "f804e2a16018d927a4123bc2a47db9bd4eb2bf19",
+    "commitDate": "2026-10-11T07:54:30+10:00",
+    "fileCount": 146,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "6ac67f27a0d8b4c0e15bd631bec1d1fdabc6cc179cc48089524d8aee12af228c"
+      },
+      {
+        "path": "README.md",
+        "sha256": "b7556adc6526ced035c0d2985d5af5a7be74c036b67a1f802f31572e7351adc5"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "Storyboard\nCopyright (c) 2026 Peter Chodyra (candco.com.au)\n\nThis work is licensed under the Creative Commons\nAttribution-NonCommercial-ShareAlike 4.0 International License\n(CC BY-NC-SA 4.0).\n\nIn short — you are free to:\n  * Use it. Run it, modify it, build on it, for yourself or your team.\n  * Share it. Pass it on, publish your fork, show people what you built.\n  * Contribute. Patches and forks that flow back under these same terms\n    are welcome.\n\nUnder these terms:\n  * Attribution. You must credit the original author and indicate if you\n    changed anything. You may not present this work, or a derivative of\n    it, as your own original creation.\n  * NonCommercial. You may not use this work, or any derivative of it,\n    for commercial purposes or monetary gain.\n  * ShareAlike. If you remix, transform, or build upon this work, you\n    must distribute your contributions under this same license.\n\nThis summary is not a substitute for the license. The full legal text\nfollows, and is the actual license that applies; it is also available at:\n\n    https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode\n\n=======================================================================\n\nAttribution-NonCommercial-ShareAlike 4.0 International\n\n=======================================================================\n\nCreative Commons Corporation (\"Creative Commons\") is not a law firm and\ndoes not provide legal services or legal advice. Distribution of\nCreative Commons public licenses does not create a lawyer-client or\nother relationship. Creative Commons makes its licenses and related\ninformation available on an \"as-is\" basis. Creative Commons gives no\nwarranties regarding its licenses, any material licensed under their\nterms and conditions, or any related information. Creative Commons\n"
+      }
+    ]
+  },
+  {
+    "name": "StoryMind",
+    "repo": "LinHao-city/StoryMind",
+    "sha": "00f9a0c7f67eeb3a076cf0a4a449ae7c856739ac",
+    "commitDate": "2026-07-03T15:58:23+08:00",
+    "fileCount": 1878,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+      },
+      {
+        "path": "README.md",
+        "sha256": "20517bd07fc12bcf63bd750bb50ab0728b186fab2fae62efea82c8865426bb7e"
+      },
+      {
+        "path": "README_zh-CN.md",
+        "sha256": "6c80322606f892facc5b9d1000d6b95f64602a8a4c9e3f1bfa7fb79b34d7efc3"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "fad0aef5ce29bd6fd2c1b9ee09e465e13b35be02e152f973e5d0a90c83b88593"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "                    GNU AFFERO GENERAL PUBLIC LICENSE\n                       Version 3, 19 November 2007\n\n Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>\n Everyone is permitted to copy and distribute verbatim copies\n of this license document, but changing it is not allowed.\n\n                            Preamble\n\n  The GNU Affero General Public License is a free, copyleft license for\nsoftware and other kinds of works, specifically designed to ensure\ncooperation with the community in the case of network server software.\n\n  The licenses for most software and other practical works are designed\nto take away your freedom to share and change the works.  By contrast,\nour General Public Licenses are intended to guarantee your freedom to\nshare and change all versions of a program--to make sure it remains free\nsoftware for all its users.\n\n  When we speak of free software, we are referring to freedom, not\nprice.  Our General Public Licenses are designed to make sure that you\nhave the freedom to distribute copies of free software (and charge for\nthem if you wish), that you receive source code or can get it if you\nwant it, that you can change the software or use pieces of it in new\nfree programs, and that you know you can do these things.\n\n  Developers that use our General Public Licenses protect your rights\nwith two steps: (1) assert copyright on the software, and (2) offer\nyou this License which gives you legal permission to copy, distribute\nand/or modify the software.\n\n  A secondary benefit of defending all users' freedom is that\nimprovements made in alternate versions of the program, if they\nreceive widespread use, become available for other developers to\nincorporate.  Many developers of free software are heartened and\nencouraged by the resulting cooperation"
+      }
+    ]
+  },
+  {
+    "name": "tldraw",
+    "repo": "tldraw/tldraw",
+    "sha": "7937be360bcb8239d89e420850843f81313fc07b",
+    "commitDate": "2026-10-09T18:24:04Z",
+    "fileCount": 4665,
+    "rootDocuments": [
+      {
+        "path": "LICENSE.md",
+        "sha256": "9578fcddc20e404b6a29f44b6fea81d8b331698c0e7e9be34132d6f4394fa533"
+      },
+      {
+        "path": "README.md",
+        "sha256": "1e35efa97844b08409feb26294c4eac533207057d7595e8e7d3b80cf1a333d5b"
+      },
+      {
+        "path": "package.json",
+        "sha256": "c0833a0dd9c73171b370fed3b5c3711be69b94ba49ce351739514fec58fe5b2a"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE.md",
+        "text": "# tldraw license\n\nThis License from tldraw, Inc. (“tldraw”) governs your use of the accompanying Software. By using the Software, you accept the terms of this License. The tldraw software is copyrighted by tldraw Inc.\n\nAlternative licenses are available from tldraw for commercial and non-commercial use. To get an alternative license or to learn more, visit https://tldraw.dev or contact sales@tldraw.com.\n\n## Definitions\n\n\"Production Environment\" means any production deployment of the Software that operates on servers, cloud platforms, web applications, or where the software is used to provide functionality to end users, customers, or the public. Production Environment excludes internal development.\n\n\"Development Environment\" means any internal hosting or deployment of the Software for development, testing, or staging purposes, operated by your organization and not accessible to end users, customers, or the public.\n\n\"License Key\" means the programmatically generated key that controls Software functionality and usage restrictions.\n\n## Permissions\n\nSubject to the following conditions, you are permitted to:\n\n- Use the Software in Development Environments.\n- Modify the Software to suit your needs.\n- Bundle the Software with your own projects.\n- Submit modifications of the Software to tldraw.\n\n## Conditions\n\nIn exchange for these permissions, you agree:\n\n- Not to use the Software in Production Environments.\n- Not to disable, change, or interfere with the Software's License Key enforcement.\n- Not to remove any copyright or other notices from the Software.\n- Not to make the Software available under a license that supersedes or negates the effect of this License.\n- Not to distribute the Software or modifications of the Software as a standalone product, but only as part of another"
+      }
+    ]
+  },
+  {
+    "name": "TRELLIS",
+    "repo": "microsoft/TRELLIS",
+    "sha": "442aa1e1afb9014e80681d3bf604e8d728a86ee7",
+    "commitDate": "2025-11-05T21:18:14+08:00",
+    "fileCount": 207,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+      },
+      {
+        "path": "README.md",
+        "sha256": "675a1bab7837d22972a776dec8e2a2eb01f9211bd40b4c57112a8335ccb9ec3e"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "    MIT License\n\n    Copyright (c) Microsoft Corporation.\n\n    Permission is hereby granted, free of charge, to any person obtaining a copy\n    of this software and associated documentation files (the \"Software\"), to deal\n    in the Software without restriction, including without limitation the rights\n    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n    copies of the Software, and to permit persons to whom the Software is\n    furnished to do so, subject to the following conditions:\n\n    The above copyright notice and this permission notice shall be included in all\n    copies or substantial portions of the Software.\n\n    THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n    SOFTWARE\n"
+      }
+    ]
+  },
+  {
+    "name": "Wan-Move",
+    "repo": "ali-vilab/Wan-Move",
+    "sha": "80c58a7d2ad175fa82a4d57f79f2a1415317dcfa",
+    "commitDate": "2026-01-05T19:31:27+08:00",
+    "fileCount": 98,
+    "rootDocuments": [
+      {
+        "path": "LICENSE.txt",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      },
+      {
+        "path": "README.md",
+        "sha256": "6facea9386391c493511df287082e370a15d0d528218ecc5257375ecf99eed66"
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "b251d6cf5d85ee423972e7b8b8e3dddb06fc981055b393f531b295b768053b01"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "3fc52447d9bfa0a86e6715250fc32e44d9e605f2623ade78d5978d5c04e1894e"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE.txt",
+        "text": "                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an exampl"
+      }
+    ]
+  },
+  {
+    "name": "Wan2.2",
+    "repo": "Wan-Video/Wan2.2",
+    "sha": "1ea34ff48f87168174e12956e200b1d908b1c5ff",
+    "commitDate": "2026-09-21T14:16:22+08:00",
+    "fileCount": 87,
+    "rootDocuments": [
+      {
+        "path": "LICENSE.txt",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      },
+      {
+        "path": "README.md",
+        "sha256": "40222cb3a66cc89aa1cd84589d1fa696806c93c09cf1c4383b3994139202dfa1"
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "b63e6bccd0678038a57c471c14ae052d7e8e2a133d69c842c4d43c15e13ee0b1"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "8338a62490c93cfbf908bb289bbaa3fb104e5606415bb48cca6cae5175313c44"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE.txt",
+        "text": "                                 Apache License\n                           Version 2.0, January 2004\n                        http://www.apache.org/licenses/\n\n   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION\n\n   1. Definitions.\n\n      \"License\" shall mean the terms and conditions for use, reproduction,\n      and distribution as defined by Sections 1 through 9 of this document.\n\n      \"Licensor\" shall mean the copyright owner or entity authorized by\n      the copyright owner that is granting the License.\n\n      \"Legal Entity\" shall mean the union of the acting entity and all\n      other entities that control, are controlled by, or are under common\n      control with that entity. For the purposes of this definition,\n      \"control\" means (i) the power, direct or indirect, to cause the\n      direction or management of such entity, whether by contract or\n      otherwise, or (ii) ownership of fifty percent (50%) or more of the\n      outstanding shares, or (iii) beneficial ownership of such entity.\n\n      \"You\" (or \"Your\") shall mean an individual or Legal Entity\n      exercising permissions granted by this License.\n\n      \"Source\" form shall mean the preferred form for making modifications,\n      including but not limited to software source code, documentation\n      source, and configuration files.\n\n      \"Object\" form shall mean any form resulting from mechanical\n      transformation or translation of a Source form, including but\n      not limited to compiled object code, generated documentation,\n      and conversions to other media types.\n\n      \"Work\" shall mean the work of authorship, whether in Source or\n      Object form, made available under the License, as indicated by a\n      copyright notice that is included in or attached to the work\n      (an exampl"
+      }
+    ]
+  },
+  {
+    "name": "Wan2GP",
+    "repo": "deepbeepmeep/Wan2GP",
+    "sha": "6479db36bdc2619a904a852bba9c2d78e1a83f82",
+    "commitDate": "2026-10-07T11:57:44+02:00",
+    "fileCount": 2812,
+    "rootDocuments": [
+      {
+        "path": "LICENSE.txt",
+        "sha256": "67c8e68389c945423c560c13936f0a960e5d2ffdcc5bb2ded4122fe1b095960f"
+      },
+      {
+        "path": "README.md",
+        "sha256": "65e0f50a402ca96f8da423b31d755647479b628389ba45817192cde8099e306f"
+      },
+      {
+        "path": "requirements.txt",
+        "sha256": "a9c4b97e100095e17302d27a2b8e35e5ec4b476a322ab2ed366cd30de97cc970"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE.txt",
+        "text": "WanGP Community License 2.0\n(for the WanGP / Wan2GP project)\n\nIMPORTANT: READ CAREFULLY. BY USING, COPYING, MODIFYING, OR\nDISTRIBUTING THE SOFTWARE, YOU AGREE TO THIS LICENSE.\n\nPLAIN-ENGLISH SUMMARY (NON-BINDING)\n\nYou may use WanGP for free, including inside a company.\nYou may modify WanGP for your own use.\nYou may use WanGP to create outputs and you may sell or license those\noutputs.\nYou are only asked to credit WanGP when you directly sell or license an\noutput created with WanGP.\nYou may not sell WanGP itself, white-label it, embed it in a paid\nproduct, or offer paid API / SaaS / hosted / OEM access to it without a\nseparate written reseller or commercial license.\nThird-party open-source code, models, weights, datasets, and other\ncomponents keep their own licenses. This License applies only to the\nLicensor's own copyrightable WanGP implementation and does not reduce\nrights granted under separate third-party licenses.\nFor redistributed WanGP source or bundles, a reasonable compliance path\nfor bundled open-source code is sufficient, such as preserving in-tree\nnotices and including standard open-source license texts in a LICENSES\nor similar directory. This License does not require a full inventory of\nseparately installed package-manager requirements or transitive\ndependencies that are not packaged with WanGP.\nIn practical terms, the Software covers WanGP's added engineering and\nproductization layer as embodied in the Licensor's own implementation,\nsuch as low-VRAM and VRAM-management work, speed improvements,\nmulti-model automation, Deepy agentic assistant workflows, UI and\nqueueing layers, API and headless interfaces, packaging, and\nintegration glue.\nIllegal or seriously abusive uses are prohibited.\n\nIf this summary conflicts with the binding terms below, the binding\nter"
+      }
+    ]
+  },
+  {
+    "name": "xyflow",
+    "repo": "xyflow/xyflow",
+    "sha": "3d35b57317576b0916c0bfeaaedd573aaacc2839",
+    "commitDate": "2026-09-24T14:38:12+02:00",
+    "fileCount": 697,
+    "rootDocuments": [
+      {
+        "path": "LICENSE",
+        "sha256": "023119ac20fb1c8c9930abe0bcd196989a1960388529a96fc43cebf96f07c9ff"
+      },
+      {
+        "path": "README.md",
+        "sha256": "be7df4c1810d7c7d0e44e26d08404a97fa9ab62d3fdf3e5fd4c31f3070472d63"
+      },
+      {
+        "path": "package.json",
+        "sha256": "99f2d6211ef56a73f1eec9ed3aff7dcb1adcbaa048b3336d5d0505c0199bbe74"
+      }
+    ],
+    "licenseExcerpts": [
+      {
+        "path": "LICENSE",
+        "text": "MIT License\n\nCopyright (c) 2019-2025 webkid GmbH\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
+      }
+    ]
+  }
+]

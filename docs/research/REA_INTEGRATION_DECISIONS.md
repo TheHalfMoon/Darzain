@@ -1,9 +1,5 @@
 # REA integration decisions
 
-Film: copy/adapt independent editor modules; preserve notices; reconstruct only the local process boundary and adapt the FFmpeg algorithm to support explicit audio and validated artifacts. Verified imported-media behavior exists in Darzain.
+Use bounded exact-pin analyses to answer a concrete integration question. Retain available source and executable tests as the behavioral authority. Keep raw large graphs locally; publish hashes/receipts and explicit limitations. The four executed boundaries support scoped adapters, not whole-app adoption.
 
-Providers: defer whole Electron shell; qualify local worker adapters and real capabilities in P03. Do not expose uninstalled models as enabled.
-
-Scene: defer whole application import; qualify state/viewport/camera modules in P05 with visual and generation conditioning tests. Shot metadata alone is not scene composition.
-
-REA does not replace security review, deterministic tests, E2E or source license qualification. Future investigations must identify exact inputs, questions, provider, commands, findings, unknowns and the resulting tested code boundary.
+Future native packaging/IPC or opaque authorized binaries require artifact digest, provider availability and a concrete question before analysis. Re-run only affected subsets after changes. No competitor auth/DRM/rate-limit bypass and no paid provider installation. See [matrix](../REA_TARGET_MATRIX.md) and [findings](../REA_FINDINGS.md).

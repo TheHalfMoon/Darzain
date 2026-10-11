@@ -1,18 +1,16 @@
-# Authoritative roadmap
+# Roadmap and MVP estimate — proposed
 
-Each phase advances only on its acceptance evidence. Implementation and production readiness are tracked separately; no invented completion percentage. The exact live task is specs/CURRENT.md.
+The [master implementation plan](IMPLEMENTATION_PLAN.md) owns tasks and gates. This roadmap owns release scope. Dates below are conditional effort ranges, not delivery promises or observed throughput.
 
-| Phase | Scope | Acceptance gates | Frontier |
+| Stage | Included | Excluded until separately qualified | Release evidence |
 |---|---|---|---|
-| P00 | Sources, competitor workflows, licenses, foundation decisions | Actual source inspection, strongest builds, REA decisions and reuse ledger | Partial: 7 donors and 13 owner snapshots inventoried; remaining sources pending |
-| P01 | Imported-media creative slice | Editable project, actual timeline/preview/export, local agent surface, negative tests, review and exact-head CI | Integrated via PR #1; exact-head CI passed; release qualification remains scoped |
-| P02 | Durable owned projects and jobs | Checksummed history, explicit recovery, crash-safe writes, verified media store, portable archives, restart/cancel/idempotency evidence | In progress: media storage and explicit history/recovery implemented; remaining durability tasks pending |
-| P03 | Local generation execution | Real ComfyUI/Wan2GP adapter, capability/hardware gating, validated generated artifacts and E2E | Pending |
-| P04 | Agent creative parity | Granular typed creative tools, MCP transport, permissions, auditable/idempotent edits | Pending |
-| P05 | Scene composition and art direction | ArtCraft state reuse, camera transforms, layers/poses, render/generation integration | Pending |
-| P06 | Production planning and advanced editing | Story/shot/script continuity, real trim/effects/audio workflows, canonical parity | Pending |
-| P07 | Performance, security, extensibility | Representative workloads, isolation/quotas, adapter contracts, fault injection | Pending |
-| P08 | Desktop and release qualification | Reproducible packages, supported-platform CI, docs, independent reviews and no critical open defects | Pending |
-| P09 | Competitive benchmark and continuing improvement | Matched tasks, honest comparison, measured reliability/quality and maintenance | Pending |
+| Review-ready P00 | 58 pinned sources, bounded code/build/test/REA experiments, contracts, provider evidence, proposed architecture and plan | Full model/native runtime qualification, account/resale rights, independent Claude review | Current package and test/source receipts |
+| First MVP | P01–P03 + minimal P09; one project/asset/timeline authority, offline image/video import, scene/shot, trim/title/audio, preview, real MP4, persistence/recovery, UI/API repeat; Arabic/English core | Paid inference requirement, hosted subscription/credits, all GPU models, empty studio panels, full professional effects/3D | Actual clean-host desktop/local-web slice, MP4, restart/reopen and API parity plus scoped P10/P11 |
+| Production v1 | Qualified image/cinema/director, selected video/audio/motion/3D, BYOK/router, resumable flows/ads, full agent SDK surface, Quality Lab; incremental capabilities | Universal model support, all codecs/OSes, unmeasured identity guarantees, unsupported regional accounts | Per-operation runtime/quality/security/hardware matrix plus full release tests |
+| Competitive expansion | Advanced native/interchange editing, additional models/providers and supported GPUs, collaboration or commercial deployment after entitlement/security work | Silent uploads, automatic unrelated account funding, assumed reseller discounts | Reproducible output/cost/quality comparisons and independently reviewed deployment |
 
-MVP requires P00-P04 acceptance for its explicitly supported workflow. V1 requires P05-P08. P09 remains the longer-term competitive improvement frontier. Optional cloud providers must never become mandatory operating costs.
+MVP work breakdown, assuming one experienced builder with independent reviewers and already-approved scope: foundation/shell/identity 4–8 working days; project/assets/migrations/recovery 6–12; editing/preview/render/jobs 8–15; API parity/Arabic/accessibility/clean-host qualification 6–10. Combined 24–45 working days, roughly 5–9 working weeks. This is a planning estimate with overlapping integration and testing, not an approved schedule. It excludes Claude/founder waiting, native toolchain surprises, model qualification, signing procurement and major redesign from review. Preserve a 1–2 week contingency if Windows shell/storage qualification uncovers severe issues. Re-estimate after the first concrete vertical-slice patch; earlier prototype results do not prove the larger scope is already complete.
+
+Production v1 needs an additional approximately 8–16 weeks for a deliberately limited enabled-engine/provider set, contingent on suitable test hardware, lawful weights and approved capped BYOK tests. Covering every inventoried engine is not this estimate. A GPU-less development host can ship offline editing and route to user-owned optional engines; it cannot establish GPU inference quality. Founder mandatory cloud compute remains zero in both MVP and v1 design.
+
+Priority is actual offline production first, then one image/provider workflow and director continuity, then measured advanced workflows. Commercial credits/subscription mode, hosted compute and multi-user remote service are extensions requiring separate entitlement, billing/auth/tenant-isolation and operational reviews. Provider model versions and prices must be refreshed when enabled.

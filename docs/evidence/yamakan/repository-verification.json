@@ -1,0 +1,14 @@
+{
+  "observedAt": "2026-10-11",
+  "method": "authenticated GitHub owner connection; GET /repos/TheHalfMoon/Darzain/branches/main",
+  "repository": "TheHalfMoon/Darzain",
+  "mainSha": "0d3bdacb51188294ba8d36ce2b218db72f6073a6",
+  "branchProtected": false,
+  "planningBranch": "docs/yamakan-master-plan",
+  "planningBase": "0d3bdacb51188294ba8d36ce2b218db72f6073a6",
+  "product": "Yamakan",
+  "repositoryRenamed": false,
+  "productionCodeChangedByPlanning": false,
+  "claudeReview": "pending; unavailable in this session",
+  "founderReviewedPlanApproval": "pending"
+}
