@@ -1,20 +1,37 @@
-# Mandatory first vertical slice
+# Mandatory first vertical slice — Definition of Done
 
-After Claude review and founder approval, implement and genuinely pass this workflow in UI and API without paid AI inference:
+Revised by the [independent review](review/CLAUDE_INDEPENDENT_REVIEW.md); the original 12-step proposal is preserved at commit 419bc356. After founder approval, the MVP is done only when **every** item below passes on the exact release head, through the UI **and** through typed tools (MCP stdio or REST/CLI) without browser clicks, with no paid inference. Historical Darzain receipts and the unmerged jobs draft are not passes.
 
-1. Launch offline on a supported clean CPU machine without provider keys/GPU; verify no external requests.
-2. Create a project. Repeat English and Arabic UI/mixed-script fixtures during language qualification.
-3. Import actual image, video and audio; record probes/hashes/immutable versions.
-4. Create Scene/Shot IDs and media/reference links; label intent-only camera metadata.
-5. Assemble three scenes on one timeline; trim/split/move/undo/redo and honor locks/targets.
-6. Add titles and audio at nonzero times with overlapping tracks/source offsets.
-7. Preview frame boundaries, portrait containment, independent audio and seek/pause/end behavior.
-8. Export an actual playable MP4 locally; probe dimensions/duration/audio and sample expected picture/title/audio onset.
-9. Cancel an actual export; confirm owned process stops and no falsely complete artifact.
-10. Close project/service, restart with rotated credentials, reopen identical editable state/media/timing.
-11. Corrupt a copy of head and exercise explicit verified history recovery preserving originals/unsaved draft.
-12. Repeat create/import/shot/timeline/title/audio/export/reopen through typed API/tools without browser clicks.
+## Journey (UI and agent, both required)
 
-Record source/build/binary versions, input/output hashes, operation logs, process exits, ffprobe, real application captures/page errors and assertions. A screenshot alone cannot pass production. Historical Darzain evidence and unmerged jobs' 25-step browser receipt retain their actual code state; do not relabel them as Yamakan release passes.
+1. **Clean-host offline launch.** Fresh Windows user profile on a Profile A host, no keys, no GPU, no Python, network adapter disabled. Capture egress (for example `pktmon`) for the whole run: zero external connections.
+2. **Create a project** in English UI and in Arabic UI (`dir="rtl"`), with mixed-script names.
+3. **Import** a still image, a CFR H.264/AAC video, a VFR phone video, a WAV and an MP3. Each records SHA-256, probe and an immutable AssetVersion. The VFR source produces a CFR mezzanine with provenance. One import is ≥ 2 GB, with service RSS below 300 MB throughout.
+4. **Scene/shot structure:** three scenes, shots linked to media, camera metadata labeled as intent.
+5. **Timeline edits:** add, trim, split, move, ripple-free overlap, track lock and target, then undo and redo across ten operations, with the result checked against the expected canonical snapshot hash.
+6. **Titles and audio:** an English title, an Arabic title with trailing punctuation, a mixed Arabic/Latin title with Arabic-Indic digits, two overlapping audio clips with source offsets, gain and fades.
+7. **Preview:** play, seek and pause at boundaries. The parity harness compares preview captures with exported frames at ≥ 12 timestamps (SSIM ≥ 0.95), and title glyph order matches in both.
+8. **Export** an MP4. ffprobe shows the expected width, height, frame rate, duration (±1 frame), H.264 + AAC stream presence, and faststart. Sampled frames match the expected picture at clip boundaries. Audio onset error is ≤ 1 video frame at each clip start. Titles appear only within their time ranges.
+9. **Cancel** a second export mid-run: the owned process exits within 1 s, no `render.mp4` exists, the job is `cancelled`, and the partial output is removed.
+10. **Crash and restart:** hard-kill the service during an export and during a save. The next start succeeds without manual steps. The save is either fully committed or absent, and the export attempt is reconciled to `failed` or `cancelled` with its partial output removed.
+11. **Reopen:** identical canonical snapshot hash, media and timing.
+12. **Corruption recovery:** corrupt a copy of the head blob. The UI and the tool both report it, offer verified history, restore without deleting the corrupt bytes, and preserve the unsaved draft for download.
+13. **Archive round trip:** export an archive, import it on a second clean profile, and get a byte-identical snapshot and media hashes, with no absolute paths or secrets in the archive.
+14. **Programmatic repeat:** steps 2–11 via MCP stdio produce the same canonical snapshot hash as the UI run (excluding IDs and timestamps, normalized by a documented rule), and the same structured errors for conflicts.
 
-Follow-on gates: portable archive round trip, hard crash/stale lock/orphan recovery, pinned input revisions during restore, corrupt media/archive rejection, concurrent writers, full disk, offline networking, Unicode paths/subtitle shaping, codec fallback and SDK parity.
+## Negative and fault tests (all required)
+
+| Area | Test | Pass condition |
+|---|---|---|
+| Concurrency | Two writers, same `expectedRevision`, forced interleave | Exactly one commit, the other gets `REVISION_CONFLICT` |
+| Windows locking | Another process holds a project file without share-delete | Save succeeds (DB commit) or fails without a phantom revision |
+| Disk full | ENOSPC injected at every write call of import, save and export; plus a small-volume CI run | Head unchanged, no partial artifact published, actionable error |
+| Adversarial media | Truncated MP4, huge dimensions, 10,000 streams, HLS/concat referencing remote URLs, polyglot file, zero-length file, decompression bomb image | Rejected with `MEDIA_INVALID` within the time/memory budget; no network attempt |
+| Archives | `../`, absolute, drive and UNC paths, reparse points, duplicate and case-colliding entries, expansion bomb | Rejected before any write outside the staging directory |
+| Loopback | Page served from another `127.0.0.1` port; DNS-rebinding Host; cross-site POST | All denied; no cookie issued |
+| Worker restart | Kill the service with an export in flight | No surviving FFmpeg; attempt reconciled |
+| Unknown schema | Open a project with `formatVersion` = 99 | Read-only inspection; writes refused |
+
+## Evidence bundle
+
+Exact commit, build and FFmpeg build hashes; input and output hashes; ffprobe JSON; sampled frames; audio onset report; parity report; MCP transcript; process exit codes; egress capture; page errors (must be zero). A screenshot alone never passes a step.

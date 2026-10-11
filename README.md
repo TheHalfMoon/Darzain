@@ -4,7 +4,7 @@ Product identity: **Yamakan**. Verified repository: [TheHalfMoon/Darzain](https:
 
 Read [CURRENT](specs/CURRENT.md), [the authoritative master plan](docs/IMPLEMENTATION_PLAN.md), [architecture recommendation](docs/ARCHITECTURE_DECISION.md), then [Claude handoff](docs/CLAUDE_REVIEW_HANDOFF.md). The new P00–P11 roadmap supersedes earlier Darzain implementation numbering for future work. Historical prototype evidence remains historical.
 
-**STOPPED AT THE CLAUDE REVIEW GATE.** Independent Claude review and founder approval are pending. No new production implementation is authorized by this package. 58 source snapshots were examined at varying depths; complete application/model runtime qualification remains partial. No paid inference, commercial software purchase or model-weight download was conducted.
+**STOPPED AT THE FOUNDER APPROVAL GATE.** Independent Claude review of 419bc356 is recorded in [CLAUDE_INDEPENDENT_REVIEW](docs/review/CLAUDE_INDEPENDENT_REVIEW.md) (CONDITIONAL GO for the revised plan; NO-GO for the package as submitted). Founder decisions are pending: [decision packet](docs/FOUNDER_DECISION_PACKET.md). No new production implementation is authorized by this package. 58 source snapshots were examined at varying depths; complete application/model runtime qualification remains partial. No paid inference, commercial software purchase or model-weight download was conducted.
 
 This package contains review-ready proposals and actual bounded evidence. It is not an installable Yamakan release. The existing Darzain prototype and staged unmerged durable-jobs work are preserved. Source/weight/service rights and capability availability remain distinct.
 

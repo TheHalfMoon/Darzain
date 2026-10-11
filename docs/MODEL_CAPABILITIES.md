@@ -31,3 +31,7 @@ Current docs distinguish cloud Wan 3.0 from open Wan2.2 source, MiniMax H3 v2 fr
 Conditioning union: imageReference(role), videoReference(role), audioReference(role), characterReference(version), cameraIntent(convention), motionReference(type), poseReference and segmentation/depth mask. Roles and control types map to versioned adapter schemas; unsupported values cannot be silently dropped. A UI camera position is not proof the generator obeyed it. Router descriptions expose supported combinations rather than independently combining incompatible flags.
 
 Capability lifecycle: candidate → documentationVerified → environmentReady → accountOrModelEntitled → runtimeQualified → releaseEnabled. Local editing-only capabilities may skip provider account entitlement but still need environment/output qualification. Retirement/expiry or failed configuration revokes enablement. Runtime qualification records operation/configuration, exact engine/model/weights where available, hardware, input/output hashes, cost and limitations; it never implies all combinations passed.
+
+## Review amendment: separate states
+
+Every capability records five independent facts: **sourceAvailable**, **weightsLicensed**, **apiEntitled**, **runtimeQualified** (exact hardware or account) and **qualityMeasured** (rubric and sample). Enablement requires the facts relevant to its route. None implies another. Open Generative AI's model list is a MuAPI catalog and establishes none of these facts for direct providers.
