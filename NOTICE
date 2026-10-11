@@ -14,3 +14,5 @@ ownership and licenses remain intact. Darzain's combined distribution follows
 GPL-3.0-or-later; model weights, FFmpeg, fonts and external services are separately
 owned and are not bundled. This file is an attribution notice, not a replacement
 for the source licenses.
+
+Darzain content-addressed byte storage and qualification tests reuse TheHalfMoon/Skelet, commit 5d4778636de8fbb3c8ef71efbfe46d473f8e97e3. Adoption is based on founder-provided authorization in the master directive. No repository license file was found in the inspected snapshot; no upstream open-source license is inferred. Source and modifications are recorded in docs/provenance/imports.json.

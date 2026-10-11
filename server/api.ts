@@ -8,6 +8,17 @@ const tools = {
     .strict(),
   "darzain.project.open": z.object({ projectId: Id }).strict(),
   "darzain.project.list": z.object({}).strict(),
+  "darzain.project.history": z.object({ projectId: Id }).strict(),
+  "darzain.project.restore": z
+    .object({
+      projectId: Id,
+      revision: z.number().int().min(0).max(10000),
+      expectedHeadFingerprint: z
+        .string()
+        .regex(/^[a-f0-9]{64}$/)
+        .nullable(),
+    })
+    .strict(),
   "darzain.project.save": z
     .object({
       project: ProjectSchema,
@@ -55,6 +66,14 @@ export class CreativeAPI {
         return this.store.load(a.projectId);
       case "darzain.project.list":
         return this.store.list();
+      case "darzain.project.history":
+        return this.store.history(a.projectId);
+      case "darzain.project.restore":
+        return this.store.restore(
+          a.projectId,
+          a.revision,
+          a.expectedHeadFingerprint,
+        );
       case "darzain.project.save":
         return this.store.save(a.project, a.expectedRevision);
       case "darzain.export.video":

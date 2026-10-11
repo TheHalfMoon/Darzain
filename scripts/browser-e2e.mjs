@@ -319,6 +319,88 @@ try {
     "Overlapping clips must keep independent source offsets",
   );
   await page.getByRole("button", { name: "Pause", exact: true }).click();
+  const beforeRestore = await getProject();
+  const historyButton = page
+    .locator(".project-list > div")
+    .filter({
+      has: page.getByRole("button", {
+        name: /Browser verified production Revision/,
+      }),
+    })
+    .getByRole("button", { name: "History & recovery" });
+  await historyButton.click();
+  await page
+    .getByRole("button", {
+      name: `Restore revision ${saved.revision}`,
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("status")
+    .filter({ hasText: "Opened Browser verified production" })
+    .waitFor();
+  const restored = await getProject();
+  assert.equal(restored.revision, beforeRestore.revision + 1);
+  assert.equal(restored.clips.length, saved.clips.length);
+  assert.equal(restored.assets.length, saved.assets.length);
+  await page
+    .getByLabel("Scene name")
+    .fill("Unsaved draft retained during recovery");
+  // Corrupt a real head while the editor holds a dirty draft, then recover through UI.
+  const headFile = join(root, "workspace", "projects", projectId, "head.json");
+  writeFileSync(headFile, "interrupted head fixture");
+  await page
+    .locator(".project-list > div")
+    .filter({
+      has: page.getByRole("button", {
+        name: /Browser verified production Revision/,
+      }),
+    })
+    .getByRole("button", { name: "History & recovery" })
+    .click();
+  await page
+    .getByText("The current project cannot be verified.", { exact: false })
+    .waitFor();
+  assert.equal(
+    await page
+      .getByRole("button", {
+        name: `Restore revision ${restored.revision}`,
+        exact: true,
+      })
+      .isDisabled(),
+    true,
+  );
+  const draftEvent = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Download unsaved draft", exact: true })
+    .click();
+  const draft = await draftEvent;
+  await draft.saveAs(join(output, "unsaved-draft.json"));
+  const draftProject = JSON.parse(
+    await readFile(join(output, "unsaved-draft.json"), "utf8"),
+  );
+  assert.equal(
+    draftProject.scenes[0].name,
+    "Unsaved draft retained during recovery",
+  );
+  await page.screenshot({
+    path: join(output, "darzain-recovery.png"),
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", {
+      name: `Restore revision ${restored.revision}`,
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("heading", { name: "Browser verified production", exact: true })
+    .waitFor();
+  await page
+    .getByRole("status")
+    .filter({ hasText: `revision ${restored.revision + 1}.` })
+    .waitFor();
+  assert.equal((await getProject()).revision, restored.revision + 1);
   assert.deepEqual(errors, []);
   const receipt = {
     runtime: process.env.DARZAIN_BROWSER_CHANNEL || "Microsoft Edge",
@@ -342,6 +424,10 @@ try {
       "video import via agent API",
       "independent overlapping audio",
       "embedded video audio muted",
+      "restore older revision through UI",
+      "detect corrupt on-disk project head",
+      "recover project through UI",
+      "download unsaved draft before restoring corrupt open project",
     ],
     focalLengthMm: 85,
     clipsAfterSplit: 4,

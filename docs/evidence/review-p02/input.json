@@ -1,0 +1,6 @@
+{
+  "base": "12c321c779255d1a0a6feec47b999e2f1f46d132",
+  "diffSha256": "b8d09d2a0f176a3d209523e5eeceb86d8e86cb0a937941ce63c42b58f83d1311",
+  "bytes": 73412,
+  "scope": "P02-T01 only: adopted byte store, fsynced immutable revisions, history, explicit restoration with corruption evidence, HTTP/CLI and UI parity. Durable jobs, archives, lock recovery remain later tasks."
+}

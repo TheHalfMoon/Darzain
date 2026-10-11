@@ -1,0 +1,40 @@
+{
+  "reviewer": "backend correctness and parsimony delta review (fresh-context inline bars)",
+  "cycle": 2,
+  "diffSha256": "8fbb87fa349262cdcf78c470f2b6363245b44c5a69f5f80bf53cb996d7eb7939",
+  "scope": "Changed core/durable.ts, core/store.ts and tests/recovery.test.ts only",
+  "verdict": "pass",
+  "findings": [],
+  "resolved": [
+    {
+      "previous": "An oversized damaged head blocks the recovery surface",
+      "status": "resolved",
+      "evidence": "Raw-head fingerprinting uses a fixed 64 KiB buffer independently of bounded JSON parsing; preservation hardlinks and verifies the prior head before replacement. The 3 MiB regression restores successfully and compares retained evidence byte for byte."
+    },
+    {
+      "previous": "Current-head anchor and restoration disagree on a damaged receipt",
+      "status": "resolved",
+      "evidence": "Restore uses the validated current head when it anchors the selected revision. The regression confirms successful restoration, unchanged damaged receipt bytes, and the older revision becoming unverified once its current-head anchor has moved."
+    }
+  ],
+  "bars": {
+    "correctness": "Pass: both reported cases resolved; no new defect found in the changed backend paths. Fingerprint conflicts and forensic verification precede publication.",
+    "parsimony": "Pass: fixed-size fingerprinting and hardlink preservation solve the evidence problem without a generalized storage layer.",
+    "product": "Pass for this delta: damaged-head recovery preserves original bytes and valid current-head anchors remain restorable.",
+    "security": "No new backend boundary issue identified within the trusted-account scope. Existing safe paths and API validation remain unchanged; separate security judge owns the complete verdict."
+  },
+  "validation": {
+    "frozenDeltaHashVerified": true,
+    "command": "rtk proxy node --test tests/recovery.test.ts",
+    "tests": 7,
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0,
+    "productFilesModified": false
+  },
+  "skipIt": [
+    "Same-account mutation of hardlinked evidence is explicitly outside the isolation guarantee.",
+    "Windows power-loss durability and later P02 tasks remain outside this delta."
+  ],
+  "manifest": "backend delta correctness + parsimony: inline bars (session model); no remaining backend findings"
+}

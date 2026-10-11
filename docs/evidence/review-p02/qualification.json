@@ -1,0 +1,33 @@
+{
+  "scope": "P02-T01",
+  "panel": "full; fresh context backend, frontend/product, security; specialized ECC/ponytail providers unavailable, inline bars used explicitly",
+  "cycles": 2,
+  "initialMustFixes": [
+    "oversized corrupt head blocked recovery",
+    "dirty unsavable draft blocked recovery entry"
+  ],
+  "resolvedWorthConsidering": [
+    "current-head anchor restoration despite damaged receipt",
+    "show recovery project identity and current revision"
+  ],
+  "finalVerdicts": {
+    "backend": "pass",
+    "frontend": "pass",
+    "security": "pass"
+  },
+  "tests": {
+    "passed": 32,
+    "failed": 0,
+    "skipped": 1,
+    "skip": "POSIX permission test on Windows"
+  },
+  "browser": {
+    "steps": 22,
+    "pageErrors": 0,
+    "actualDirtyDraftDownload": true
+  },
+  "limitations": [
+    "Scope is engineering preview; durable jobs, archives, crash-lock recovery and full release acceptance remain open.",
+    "OCR local provider failures remain documented in docs/evidence/ocr-attempts.json; no successful OCR review is claimed."
+  ]
+}

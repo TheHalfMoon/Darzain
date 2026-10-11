@@ -1,0 +1,33 @@
+{
+  "judge": "security",
+  "scope": "P02-T01 frozen diff; authenticated loopback preview under a trusted local account",
+  "diffSha256": "b8d09d2a0f176a3d209523e5eeceb86d8e86cb0a937941ce63c42b58f83d1311",
+  "verdict": "pass",
+  "findings": {
+    "must-fix": [],
+    "worth-considering": [],
+    "skip-it": []
+  },
+  "confirmed": [
+    "New history and restore calls inherit the authenticated API and reject unknown properties, non-UUID IDs, invalid revisions and invalid head fingerprints.",
+    "Recovery validates snapshot hashes, project identity and every referenced asset before publishing a replacement head.",
+    "Snapshot reads are bounded; content objects enforce hash-only paths, bounded bytes, private POSIX directories and symlink checks; immutable publication does not overwrite existing snapshots or objects.",
+    "No new secret exposure, shell interpolation or unauthenticated filesystem endpoint was found."
+  ],
+  "acceptedLimitations": [
+    "Same-account mutation after file verification, Windows ACL qualification and Windows power-loss directory durability are explicitly outside this preview guarantee.",
+    "Unkeyed integrity receipts detect accidental corruption; they do not authenticate a malicious operator with workspace write access.",
+    "Durable jobs, archives and lock recovery remain separate future tasks."
+  ],
+  "handoff": [
+    {
+      "owner": "correctness/product",
+      "file": "core/store.ts",
+      "line": 149,
+      "issue": "A head larger than the 2 MiB bound causes history and restore to fail before their damaged-head handling, even when verified snapshots exist.",
+      "fix": "Confirm whether oversized damaged heads are included in recovery acceptance; if so, fingerprint and preserve them using a bounded streaming path rather than removing the read cap."
+    }
+  ],
+  "validation": "Static review of the frozen diff and relevant storage, path, schema, media and authenticated HTTP context; frozen diff SHA-256 verified. Parent-provided test and E2E results were not independently rerun.",
+  "manifest": "security: fresh-context inline judge (session model)"
+}

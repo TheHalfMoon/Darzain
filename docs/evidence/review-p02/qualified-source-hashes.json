@@ -1,0 +1,10 @@
+{
+  "core/store.ts": "c2db3d234f04099d0aa8c66964cfd5dd10ac6e8342028bbab60b1d75e72dbe45",
+  "core/durable.ts": "4b5ae5b421c7462857c3625d1c871d4ee1e01310180c02e2610d8af1ebfc9859",
+  "core/donors/skelet/storage.ts": "67deb21124c581eb5b099a073f11b71c47eb3aa0892e7aabb8835570fbaf3e20",
+  "server/api.ts": "a9675e7f10954c343686998069344b28dd0ccc33d585be76b913b579956eff7a",
+  "src/main.tsx": "3afbad3c3131b6c23277c5249057017665bab6cc9b13d76370f269ba90626364",
+  "tests/recovery.test.ts": "e6041815a83d0793726bf5102a9e674eed6fbad1901bc00774eede63813ca23a",
+  "tests/skelet-storage.test.mjs": "0e8d6d0785377b0671ec5e71618f71a972602a4462d3b55fc4fbe458ad3ba2ba",
+  "scripts/browser-e2e.mjs": "83f110c80bae73086689cda499029a658fdabdb4c8dcf51a26a7c2703e6f5dbb"
+}

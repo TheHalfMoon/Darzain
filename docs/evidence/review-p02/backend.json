@@ -1,0 +1,50 @@
+{
+  "reviewer": "backend correctness and parsimony (fresh-context inline bars)",
+  "diffSha256": "b8d09d2a0f176a3d209523e5eeceb86d8e86cb0a937941ce63c42b58f83d1311",
+  "base": "12c321c779255d1a0a6feec47b999e2f1f46d132",
+  "scope": "P02-T01 backend durable files, project history/restoration, adopted Skelet byte store and API changes",
+  "bars": {
+    "correctness": "One reproduced recovery boundary failure; scoped tests pass. Immutable snapshot/receipt publication order, orphan preservation, media integrity and optimistic restoration conflict checks are sound within the stated scope.",
+    "parsimony": "Pass: stdlib publication helper and retained donor storage are proportionate; no added runtime dependency or speculative architecture.",
+    "product": "Damaged-head recovery gate has an oversized-head gap. Jobs, archives and crash-lock recovery are later tasks and are not findings here.",
+    "security": "No additional blocker found in this backend read: new tools inherit the authenticated loopback entry point and use strict IDs/revisions/fingerprints plus existing safe paths. Same-account mutation and Windows power-loss durability remain explicitly outside this qualification. Separate security judge owns the complete security verdict."
+  },
+  "findings": [
+    {
+      "category": "must-fix",
+      "priority": 2,
+      "file": "core/store.ts",
+      "line": 118,
+      "title": "An oversized damaged head blocks the recovery surface",
+      "issue": "headBytes uses the ordinary 2 MiB readBounded limit and lets its size error escape before history enumerates receipts. With a valid revision 0 plus a head overwritten by 2 MiB + 1 bytes, history fails with 'Project file exceeds its byte limit'; restore calls the same helper, so no verified prior snapshot can be restored through the advertised recovery API/UI.",
+      "fix": "Separate corrupt-head evidence handling from bounded JSON parsing: fingerprint and preserve the raw head with bounded-memory file operations, then expose verified candidates and allow explicit replacement after the fingerprint check. Keep the 2 MiB limit for JSON parsing and preserve the entire original evidence. Add an oversized-head recovery regression.",
+      "evidence": "work/evidence/review-p02/repro-backend.mjs; isolated fixture under work/evidence/review-p02/fixtures/backend-ILaRiy"
+    },
+    {
+      "category": "worth-considering",
+      "priority": 2,
+      "file": "core/store.ts",
+      "line": 239,
+      "title": "Current-head anchor and restoration disagree on a damaged receipt",
+      "issue": "history accepts the valid current head as an integrity anchor and reports its snapshot verified even when its existing receipt is malformed. restore then unconditionally parses that malformed receipt and rejects the offered revision. Reproduced by writing '{}' to 0.receipt.json while leaving head and snapshot intact.",
+      "fix": "Make restoration use the same valid current-head anchor when the selected revision is current, while retaining the malformed receipt as evidence; alternatively distinguish restorable entries from head-verified entries in history.",
+      "evidence": "work/evidence/review-p02/repro-backend.mjs"
+    }
+  ],
+  "skipIt": [
+    "No finding for Windows directory fsync or power-loss guarantees: limitation is explicit.",
+    "No finding for durable jobs, portable archives or lock recovery: these are later P02 tasks.",
+    "No finding for verified-path TOCTOU under hostile same-account mutation: outside the stated local-account scope."
+  ],
+  "validation": {
+    "frozenDiffHashVerified": true,
+    "command": "rtk proxy node --test tests/recovery.test.ts tests/skelet-storage.test.mjs",
+    "tests": 16,
+    "passed": 15,
+    "failed": 0,
+    "skipped": 1,
+    "skipReason": "POSIX permission fixture on Windows",
+    "productFilesModified": false
+  },
+  "manifest": "backend correctness + parsimony: fresh-context inline bars (session model); scoped product/security boundary read; full panel arbitration belongs to caller"
+}

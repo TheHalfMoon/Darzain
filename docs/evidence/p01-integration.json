@@ -1,0 +1,20 @@
+{
+  "pullRequest": "https://github.com/TheHalfMoon/Darzain/pull/1",
+  "reviewedHead": "e530d8e7dcab60a115e5d68aece9a62eda7d85d0",
+  "mergeCommit": "12c321c779255d1a0a6feec47b999e2f1f46d132",
+  "parents": [
+    "f9e032f5384b649258f06728d17d118095a67461",
+    "e530d8e7dcab60a115e5d68aece9a62eda7d85d0"
+  ],
+  "prQualification": {
+    "runId": 38106622223,
+    "conclusion": "success"
+  },
+  "postmergeQualification": {
+    "runId": 38106815347,
+    "conclusion": "success",
+    "event": "push",
+    "head": "12c321c779255d1a0a6feec47b999e2f1f46d132"
+  },
+  "verifiedVia": "Owner-authorized normal merge, fetched Git tree/parents, Codex CI diagnostics for PR and connected GitHub Actions read for main."
+}

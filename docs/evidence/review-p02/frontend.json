@@ -1,0 +1,41 @@
+{
+  "scope": "P02-T01 frontend correctness, product and parsimony; frozen diff b8d09d2a0f176a3d209523e5eeceb86d8e86cb0a937941ce63c42b58f83d1311",
+  "bars": {
+    "correctness": "fail: recovery entry is blocked by a failed save of unsaved current work",
+    "product": "fail: normal cold-start recovery works, but recovery is unreachable from a dirty editor with a damaged head",
+    "parsimony": "pass: bounded state and existing API/run helpers; no unnecessary abstraction",
+    "security": "not separately assessed; parent panel owns backend trigger review"
+  },
+  "findings": [
+    {
+      "category": "must-fix",
+      "priority": 1,
+      "file": "src/main.tsx",
+      "line": 276,
+      "issue": "History & recovery requires a successful autosave before loading history. Open a project, make an unsaved scene edit, then corrupt its head: clicking recovery only sends project.save, reports a JSON error and never opens the panel. A stale revision conflict causes the same block. Reloading to reach recovery discards the retained local edit.",
+      "fix": "Make opening history read-only and independent of successful save; retain dirty editor state on save failure. Provide an explicit save/discard or local-copy choice before a restore replaces dirty work, including a reachable choice when the current head cannot be saved.",
+      "evidence": "frontend-repro.json: actual isolated Edge run; panelCount 0, requests [darzain.project.save], unsavedEditsRetained true"
+    },
+    {
+      "category": "worth-considering",
+      "priority": 2,
+      "file": "src/main.tsx",
+      "line": 357,
+      "issue": "The history heading does not identify its target project or mark the current revision. Opening project B's history while project A remains in the editor leaves A's heading visible beneath the panel; projects with the same default name or damaged heads are difficult to distinguish before restoring.",
+      "fix": "Show the history target name plus a short stable project identifier and label its current revision; keep identity visible for damaged projects using the returned projectId."
+    }
+  ],
+  "evidence": [
+    "Read frozen frontend diff, src/main.tsx, core history/list/save boundary, PRODUCT.md, ROADMAP.md and CURRENT.md",
+    "Inspected actual darzain-recovery.png and 21-step browser receipt with zero page errors",
+    "Ran isolated real Edge reproduction in frontend-repro.mjs; no product files modified"
+  ],
+  "clean": [
+    "Corrupt project rows retain an enabled recovery entry on cold start",
+    "Unverified snapshot restore buttons are disabled",
+    "Restoration carries the server head fingerprint and accepts the returned new revision",
+    "Successful project accepts clear stale revision-history state",
+    "UI plainly states that restore creates a new revision and preserves prior evidence"
+  ],
+  "manifest": "frontend: fresh independent session-model review; correctness inline, parsimony inline, product actual artifacts plus isolated Edge reproduction"
+}
