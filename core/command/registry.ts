@@ -73,6 +73,14 @@ export const commands = {
     input: z.object({}).strict(),
     run: ({ store }) => store.list(),
   }),
+  "yamakan.project.export": define({
+    scope: "project:read",
+    mutation: false,
+    summary:
+      "Export the current revision as canonical project JSON (no host paths or credentials).",
+    input: z.object({ projectId: Id }).strict(),
+    run: ({ store }, a) => store.exportProject(a.projectId),
+  }),
   "yamakan.project.history": define({
     scope: "project:read",
     mutation: false,

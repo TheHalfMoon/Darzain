@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { readFile, writeFile, access } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { randomBytes, timingSafeEqual, randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,24 +16,31 @@ import {
 } from "../core/command/errors.ts";
 import { RESOURCE_POLICY } from "../core/command/policy.ts";
 import { acquireServiceLock } from "../core/service-lock.ts";
+import { isLegacyWorkspace } from "../core/migrate.ts";
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
 const env = (name: string) =>
   process.env[`YAMAKAN_${name}`] || process.env[`DARZAIN_${name}`];
-// A pre-rename default workspace keeps working until T3 migrates it to a new root.
-async function defaultRoot() {
-  const current = path.join(projectRoot, ".yamakan");
-  const legacy = path.join(projectRoot, ".darzain");
-  const exists = (p: string) =>
-    access(p).then(
-      () => true,
-      () => false,
-    );
-  return !(await exists(current)) && (await exists(legacy)) ? legacy : current;
+const root = path.resolve(
+  env("WORKSPACE") || path.join(projectRoot, ".yamakan"),
+);
+// A pre-database Darzain workspace is never opened in place: that would write
+// into the original root. It is migrated into a new root instead.
+const legacyHint = (dir: string) =>
+  `npm run migrate -- "${dir}" "<new empty folder>"`;
+if (await isLegacyWorkspace(root)) {
+  console.error(
+    `This workspace uses the pre-Yamakan format and was not opened. Migrate it with: ${legacyHint(root)}`,
+  );
+  process.exit(1);
 }
-const root = path.resolve(env("WORKSPACE") || (await defaultRoot()));
+const legacyDefault = path.join(projectRoot, ".darzain");
+if (!env("WORKSPACE") && (await isLegacyWorkspace(legacyDefault)))
+  console.warn(
+    `A pre-Yamakan workspace was found and left untouched. Migrate it with: ${legacyHint(legacyDefault)}`,
+  );
 await initializeRoot(root);
 // The OS-owned lock is taken before the database is read and is released by
 // the operating system if this process dies.

@@ -4,15 +4,24 @@ Updated: 2026-10-11. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 
 **Phase:** P01 authority (T1–T3), implementation authorized by the [founder decision record](../docs/FOUNDER_DECISION_RECORD.md) against plan `edbaba6c4f5f2f42e968b4ab2273c8e11620d9af`. [IMPLEMENTATION_PLAN](../docs/IMPLEMENTATION_PLAN.md) is the sole task authority; [operational contracts](../docs/OPERATIONAL_CONTRACTS.md) define protocols. Release verdict: **NO-GO** until every T10 gate passes.
 
-**Verified main:** `c1664985` (T1 PR #6 merged at reviewed head `9f9b5c93`; tree identical). Planning PRs #3 `4e2f4b2b`, #4 `237518ef`, #5 `559ac7f7` merged earlier; tree identical to `edbaba6c`.
+**Verified main:** `27e3c7da` (T2 PR #7 merged at reviewed head `38459f53`; tree identical). T1 PR #6 `c1664985`; planning PRs #3–#5 merged earlier.
 
 | Task | Status | Evidence |
 |---|---|---|
 | T1 command boundary and import guard | **Merged** (#6, `c1664985`) | Combined + security fresh-context reviews (3 cycles, all must-fix resolved); CI `qualify` on exact head; Windows tests + Edge E2E |
-| T2 SQLite snapshot authority | In review on `feat/t2-sqlite-authority` | See the T2 PR body |
-| T3–T10 | Not started | — |
+| T2 SQLite snapshot authority | **Merged** (#7, `27e3c7da`) | Combined + security reviews (3 cycles, 3 must-fix resolved); CI `qualify` on exact head after a Linux-only permission fix; Windows tests + Edge E2E |
+| T3 canonical v1 and migration | In review on `feat/t3-canonical-migration` | See the T3 PR body |
+| T4–T10 | Not started | — |
 
-## T2 surface (in review)
+## T3 surface (in review)
+
+- `core/time.ts`: integer flicks (705,600,000/s) with BigInt intermediates, explicit rounding and safe-integer checks; frame/PTS/time-base conversions.
+- `core/canonical.ts`: `yamakan.project` formatVersion 1 (flicks, rational fps, language, source time base). Newer versions are inspectable but never edited or rewritten. The 30 fps editing shape is a lossless projection; unrepresentable values fail with `CAPABILITY_UNAVAILABLE`.
+- The workspace DB stores canonical snapshots (`yamakan.project/1`); T2 `yamakan.edit-view/1` snapshots upgrade on read and are never rewritten. `yamakan.project.export` returns canonical JSON.
+- `core/migrate.ts` + `npm run migrate`: legacy Darzain workspace → new root. The source is only read; its full file manifest is hashed before and after, and the migration fails if anything changed. Revisions keep their numbers; media is re-verified by hash. A project with an unverifiable head is skipped unless `--accept-latest-verified` is given, and the report says so.
+- The server refuses to open a legacy root and no longer falls back to `.darzain`.
+
+## T2 surface (merged)
 
 - `core/store.ts` `ProjectStore` is now SQLite-backed (`workspace.sqlite`, WAL, `synchronous=FULL`, FK on, `STRICT` tables, `user_version` 1). Snapshot bytes, head CAS, revision, request receipt and outbox event commit in one `BEGIN IMMEDIATE` transaction; replay is checked before the revision. A newer DB version or failed `quick_check` refuses to open (`RECOVERY_REQUIRED`).
 - `core/service-lock.ts`: one service per workspace through SQLite exclusive locking; the OS releases it on process death, so there is no manual unlock.
@@ -48,4 +57,4 @@ Updated: 2026-10-11. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 - **Disk:** C: has ~3 GiB free (99% used); D: has ~20 GiB free. Clone and npm cache live on D:. T4's ≥2 GiB import and T10 media tests need a disk-capacity preflight and may need space freed by the founder.
 - Jev key and an OCR LLM backend are founder-provided resources; without them those reviews stay recorded as unavailable.
 
-**Next executable task:** T3 canonical v1 schema and legacy migration, after T2 merges.
+**Next executable task:** T4 streaming assets and owned probes (needs the native Windows Job Object launch binding), after T3 merges.

@@ -16,6 +16,15 @@ import { mediaHeader, MAX_ASSET_BYTES, probe } from "./media.ts";
 import { readBounded } from "./durable.ts";
 import { LocalContentAddressedStorage } from "./donors/skelet/storage.ts";
 import { CommandError } from "./command/errors.ts";
+import {
+  FORMAT,
+  FORMAT_VERSION,
+  fromEditView,
+  inspectFormat,
+  parseCanonical,
+  toEditView,
+} from "./canonical.ts";
+import type { CanonicalProject } from "./canonical.ts";
 import { RESOURCE_POLICY } from "./command/policy.ts";
 
 export type ProjectHistory = {
@@ -46,9 +55,11 @@ export type StoreOptions = {
   snapshotBytes?: number;
 };
 
-// Snapshot bytes are the 30 fps editing shape (core/project.ts) until the
-// canonical project format lands (T3); the label says exactly that.
-export const SNAPSHOT_FORMAT = "yamakan.edit-view/1";
+// Snapshots hold canonical project bytes (core/canonical.ts). Snapshots that
+// T2 builds stored in the 30 fps editing shape are upgraded on read by the
+// same pure, lossless conversion; they are never rewritten in place.
+export const SNAPSHOT_FORMAT = "yamakan.project/1";
+export const EDIT_VIEW_FORMAT = "yamakan.edit-view/1";
 const MAX_REVISION = 10000;
 const SCHEMA_VERSION = 1;
 const WORKSPACE_SCOPE = "";
@@ -100,6 +111,8 @@ type Commit = {
   receipt?: RequestReceipt;
   // Precondition evaluated inside the transaction, before any write.
   check?: (head: Head) => void;
+  // Project language for the new snapshot; defaults to the current head's.
+  language?: () => CanonicalProject["language"];
   next: (current: () => Project, revision: number) => Project;
 };
 
@@ -244,18 +257,42 @@ export class ProjectStore {
       )
       .get(id) as Head | undefined;
   }
-  #snapshot(hash: string, id: string, revision: number): Project {
+  #canonical(hash: string, id: string, revision: number): CanonicalProject {
     const row = this.#database
-      .prepare("SELECT bytes FROM snapshots WHERE hash = ?")
-      .get(hash) as { bytes: Uint8Array } | undefined;
+      .prepare("SELECT format, bytes FROM snapshots WHERE hash = ?")
+      .get(hash) as { format: string; bytes: Uint8Array } | undefined;
     if (!row) throw new Error("Project snapshot hash mismatch.");
     const text = Buffer.from(row.bytes).toString("utf8");
     if (sha256Hex(text) !== hash)
       throw new Error("Project snapshot hash mismatch.");
-    const project = ProjectSchema.parse(JSON.parse(text));
+    const value: unknown = JSON.parse(text);
+    const project =
+      row.format === EDIT_VIEW_FORMAT
+        ? fromEditView(ProjectSchema.parse(value))
+        : parseCanonical(value);
     if (project.id !== id || project.revision !== revision)
       throw new Error("Project snapshot identity mismatch.");
     return project;
+  }
+  #newerFormat(hash: string): boolean {
+    const row = this.#database
+      .prepare("SELECT format, bytes FROM snapshots WHERE hash = ?")
+      .get(hash) as { format: string; bytes: Uint8Array } | undefined;
+    if (!row || row.format === EDIT_VIEW_FORMAT) return false;
+    try {
+      const info = inspectFormat(
+        JSON.parse(Buffer.from(row.bytes).toString("utf8")),
+      );
+      return (
+        info.format === FORMAT && (info.formatVersion ?? 0) > FORMAT_VERSION
+      );
+    } catch {
+      return false;
+    }
+  }
+  // The editing shape the current editor and renderer consume.
+  #snapshot(hash: string, id: string, revision: number): Project {
+    return toEditView(this.#canonical(hash, id, revision));
   }
   static fingerprint(head: Head) {
     return sha256Hex(`${head.revision}:${head.snapshot_hash}`);
@@ -333,10 +370,17 @@ export class ProjectStore {
         if (!head) throw new Error("Project not found.");
         return this.#snapshot(head.snapshot_hash, c.projectId, head.revision);
       };
-      const next = ProjectSchema.parse(c.next(current, revision));
-      if (next.id !== c.projectId || next.revision !== revision)
+      const view = ProjectSchema.parse(c.next(current, revision));
+      if (view.id !== c.projectId || view.revision !== revision)
         throw new Error("Project snapshot identity mismatch.");
-      const bytes = Buffer.from(canonicalJson(next), "utf8");
+      const language =
+        c.language?.() ??
+        (head
+          ? this.#canonical(head.snapshot_hash, c.projectId, head.revision)
+              .language
+          : "en");
+      const canonicalNext = fromEditView(view, language);
+      const bytes = Buffer.from(canonicalJson(canonicalNext), "utf8");
       if (
         bytes.length >
         Math.min(
@@ -399,7 +443,8 @@ export class ProjectStore {
       this.#options.fault?.("before-commit");
       db.exec("COMMIT");
       this.#options.fault?.("after-commit");
-      return next;
+      // Return exactly what a later load returns.
+      return toEditView(canonicalNext);
     } catch (e) {
       if (db.isTransaction) db.exec("ROLLBACK");
       throw isBusy(e)
@@ -425,6 +470,74 @@ export class ProjectStore {
     const head = this.#head(id);
     if (!head) throw new Error("Project not found.");
     return this.#snapshot(head.snapshot_hash, id, head.revision);
+  }
+  // Migration only (T3): import a project's verified history with its original
+  // revision numbers into this workspace in one transaction. Refuses a project
+  // that already exists; nothing is committed if any revision is invalid.
+  importHistory(projectId: string, revisions: CanonicalProject[]) {
+    Id.parse(projectId);
+    if (!revisions.length) throw new Error("Migration has no revisions.");
+    const ordered = [...revisions].sort((a, b) => a.revision - b.revision);
+    const db = this.#database;
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      if (this.#head(projectId))
+        throw new CommandError("VALIDATION", "Project already exists.");
+      const limit = Math.min(
+        RESOURCE_POLICY.enforced.snapshotBytes,
+        this.#options.snapshotBytes ?? Infinity,
+      );
+      let parent: number | null = null;
+      let headHash = "";
+      for (const project of ordered) {
+        const p = parseCanonical(project);
+        if (p.id !== projectId)
+          throw new Error("Project snapshot identity mismatch.");
+        const bytes = Buffer.from(canonicalJson(p), "utf8");
+        if (bytes.length > limit)
+          throw new CommandError(
+            "LIMIT_EXCEEDED",
+            "Project snapshot exceeds its byte limit.",
+          );
+        headHash = sha256Hex(bytes);
+        db.prepare(
+          "INSERT INTO snapshots(hash, format, bytes, byte_length) VALUES (?, ?, ?, ?) ON CONFLICT(hash) DO NOTHING",
+        ).run(headHash, SNAPSHOT_FORMAT, bytes, bytes.length);
+        if (parent === null)
+          db.prepare(
+            "INSERT INTO projects(project_id, revision, snapshot_hash) VALUES (?, ?, ?)",
+          ).run(projectId, p.revision, headHash);
+        db.prepare(
+          "INSERT INTO revisions(project_id, revision, snapshot_hash, parent_revision, operation, receipt_id) VALUES (?, ?, ?, ?, ?, NULL)",
+        ).run(projectId, p.revision, headHash, parent, "migration.import");
+        parent = p.revision;
+      }
+      db.prepare(
+        "UPDATE projects SET revision = ?, snapshot_hash = ? WHERE project_id = ?",
+      ).run(parent, headHash, projectId);
+      db.prepare(
+        "INSERT INTO outbox(project_id, revision, operation) VALUES (?, ?, ?)",
+      ).run(projectId, parent, "migration.import");
+      db.exec("COMMIT");
+    } catch (e) {
+      if (db.isTransaction) db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+  // Publish verified media bytes into this workspace's content-addressed store.
+  async importObject(
+    projectId: string,
+    source: AsyncIterable<Uint8Array>,
+  ): Promise<{ sha256: string; byteLength: number }> {
+    await this.#ensureDirectories(projectId);
+    return (await this.#objects(projectId)).put(source);
+  }
+  // Canonical bytes for portable export: no host paths, tokens or UI state.
+  async exportProject(id: string): Promise<CanonicalProject> {
+    Id.parse(id);
+    const head = this.#head(id);
+    if (!head) throw new Error("Project not found.");
+    return this.#canonical(head.snapshot_hash, id, head.revision);
   }
   async list() {
     const rows = this.#database
@@ -518,7 +631,8 @@ export class ProjectStore {
       )
       .get(id, revision) as { snapshot_hash: string } | undefined;
     if (!row) throw new Error("Revision not found.");
-    const selected = this.#snapshot(row.snapshot_hash, id, revision);
+    const restoredCanonical = this.#canonical(row.snapshot_hash, id, revision);
+    const selected = toEditView(restoredCanonical);
     // Filesystem verification happens before, never inside, the transaction.
     for (const asset of selected.assets) await this.#verifiedAsset(id, asset);
     return this.#commit({
@@ -534,7 +648,14 @@ export class ProjectStore {
             "REVISION_CONFLICT",
             "Revision conflict; refresh history before restoring.",
           );
+        // A damaged head may be replaced; a head written by a newer build may not.
+        if (this.#newerFormat(head.snapshot_hash))
+          throw new CommandError(
+            "RECOVERY_REQUIRED",
+            "The current revision uses a newer project format; restore it with a newer build.",
+          );
       },
+      language: () => restoredCanonical.language,
       next: (_current, next) => ({ ...selected, revision: next }),
     });
   }
