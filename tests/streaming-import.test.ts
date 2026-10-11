@@ -164,12 +164,12 @@ test("an injected out-of-space failure while staging commits nothing", async () 
   store.close();
 });
 
-test("a version 1 workspace database upgrades to version 2 in place", async () => {
+test("a version 1 workspace database upgrades step by step to the current version", async () => {
   const { root, store } = await workspace();
   store.close();
   const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
   db.exec(
-    "DROP TABLE asset_versions; DROP TABLE asset_objects; PRAGMA user_version = 1",
+    "DROP TABLE attempts; DROP TABLE jobs; DROP TABLE supervisor; DROP TABLE asset_versions; DROP TABLE asset_objects; PRAGMA user_version = 1",
   );
   db.close();
   const reopened = new ProjectStore(root);
@@ -178,9 +178,11 @@ test("a version 1 workspace database upgrades to version 2 in place", async () =
   assert.equal(
     (check.prepare("PRAGMA user_version").get() as { user_version: number })
       .user_version,
-    2,
+    3,
   );
   assert.equal(rows(root, "asset_objects"), 0);
+  assert.equal(rows(root, "jobs"), 0);
+  assert.equal(rows(root, "supervisor"), 1);
   check.close();
   reopened.close();
 });

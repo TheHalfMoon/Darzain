@@ -19,7 +19,7 @@ import { CommandError, toCommandError } from "../core/command/errors.ts";
 import { RESOURCE_POLICY } from "../core/command/policy.ts";
 import { canonicalJson, sha256Hex } from "../core/donors/ninerr/canonical.ts";
 import { ProjectStore } from "../core/store.ts";
-import { RenderQueue } from "../core/render.ts";
+import { JobSupervisor } from "../core/jobs.ts";
 // @ts-expect-error The guard is a plain .mjs module without declarations.
 import { checkImports } from "../scripts/import-guard.mjs";
 
@@ -100,7 +100,7 @@ test("scopes are enforced before input validation and execution", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-scope-"));
   const store = new ProjectStore(root);
   await store.initialize();
-  const queue = new RenderQueue(store);
+  const queue = new JobSupervisor(store);
   const readOnly = { store, queue, principal: principal("project:read") };
   await assert.rejects(
     execute(readOnly, "yamakan.project.create", { name: "Denied" }),

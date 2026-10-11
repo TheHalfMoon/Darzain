@@ -55,7 +55,7 @@ export type StoreOptions = {
 export const SNAPSHOT_FORMAT = "yamakan.project/1";
 export const EDIT_VIEW_FORMAT = "yamakan.edit-view/1";
 const MAX_REVISION = 10000;
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const WORKSPACE_SCOPE = "";
 
 // Asset objects are content-addressed files under a project; a version is a
@@ -76,6 +76,40 @@ CREATE TABLE asset_versions(
   probe TEXT,
   FOREIGN KEY(project_id, digest) REFERENCES asset_objects(project_id, digest)
 ) STRICT;
+`;
+// Durable jobs (T5): intent in jobs, execution identity in attempts, and one
+// supervisor generation that fences attempts from an earlier service run.
+const SCHEMA_V3 = `
+CREATE TABLE jobs(
+  job_id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  frozen_revision INTEGER NOT NULL CHECK(frozen_revision >= 0),
+  idempotency_key TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  state TEXT NOT NULL CHECK(state IN ('queued', 'preparing', 'running', 'validating', 'succeeded', 'cancelRequested', 'cancelled', 'failed', 'reconciliationRequired')),
+  cancel_requested INTEGER NOT NULL DEFAULT 0 CHECK(cancel_requested IN (0, 1)),
+  progress REAL NOT NULL DEFAULT 0,
+  error TEXT,
+  artifact TEXT,
+  UNIQUE(project_id, kind, frozen_revision, idempotency_key)
+) STRICT;
+CREATE INDEX jobs_active ON jobs(state) WHERE state NOT IN ('succeeded', 'cancelled', 'failed', 'reconciliationRequired');
+CREATE TABLE attempts(
+  job_id TEXT NOT NULL REFERENCES jobs(job_id),
+  attempt_no INTEGER NOT NULL CHECK(attempt_no > 0),
+  generation INTEGER NOT NULL,
+  state TEXT NOT NULL CHECK(state IN ('preparing', 'running', 'validating', 'succeeded', 'cancelled', 'failed')),
+  pid INTEGER,
+  exit_code INTEGER,
+  error TEXT,
+  PRIMARY KEY(job_id, attempt_no)
+) STRICT;
+CREATE TABLE supervisor(
+  id INTEGER PRIMARY KEY CHECK(id = 1),
+  generation INTEGER NOT NULL
+) STRICT;
+INSERT INTO supervisor(id, generation) VALUES (1, 0);
 `;
 const SCHEMA = `
 CREATE TABLE snapshots(
@@ -257,7 +291,7 @@ export class ProjectStore {
         "PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;",
       );
       // Versioned, transactional schema steps; each commits on its own.
-      const steps = [SCHEMA, SCHEMA_V2];
+      const steps = [SCHEMA, SCHEMA_V2, SCHEMA_V3];
       for (let v = acceptable(db); v < SCHEMA_VERSION; v++) {
         db.exec("BEGIN IMMEDIATE");
         try {
@@ -517,6 +551,40 @@ export class ProjectStore {
     });
     await this.#ensureDirectories(p.id);
     return p;
+  }
+  // Runs fn inside one immediate transaction for other core modules (jobs).
+  // fn must be synchronous: no I/O, process or network wait inside.
+  transaction<T>(fn: (db: DatabaseSync) => T): T {
+    const db = this.#database;
+    try {
+      db.exec("BEGIN IMMEDIATE");
+    } catch (e) {
+      throw isBusy(e)
+        ? new CommandError("BUSY", "Workspace database is busy; retry.")
+        : e;
+    }
+    try {
+      const result = fn(db);
+      db.exec("COMMIT");
+      return result;
+    } catch (e) {
+      if (db.isTransaction) db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+  read<T>(fn: (db: DatabaseSync) => T): T {
+    return fn(this.#database);
+  }
+  // The editing shape of one retained revision (jobs render frozen revisions).
+  async loadRevision(id: string, revision: number): Promise<Project> {
+    Id.parse(id);
+    const row = this.#database
+      .prepare(
+        "SELECT snapshot_hash FROM revisions WHERE project_id = ? AND revision = ?",
+      )
+      .get(id, revision) as { snapshot_hash: string } | undefined;
+    if (!row) throw new Error("Revision not found.");
+    return this.#snapshot(row.snapshot_hash, id, revision);
   }
   async load(id: string): Promise<Project> {
     Id.parse(id);

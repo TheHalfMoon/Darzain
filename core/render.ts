@@ -1,18 +1,11 @@
-import { spawn } from "node:child_process";
-import {
-  writeFile,
-  mkdir,
-  rename,
-  unlink,
-  copyFile,
-  access,
-} from "node:fs/promises";
-import { randomUUID } from "node:crypto";
+import { writeFile, mkdir, unlink, copyFile, access } from "node:fs/promises";
+import path from "node:path";
 import { ProjectSchema } from "./project.ts";
 import type { Project } from "./project.ts";
 import { ProjectStore } from "./store.ts";
 import { probe } from "./media.ts";
 import { RESOURCE_POLICY } from "./command/policy.ts";
+import { mediaTools, workers } from "./process/workers.ts";
 export type RenderJob = {
   id: string;
   projectId: string;
@@ -25,12 +18,16 @@ export type RenderJob = {
 // Adapted from the donor's buildTimelineCommand: ordered overlays, source trimming,
 // normalized timestamps, scale-to-fit, and a deterministic black canvas. Yamakan adds
 // explicit audio mixing, safe title text files, cancellation and verified atomic output.
+// Renders into a project-relative staging folder through an owned FFmpeg
+// worker and returns the verified, unpublished output file. Publication and
+// the terminal job state belong to the job supervisor (core/jobs.ts).
 export async function renderProject(
   store: ProjectStore,
   p: Project,
-  jobId: string,
+  staging: string[],
   signal: AbortSignal,
   onProgress: (value: number) => void,
+  onCreated?: (pid: number) => void | Promise<void>,
 ) {
   ProjectSchema.parse(p);
   const active = p.clips.filter((c) => {
@@ -48,8 +45,8 @@ export async function renderProject(
     throw new Error("Timeline has no active picture or title.");
   const duration =
     Math.max(...active.map((c) => c.startFrame + c.durationFrames)) / p.fps;
-  const dir = await store.file(p.id, "exports", jobId);
-  await mkdir(dir, { recursive: false });
+  const dir = await store.file(p.id, ...staging);
+  await mkdir(dir, { recursive: true });
   if (active.some((c) => c.title !== null)) {
     const fonts = [
       process.env.YAMAKAN_FONT,
@@ -110,7 +107,7 @@ export async function renderProject(
     }
     const { file, asset } = await store.assetFile(p.id, c.assetId!);
     const index = args.filter((x) => x === "-i").length;
-    args.push("-protocol_whitelist", "file,pipe");
+    args.push("-protocol_whitelist", "file");
     if (asset.kind === "image") args.push("-loop", "1", "-t", String(len));
     args.push("-i", file);
     if (asset.kind === "audio") {
@@ -162,32 +159,28 @@ export async function renderProject(
     "pipe:1",
     "render.partial.mp4",
   );
+  const output = path.join(dir, "render.partial.mp4");
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal.addEventListener("abort", abort, { once: true });
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, RESOURCE_POLICY.enforced.renderWallSeconds * 1000);
+  let progress = "";
   try {
-    await new Promise<void>((resolve, reject) => {
-      if (signal.aborted) {
-        reject(new Error("Cancelled."));
-        return;
-      }
-      const child = spawn(
-        process.env.YAMAKAN_FFMPEG || process.env.DARZAIN_FFMPEG || "ffmpeg",
-        args,
-        {
-          cwd: dir,
-          windowsHide: true,
-          stdio: ["ignore", "pipe", "pipe"],
-        },
-      );
-      let error = "",
-        progress = "",
-        timedOut = false;
-      const cancel = () => child.kill();
-      signal.addEventListener("abort", cancel, { once: true });
-      const timer = setTimeout(() => {
-        timedOut = true;
-        child.kill();
-      }, 180000);
-      child.stdout.on("data", (chunk) => {
-        progress += String(chunk);
+    if (signal.aborted) throw new Error("Cancelled.");
+    const result = await workers().run({
+      executable: mediaTools().ffmpeg,
+      args,
+      cwd: dir,
+      memoryBytes: RESOURCE_POLICY.enforced.renderMemoryBytes,
+      signal: controller.signal,
+      onCreated,
+      stderrLimit: 8000,
+      onStdout: (chunk) => {
+        progress += chunk.toString("utf8");
         const lines = progress.split("\n");
         progress = lines.pop() || "";
         for (const line of lines) {
@@ -195,153 +188,33 @@ export async function renderProject(
           if (match)
             onProgress(Math.min(0.99, Number(match[1]) / 1e6 / duration));
         }
-      });
-      child.stderr.on("data", (chunk) => {
-        error = (error + String(chunk)).slice(-8000);
-      });
-      // Public messages never carry FFmpeg stderr, which contains host paths;
-      // the bounded stderr tail stays server-side as the error cause.
-      child.on("error", (cause) =>
-        reject(new Error("FFmpeg is not available.", { cause })),
-      );
-      child.on("close", (code) => {
-        clearTimeout(timer);
-        signal.removeEventListener("abort", cancel);
-        if (signal.aborted) reject(new Error("Cancelled."));
-        else if (timedOut) reject(new Error("Render time limit exceeded."));
-        else if (code !== 0)
-          reject(
-            new Error(`FFmpeg failed to render the timeline (exit ${code}).`, {
-              cause: error,
-            }),
-          );
-        else resolve();
-      });
+      },
     });
-    const output = await store.file(
-      p.id,
-      "exports",
-      jobId,
-      "render.partial.mp4",
-    );
-    const result = await probe(output);
+    if (signal.aborted) throw new Error("Cancelled.");
+    if (timedOut) throw new Error("Render time limit exceeded.");
+    // Public messages never carry FFmpeg stderr, which contains host paths;
+    // the bounded stderr tail stays server-side as the error cause.
+    if (result.code !== 0)
+      throw new Error(
+        `FFmpeg failed to render the timeline (exit ${result.code}).`,
+        { cause: result.stderr },
+      );
+    const probed = await probe(output);
     if (
-      !result.hasVideo ||
-      result.width !== p.width ||
-      result.height !== p.height ||
-      Math.abs(result.durationFrames - duration * 30) > 2 ||
-      (audio.length && !result.hasAudio)
+      !probed.hasVideo ||
+      probed.width !== p.width ||
+      probed.height !== p.height ||
+      Math.abs(probed.durationFrames - duration * 30) > 2 ||
+      (audio.length && !probed.hasAudio)
     )
       throw new Error("Rendered output failed verification.");
-    const completed = await store.file(p.id, "exports", jobId, "render.mp4");
-    if (signal.aborted) throw new Error("Cancelled.");
-    await rename(output, completed);
-    if (signal.aborted) {
-      await unlink(completed);
-      throw new Error("Cancelled.");
-    }
     onProgress(1);
-    return `exports/${jobId}/render.mp4`;
+    return output;
   } catch (e) {
-    await unlink(
-      await store.file(p.id, "exports", jobId, "render.partial.mp4"),
-    ).catch(() => {});
+    await unlink(output).catch(() => {});
     throw e;
-  }
-}
-export class RenderQueue {
-  private jobs = new Map<string, RenderJob>();
-  private controllers = new Map<string, AbortController>();
-  private tail = Promise.resolve();
-  private keys = new Map<string, string>();
-  private closing = false;
-  readonly store: ProjectStore;
-  constructor(store: ProjectStore) {
-    this.store = store;
-  }
-  async close() {
-    this.closing = true;
-    for (const job of this.jobs.values()) this.cancel(job.id);
-    await this.tail;
-  }
-  list() {
-    return [...this.jobs.values()];
-  }
-  status(id: string) {
-    const job = this.jobs.get(id);
-    if (!job) throw new Error("Job not found.");
-    return { ...job };
-  }
-  async submit(projectId: string, key: string) {
-    if (this.closing) throw new Error("Render queue is closing.");
-    if (!/^[a-zA-Z0-9_-]{1,80}$/.test(key))
-      throw new Error("Invalid idempotency key.");
-    const p = await this.store.load(projectId);
-    if (this.closing) throw new Error("Render queue is closing.");
-    const fingerprint = `${p.id}:${p.revision}:${key}`;
-    const prior = this.keys.get(fingerprint);
-    if (prior) return this.status(prior);
-    if (this.jobs.size >= RESOURCE_POLICY.enforced.renderJobsPerSession)
-      throw new Error("Job session limit reached.");
-    const id = randomUUID(),
-      controller = new AbortController();
-    const job: RenderJob = {
-      id,
-      projectId,
-      revision: p.revision,
-      state: "QUEUED",
-      progress: 0,
-      error: null,
-      artifact: null,
-    };
-    this.jobs.set(id, job);
-    this.keys.set(fingerprint, id);
-    this.controllers.set(id, controller);
-    this.tail = this.tail
-      .catch(() => {})
-      .then(async () => {
-        if (controller.signal.aborted) return;
-        job.state = "RUNNING";
-        try {
-          job.artifact = await renderProject(
-            this.store,
-            p,
-            id,
-            controller.signal,
-            (n) => (job.progress = n),
-          );
-          if (controller.signal.aborted) {
-            await unlink(
-              await this.store.file(p.id, ...job.artifact.split("/")),
-            ).catch(() => {});
-            job.artifact = null;
-            throw new Error("Cancelled.");
-          }
-          job.state = "COMPLETED";
-        } catch (e) {
-          job.state = controller.signal.aborted ? "CANCELLED" : "FAILED";
-          // Job status is a public result: never expose workspace paths.
-          job.error = controller.signal.aborted
-            ? null
-            : e instanceof Error
-              ? e.message.replaceAll(this.store.root, "[workspace]")
-              : "Render failed.";
-        } finally {
-          this.controllers.delete(id);
-        }
-      });
-    return { ...job };
-  }
-  cancel(id: string) {
-    const job = this.jobs.get(id);
-    if (!job) throw new Error("Job not found.");
-    if (["QUEUED", "RUNNING"].includes(job.state)) {
-      this.controllers.get(id)?.abort();
-      if (job.state === "QUEUED") {
-        job.state = "CANCELLED";
-        this.controllers.delete(id);
-      }
-    }
-    return { ...job };
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener("abort", abort);
   }
 }

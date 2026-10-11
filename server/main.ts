@@ -57,6 +57,8 @@ const sessionToken = randomBytes(32).toString("hex");
 const clientToken = randomBytes(32).toString("hex");
 await writeFile(await safePath(root, "token"), clientToken, { mode: 0o600 });
 const api = new CreativeAPI(store);
+// Durable jobs: reconcile any interrupted attempts and resume queued work.
+await api.queue.start();
 const port = Number(env("PORT") || 4318);
 const origin = `http://127.0.0.1:${port}`;
 function sameToken(value: string, expected: string) {

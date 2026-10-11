@@ -17,7 +17,7 @@ import { once } from "node:events";
 import { writeFileSync, existsSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { ProjectStore } from "../core/store.ts";
-import { RenderQueue } from "../core/render.ts";
+import { JobSupervisor } from "../core/jobs.ts";
 import { execute, Scopes } from "../core/command/registry.ts";
 import { CommandError } from "../core/command/errors.ts";
 import { acquireServiceLock } from "../core/service-lock.ts";
@@ -159,7 +159,7 @@ test("a process killed inside the transaction leaves no partial commit; one kill
 
 test("request replay is checked before the revision and rejects reused IDs with different input", async () => {
   const { store, project } = await workspace();
-  const queue = new RenderQueue(store);
+  const queue = new JobSupervisor(store);
   const ctx = (requestId: string) => ({
     store,
     queue,
@@ -323,7 +323,7 @@ test("a damaged lock file is set aside and the lock is acquired", async () => {
 
 test("server-generated request IDs are not stored as replay receipts", async () => {
   const { root, store, project } = await workspace();
-  const queue = new RenderQueue(store);
+  const queue = new JobSupervisor(store);
   await execute(
     {
       store,

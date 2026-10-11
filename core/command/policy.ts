@@ -19,7 +19,10 @@ export const RESOURCE_POLICY = Object.freeze({
     timelineFrames: 18000,
     // The render queue is a single serial tail; this documents, not configures, it.
     activeRenderWorkers: 1,
-    renderJobsPerSession: 100,
+    // Active (non-terminal) jobs admitted at once; history never counts.
+    activeJobs: 128,
+    renderWallSeconds: 180,
+    renderMemoryBytes: 2 * GiB,
     renderThreads: 2,
     mediaDimension: 4096,
     probeStreams: 10,
