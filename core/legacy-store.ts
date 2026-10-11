@@ -130,6 +130,10 @@ export class LegacyProjectStore {
       throw error;
     }
   }
+  // Read-only access to one verified revision, for migration (T3).
+  readRevision(id: string, revision: number) {
+    return this.snapshot(id, revision);
+  }
   private async snapshot(id: string, revision: number) {
     HeadSchema.shape.revision.parse(revision);
     const receipt = HeadSchema.parse(
