@@ -34,6 +34,7 @@ export function mediaHeader(bytes: Buffer, ext: string) {
     throw new Error("Media signature does not match a supported format.");
 }
 export async function probe(file: string) {
+  // execFile errors embed the command line and stderr, which contain host paths.
   const { stdout } = await execute(
     process.env.YAMAKAN_FFPROBE || process.env.DARZAIN_FFPROBE || "ffprobe",
     [
@@ -48,7 +49,15 @@ export async function probe(file: string) {
       file,
     ],
     { timeout: 10000, maxBuffer: 1024 * 1024, windowsHide: true },
-  );
+  ).catch((cause: NodeJS.ErrnoException) => {
+    if (cause.code === "ENOENT") throw cause;
+    throw new Error(
+      "Media probe failed; the file is unreadable or unsupported.",
+      {
+        cause,
+      },
+    );
+  });
   const info = JSON.parse(stdout);
   const streams = info.streams || [];
   const visual = streams.find((x: any) => x.codec_type === "video");

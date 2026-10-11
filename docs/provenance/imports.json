@@ -186,9 +186,9 @@
     "modifications": [
       "Adapt buildTimelineCommand algorithm only: canonical frame data, local process isolation, explicit audio mixing, safe title files, cancellation and verified atomic output.",
       "T1: prefer YAMAKAN_FFMPEG/YAMAKAN_FONT with DARZAIN_* compatibility fallback; product name in comments.",
-      "T1 review: render threads and session job limit read the server resource policy; public FFmpeg errors are classified and path-free, with the stderr tail kept as the server-side error cause."
+      "T1 review: render threads and session job limit read the server resource policy; public FFmpeg errors are classified and path-free, with the stderr tail kept as the server-side error cause. Job error messages are redacted of the workspace root."
     ],
-    "importedSha256": "26bc653a9e5e04f99170cbcbb2c6f8eaca7afabb234c383da32b71f950a6a347"
+    "importedSha256": "03834095d28982af1dee14794042513ac4fafd4b57102e9720995866638bdc40"
   },
   {
     "source": "TheHalfMoon/Skelet",

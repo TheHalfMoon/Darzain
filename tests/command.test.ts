@@ -307,17 +307,25 @@ test("import guard accepts the repository and rejects unsafe imports", () => {
     "server/k.ts": 'import vm from "node:vm";',
     "server/l.ts": 'new Worker(src, { eval: true }); import "worker_threads";',
     "server/m.ts": "require(name)",
+    "server/n.ts": "(0, eval)('1')",
   };
   for (const [file, text] of Object.entries(bypasses))
     assert.ok(
       run({ ...clean, [file]: text }).some((v) => v.endsWith(file)),
       `guard missed ${file}: ${text}`,
     );
+  assert.ok(
+    run({
+      ...clean,
+      "core/render.ts":
+        'import { spawn } from "node:child_process";\noptions.shell = true;',
+    }).some((v) => /Shell reference/.test(v)),
+  );
   assert.deepEqual(
     run({
       ...clean,
       "core/render.ts":
-        'import { spawn } from "node:child_process";\nconst m = /x/.exec(line);',
+        'import {\n  spawn,\n  execFile,\n} from "node:child_process";\nconst m = /x/.exec(line);',
       "server/ok.ts": 'const { readFile } = await import("node:fs/promises");',
     }),
     [],
