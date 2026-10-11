@@ -1,4 +1,11 @@
-import { mkdir, readdir, writeFile, unlink, statfs } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  readdir,
+  writeFile,
+  unlink,
+  statfs,
+} from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { canonicalJson, sha256Hex } from "./donors/ninerr/canonical.ts";
@@ -33,9 +40,15 @@ export type RequestReceipt = {
 
 export type FaultPoint =
   "after-snapshot-insert" | "before-commit" | "after-commit";
-export type StoreOptions = { fault?: (point: FaultPoint) => void };
+export type StoreOptions = {
+  fault?: (point: FaultPoint) => void;
+  // Test seam: can only lower the policy's snapshot byte limit.
+  snapshotBytes?: number;
+};
 
-const SNAPSHOT_FORMAT = "yamakan.project/v1";
+// Snapshot bytes are the 30 fps editing shape (core/project.ts) until the
+// canonical project format lands (T3); the label says exactly that.
+export const SNAPSHOT_FORMAT = "yamakan.edit-view/1";
 const MAX_REVISION = 10000;
 const SCHEMA_VERSION = 1;
 const WORKSPACE_SCOPE = "";
@@ -58,7 +71,6 @@ CREATE TABLE command_receipts(
   project_id TEXT NOT NULL,
   request_id TEXT NOT NULL,
   request_digest TEXT NOT NULL,
-  result BLOB NOT NULL,
   committed_revision INTEGER NOT NULL,
   UNIQUE(principal_id, project_id, request_id)
 ) STRICT;
@@ -91,6 +103,40 @@ type Commit = {
   next: (current: () => Project, revision: number) => Project;
 };
 
+// Integrity, version and ownership checks, run read-only before any write.
+function acceptable(db: DatabaseSync): number {
+  const integrity = db.prepare("PRAGMA quick_check").all();
+  if (
+    integrity.length !== 1 ||
+    (integrity[0] as { quick_check: string }).quick_check !== "ok"
+  )
+    throw new CommandError(
+      "RECOVERY_REQUIRED",
+      "Workspace database failed its integrity check; restore a verified backup to a new root.",
+    );
+  const { user_version } = db.prepare("PRAGMA user_version").get() as {
+    user_version: number;
+  };
+  if (user_version > SCHEMA_VERSION)
+    throw new CommandError(
+      "RECOVERY_REQUIRED",
+      `Workspace database version ${user_version} is newer than this build supports.`,
+    );
+  if (
+    user_version === 0 &&
+    (
+      db.prepare("SELECT count(*) AS n FROM sqlite_schema").get() as {
+        n: number;
+      }
+    ).n !== 0
+  )
+    throw new CommandError(
+      "RECOVERY_REQUIRED",
+      "workspace.sqlite is not a Yamakan workspace database.",
+    );
+  return user_version;
+}
+
 const isBusy = (e: unknown) =>
   e instanceof Error && /database is locked|SQLITE_BUSY/i.test(e.message);
 
@@ -109,30 +155,33 @@ export class ProjectStore {
   async initialize() {
     await initializeRoot(this.root);
     await mkdir(await safePath(this.root, "projects"), { recursive: true });
-    const db = new DatabaseSync(await safePath(this.root, "workspace.sqlite"), {
-      enableForeignKeyConstraints: true,
-    });
+    const file = await safePath(this.root, "workspace.sqlite");
+    // Inspect before writing anything: a database this build refuses is left
+    // exactly as it was found (no journal-mode change, no schema).
+    if (
+      await access(file).then(
+        () => true,
+        () => false,
+      )
+    ) {
+      const probe = new DatabaseSync(file, { readOnly: true });
+      try {
+        probe.exec("PRAGMA busy_timeout = 5000");
+        acceptable(probe);
+      } catch (e) {
+        throw isBusy(e)
+          ? new CommandError("BUSY", "Workspace database is busy.")
+          : e;
+      } finally {
+        probe.close();
+      }
+    }
+    const db = new DatabaseSync(file, { enableForeignKeyConstraints: true });
     try {
       db.exec(
         "PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;",
       );
-      const integrity = db.prepare("PRAGMA quick_check").all();
-      if (
-        integrity.length !== 1 ||
-        (integrity[0] as { quick_check: string }).quick_check !== "ok"
-      )
-        throw new CommandError(
-          "RECOVERY_REQUIRED",
-          "Workspace database failed its integrity check; restore a verified backup to a new root.",
-        );
-      const { user_version } = db.prepare("PRAGMA user_version").get() as {
-        user_version: number;
-      };
-      if (user_version > SCHEMA_VERSION)
-        throw new CommandError(
-          "RECOVERY_REQUIRED",
-          `Workspace database version ${user_version} is newer than this build supports.`,
-        );
+      const user_version = acceptable(db);
       if (user_version === 0) {
         db.exec("BEGIN IMMEDIATE");
         try {
@@ -155,10 +204,6 @@ export class ProjectStore {
   close() {
     this.#db?.close();
     this.#db = null;
-  }
-  async directory(id: string) {
-    Id.parse(id);
-    return safePath(this.root, "projects", id);
   }
   async file(id: string, ...parts: string[]) {
     return safePath(this.root, "projects", Id.parse(id), ...parts);
@@ -196,9 +241,7 @@ export class ProjectStore {
   #commit(c: Commit): Project {
     const db = this.#database;
     const scope =
-      c.expectedRevision === null && c.operation === "project.create"
-        ? WORKSPACE_SCOPE
-        : c.projectId;
+      c.operation === "project.create" ? WORKSPACE_SCOPE : c.projectId;
     try {
       db.exec("BEGIN IMMEDIATE");
     } catch (e) {
@@ -212,7 +255,7 @@ export class ProjectStore {
       if (c.receipt) {
         const prior = db
           .prepare(
-            "SELECT request_digest, result FROM command_receipts WHERE principal_id = ? AND project_id = ? AND request_id = ?",
+            "SELECT r.request_digest, s.bytes AS result FROM command_receipts r JOIN revisions v ON v.receipt_id = r.id JOIN snapshots s ON s.hash = v.snapshot_hash WHERE r.principal_id = ? AND r.project_id = ? AND r.request_id = ?",
           )
           .get(c.receipt.principalId, scope, c.receipt.requestId) as
           { request_digest: string; result: Uint8Array } | undefined;
@@ -262,7 +305,13 @@ export class ProjectStore {
       if (next.id !== c.projectId || next.revision !== revision)
         throw new Error("Project snapshot identity mismatch.");
       const bytes = Buffer.from(canonicalJson(next), "utf8");
-      if (bytes.length > RESOURCE_POLICY.enforced.snapshotBytes)
+      if (
+        bytes.length >
+        Math.min(
+          RESOURCE_POLICY.enforced.snapshotBytes,
+          this.#options.snapshotBytes ?? Infinity,
+        )
+      )
         throw new CommandError(
           "LIMIT_EXCEEDED",
           "Project snapshot exceeds its byte limit.",
@@ -291,14 +340,13 @@ export class ProjectStore {
         ? Number(
             db
               .prepare(
-                "INSERT INTO command_receipts(principal_id, project_id, request_id, request_digest, result, committed_revision) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO command_receipts(principal_id, project_id, request_id, request_digest, committed_revision) VALUES (?, ?, ?, ?, ?)",
               )
               .run(
                 c.receipt.principalId,
                 scope,
                 c.receipt.requestId,
                 c.receipt.digest,
-                bytes,
                 revision,
               ).lastInsertRowid,
           )
@@ -377,15 +425,16 @@ export class ProjectStore {
         });
     return listed;
   }
-  async history(id: string): Promise<ProjectHistory> {
+  // Newest first and bounded: each listed revision is decoded and hash-checked.
+  async history(id: string, limit = 100): Promise<ProjectHistory> {
     Id.parse(id);
     const head = this.#head(id);
     if (!head) throw new Error("Project not found.");
     const rows = this.#database
       .prepare(
-        "SELECT revision, snapshot_hash FROM revisions WHERE project_id = ? ORDER BY revision DESC",
+        "SELECT revision, snapshot_hash FROM revisions WHERE project_id = ? ORDER BY revision DESC LIMIT ?",
       )
-      .all(id) as Head[];
+      .all(id, Math.min(Math.max(1, limit), 500)) as Head[];
     return {
       projectId: id,
       headFingerprint: ProjectStore.fingerprint(head),

@@ -1,3 +1,4 @@
+import { rename } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import { safePath } from "./paths.ts";
 import { CommandError } from "./command/errors.ts";
@@ -7,11 +8,15 @@ import { CommandError } from "./command/errors.ts";
 // the operating system releases it when the process dies, so a crash never
 // leaves a lock that must be deleted by hand. The file's contents are only
 // diagnostic metadata.
-export async function acquireServiceLock(root: string) {
-  const db = new DatabaseSync(await safePath(root, "service.lock"));
+export async function acquireServiceLock(
+  root: string,
+  retried = false,
+): Promise<{ release: () => void }> {
+  const file = await safePath(root, "service.lock");
+  const db = new DatabaseSync(file);
   try {
     db.exec(
-      "PRAGMA busy_timeout = 0; PRAGMA locking_mode = EXCLUSIVE; PRAGMA journal_mode = MEMORY;",
+      "PRAGMA busy_timeout = 0; PRAGMA locking_mode = EXCLUSIVE; PRAGMA journal_mode = DELETE;",
     );
     db.exec("BEGIN EXCLUSIVE");
     db.exec(
@@ -28,6 +33,19 @@ export async function acquireServiceLock(root: string) {
         "BUSY",
         "Another Yamakan service already owns this workspace.",
       );
+    // A lock file damaged by a crash holds only metadata: keep it aside for
+    // diagnosis and start a fresh one, never requiring manual deletion.
+    if (
+      !retried &&
+      e instanceof Error &&
+      /malformed|not a database/i.test(e.message)
+    ) {
+      await rename(
+        file,
+        await safePath(root, `service.lock.damaged-${Date.now()}`),
+      );
+      return acquireServiceLock(root, true);
+    }
     throw e;
   }
   return { release: () => db.close() };

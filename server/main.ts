@@ -191,7 +191,7 @@ const server = createServer(async (req, res) => {
           request.operation,
           request.parameters,
           principal,
-          request.requestId,
+          request.clientRequestId ? request.requestId : undefined,
         );
         return json(200, { apiVersion: 1, requestId, operation, result });
       }
