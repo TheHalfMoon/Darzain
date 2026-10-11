@@ -1,0 +1,20 @@
+{
+  "source": "NPMScan donor repository audit",
+  "repository": "LudwigKienle/ai-video-production-editor",
+  "ref": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+  "observedAt": "2026-10-11",
+  "totalPackages": 100,
+  "vulnerablePackageCount": 31,
+  "installScriptFlaggedCount": 2,
+  "ownershipRiskFlaggedCount": 1,
+  "coverage": {
+    "totalPackages": 786,
+    "detailedCount": 100,
+    "vulnerabilityCheckedCount": 786,
+    "localPackagesSkipped": 0,
+    "complete": false
+  },
+  "warnings": [],
+  "truncationNote": "686 dependencies past the 100-package detail cap did not get the license/install-script/ownership checks (vulnerable packages are detailed first). 786 of 786 were checked for known vulnerabilities. overflowPackages lists the first 50 names.",
+  "decision": "Do not adopt complete donor dependency/Electron boundary. Selected editor source uses separately audited Darzain lockfile."
+}

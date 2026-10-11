@@ -1,0 +1,18 @@
+{
+  "cycle": 3,
+  "scope": "Two narrow frontend corrections only; no whole-scope rereview",
+  "file": "src/main.tsx",
+  "sha256": "ada70ea697b8f394cc12748873db30cb6a992ad01ee4b04a768c830aeb1a5235",
+  "hashMatchesFinalInput": true,
+  "checks": [
+    "Recomputed current main.tsx SHA256 and matched final-input.json.",
+    "Lines 177-186 distinguish existing-id updates from additions. Existing updates enforce original track lock; all updates and additions enforce destination lock. A locked unrelated occurrence no longer blocks duplicating onto an unlocked track.",
+    "Lines 94-108 derive sequenceDuration and include it in playback effect dependencies. Duration edits clean up the prior timer and restart from the current playhead with the new end time.",
+    "Read current browser regression receipt: locked duplicate rejection, autosave switching, embedded-video muting, overlapping audio at 0.337818 and 1.314587 seconds, empty pageErrors, and 84614-byte export. The receipt does not add dedicated assertions for these two optional paths; their resolution is established by source review."
+  ],
+  "resolved": ["FE-D01", "FE-06-duration"],
+  "mustFix": [],
+  "worthConsidering": [],
+  "verdict": "PASS: both final optional findings resolved; no new defect found in the narrow delta",
+  "manifest": "frontend final delta: inline correctness/parsimony/product; source review plus supplied browser receipt; no new browser run by reviewer"
+}

@@ -1,0 +1,191 @@
+[
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/types.ts",
+    "imported": "src/donors/film-editor/types.ts",
+    "sha256": "be796c82d49d2e2a50ec56b00363c8b5a7f0a8dd041479c18ec4580603e4075c",
+    "modifications": [],
+    "importedSha256": "be796c82d49d2e2a50ec56b00363c8b5a7f0a8dd041479c18ec4580603e4075c"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/components/Timeline.tsx",
+    "imported": "src/donors/film-editor/components/Timeline.tsx",
+    "sha256": "ad0e74169a035125d7aeefa575aee30be4649312523a7315adf665ffd63bf900",
+    "modifications": [
+      "Use isolated LibraryAsset type; omit cloud-backed library hook.",
+      "Duplicate clips use canonical UUIDs."
+    ],
+    "importedSha256": "ef1b80d6057b3476dd1f2d5d070e860ea78564a8760e8146c0b90b764c07b8f0"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/components/PreviewPlayer.tsx",
+    "imported": "src/donors/film-editor/components/PreviewPlayer.tsx",
+    "sha256": "665d367de92f9b6389c3b31d6728703bc1d9335b87892446591053e6c7b789ff",
+    "modifications": [
+      "Use individual media playback elements per clip, dispose detached media/context on removal/unmount, mute embedded video sound to match explicit-audio export, and fit portrait video within the project canvas."
+    ],
+    "importedSha256": "aeb781761fa7a00c4b740fdaa249c428170309028329edf46037b13597428c99"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/components/Waveform.tsx",
+    "imported": "src/donors/film-editor/components/Waveform.tsx",
+    "sha256": "b3f358e3af2c4cba3ed42017a8ba3a085e9e8f9acb7a3fc611f1f1976bdddc4e",
+    "modifications": [],
+    "importedSha256": "b3f358e3af2c4cba3ed42017a8ba3a085e9e8f9acb7a3fc611f1f1976bdddc4e"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/components/icons.tsx",
+    "imported": "src/donors/film-editor/components/icons.tsx",
+    "sha256": "7c8afbacedf67bc51324ecfc75bcfd39b8e4fd8218dd9d4e1a1127cdd0a0f7e1",
+    "modifications": [],
+    "importedSha256": "7c8afbacedf67bc51324ecfc75bcfd39b8e4fd8218dd9d4e1a1127cdd0a0f7e1"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/utils/timecode.ts",
+    "imported": "src/donors/film-editor/utils/timecode.ts",
+    "sha256": "875fbde2c77647b7f28801c9818989349d7dd96e4e770797c7477ce69b340064",
+    "modifications": [],
+    "importedSha256": "875fbde2c77647b7f28801c9818989349d7dd96e4e770797c7477ce69b340064"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/utils/colorGrading.ts",
+    "imported": "src/donors/film-editor/utils/colorGrading.ts",
+    "sha256": "f195fcbdbdbf2a10954418b5b3bd3e2049ed941c4755f37ebbf0a348aaa2874c",
+    "modifications": [],
+    "importedSha256": "f195fcbdbdbf2a10954418b5b3bd3e2049ed941c4755f37ebbf0a348aaa2874c"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/utils/colorWheels.ts",
+    "imported": "src/donors/film-editor/utils/colorWheels.ts",
+    "sha256": "37190717704fe4eb7c65c7698493d2d77965f8ace714d4bce971445b7297c041",
+    "modifications": [],
+    "importedSha256": "37190717704fe4eb7c65c7698493d2d77965f8ace714d4bce971445b7297c041"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/utils/lut.ts",
+    "imported": "src/donors/film-editor/utils/lut.ts",
+    "sha256": "b8ee80b8f6780d8df14069c6d301e70b42c183abac5f1bb3dbeb3248f04d4969",
+    "modifications": [],
+    "importedSha256": "b8ee80b8f6780d8df14069c6d301e70b42c183abac5f1bb3dbeb3248f04d4969"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/utils/effects.ts",
+    "imported": "src/donors/film-editor/utils/effects.ts",
+    "sha256": "d2236a9879b5310a12a2383ab825a9359228d889bfaa4a16ec8797a9120d2d43",
+    "modifications": [],
+    "importedSha256": "d2236a9879b5310a12a2383ab825a9359228d889bfaa4a16ec8797a9120d2d43"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/utils/historyState.ts",
+    "imported": "src/donors/film-editor/utils/historyState.ts",
+    "sha256": "13ba35a80fb3b94b05cb45056c45dcc9d525134c25b2a410427860a89864af2a",
+    "modifications": [],
+    "importedSha256": "13ba35a80fb3b94b05cb45056c45dcc9d525134c25b2a410427860a89864af2a"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/utils/historyState.test.ts",
+    "imported": "src/donors/film-editor/utils/historyState.test.ts",
+    "sha256": "9552fdf17d20ad2fc753f42494f46970e9abc5230d37afe648703fdea3483123",
+    "modifications": [],
+    "importedSha256": "9552fdf17d20ad2fc753f42494f46970e9abc5230d37afe648703fdea3483123"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/utils/exportSettings.ts",
+    "imported": "src/donors/film-editor/utils/exportSettings.ts",
+    "sha256": "7aa1108d1e41a14a9cadbb2c9120e0e372f37942b18565974af42f4d86b1261d",
+    "modifications": [],
+    "importedSha256": "7aa1108d1e41a14a9cadbb2c9120e0e372f37942b18565974af42f4d86b1261d"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/utils/exportSettings.test.ts",
+    "imported": "src/donors/film-editor/utils/exportSettings.test.ts",
+    "sha256": "df2b1a0c229046088ebb7da04ccf2ae376917204949ec8f8876eb33f297418dc",
+    "modifications": [],
+    "importedSha256": "df2b1a0c229046088ebb7da04ccf2ae376917204949ec8f8876eb33f297418dc"
+  },
+  {
+    "source": "TheHalfMoon/Ninerr",
+    "sha": "bec85aa7ee8f1b1695c689aff1631c165baa09fa",
+    "original": "packages/persistence/src/canonical.ts",
+    "imported": "core/donors/ninerr/canonical.ts",
+    "sha256": "2dc287c662c5101323546cfdcbf0f550b79cbb5d5464684a857867e90fc2a039",
+    "modifications": [],
+    "importedSha256": "2dc287c662c5101323546cfdcbf0f550b79cbb5d5464684a857867e90fc2a039"
+  },
+  {
+    "source": "TheHalfMoon/Ninerr",
+    "sha": "bec85aa7ee8f1b1695c689aff1631c165baa09fa",
+    "original": "packages/persistence/src/errors.ts",
+    "imported": "core/donors/ninerr/errors.ts",
+    "sha256": "6b3d1cd0276c17dcfcdce2446933ec47b20017e30f4f5ab9be56efb30a340b74",
+    "modifications": [],
+    "importedSha256": "6b3d1cd0276c17dcfcdce2446933ec47b20017e30f4f5ab9be56efb30a340b74"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/data/moodboardTypes.ts",
+    "imported": "src/donors/film-editor/data/moodboardTypes.ts",
+    "sha256": "32f15d98bf90d8cd88a773ea07109e54a8a47a02543718425dc1210cfeda6865",
+    "modifications": [],
+    "importedSha256": "32f15d98bf90d8cd88a773ea07109e54a8a47a02543718425dc1210cfeda6865"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "src/data/productionFormats.ts",
+    "imported": "src/donors/film-editor/data/productionFormats.ts",
+    "sha256": "1f3c269f7347f7338a75a386bf522251c0dc8f916a7e9db868126931c41ba476",
+    "modifications": [],
+    "importedSha256": "1f3c269f7347f7338a75a386bf522251c0dc8f916a7e9db868126931c41ba476"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "index.css",
+    "imported": "src/donors/film-editor/editor.css",
+    "sha256": "6ebee23322e375c52cf27ca5b59ba035d42a0d03e197ee71cc42219a1448533f",
+    "modifications": [
+      "Extract timeline/editor CSS and tokens only; omit remote fonts and unrelated global rules; scope tokens to Darzain app."
+    ],
+    "importedSha256": "ec10b881ca35357be77dba06b57f7f5d0cc1d30c1d35f97162a0e069540cadf8"
+  },
+  {
+    "source": "LudwigKienle/ai-video-production-editor",
+    "sha": "752cd43d3af6421d2bd6d4ce27f2d9815f7acba3",
+    "original": "electron/ffmpeg-handler.js",
+    "imported": "core/render.ts",
+    "sha256": "3d00d53bb30d060c80319147e0afab0f696d2b439e8384b6f495c4b1a902342b",
+    "modifications": [
+      "Adapt buildTimelineCommand algorithm only: canonical frame data, local process isolation, explicit audio mixing, safe title files, cancellation and verified atomic output."
+    ],
+    "importedSha256": "a1b56cbb533ade20fa13d20c1c115eda23824c5d336e036a06a0a9b484fa08ec"
+  }
+]

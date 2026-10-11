@@ -1,0 +1,421 @@
+@import "tailwindcss";
+:root {
+  font-family:
+    Inter,
+    Segoe UI,
+    sans-serif;
+  color: #e8ebf4;
+  background: #0c1019;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button,
+.download {
+  border: 1px solid #333c50;
+  background: #1e2738;
+  color: #e8ebf4;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+}
+button:hover {
+  background: #303b52;
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #8cafef;
+  outline-offset: 2px;
+}
+input,
+select {
+  background: #111722;
+  color: #e8ebf4;
+  border: 1px solid #344156;
+  border-radius: 5px;
+  padding: 7px;
+  width: 100%;
+}
+label {
+  font-size: 12px;
+  color: #aebbd2;
+  display: block;
+  margin: 9px 0;
+}
+label input,
+label select {
+  display: block;
+  margin-top: 5px;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 20px 28px;
+  border-bottom: 1px solid #283147;
+}
+.identity {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.identity strong {
+  letter-spacing: 0.16em;
+  font-size: 21px;
+}
+.identity small {
+  display: block;
+  color: #9cabc0;
+  margin-top: 2px;
+}
+.mark,
+.large-mark {
+  display: grid;
+  place-items: center;
+  color: #a6c9ff;
+  border: 1px solid #678dc5;
+  background: #172844;
+  border-radius: 12px;
+  font-weight: 700;
+}
+.mark {
+  width: 45px;
+  height: 45px;
+  font-size: 27px;
+}
+.large-mark {
+  width: 84px;
+  height: 84px;
+  font-size: 50px;
+  margin: 0 auto 24px;
+}
+nav {
+  display: flex;
+  gap: 8px;
+}
+.badge {
+  font-size: 12px;
+  color: #9cafc8;
+}
+.status {
+  padding: 10px 28px;
+  border-bottom: 1px solid #253047;
+  color: #a9c4eb;
+  font-size: 13px;
+  background: #131e2e;
+  overflow-wrap: anywhere;
+}
+.workspace {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  min-height: calc(100vh - 150px);
+}
+aside {
+  padding: 22px 16px;
+  border-right: 1px solid #253047;
+  overflow: auto;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 22px 0 12px;
+  color: #b3c3db;
+}
+h2:first-child {
+  margin-top: 0;
+}
+h2 span {
+  float: right;
+  color: #7487a5;
+}
+small {
+  font-size: 11px;
+  color: #9cabbe;
+}
+.project-list,
+.asset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 12px 0;
+}
+.project-list button,
+.asset-list button {
+  text-align: left;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.project-list button {
+  display: block;
+}
+.project-list small,
+.asset-list small {
+  display: block;
+  margin-top: 3px;
+}
+.asset-list img {
+  width: 45px;
+  height: 45px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.asset-list span {
+  overflow-wrap: anywhere;
+}
+.hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8699b4;
+  margin-top: 18px;
+}
+main {
+  min-width: 0;
+  padding: 24px;
+  overflow: hidden;
+}
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 20px;
+  align-items: center;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+}
+.primary {
+  background: #a8c8ff;
+  color: #10203a;
+  border-color: #a8c8ff;
+  font-weight: 600;
+}
+.primary:hover {
+  background: #cee0ff;
+}
+.production {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 245px;
+  gap: 22px;
+}
+.preview {
+  background: #05070c;
+  border: 1px solid #27364f;
+  border-radius: 8px;
+  overflow: hidden;
+  align-self: start;
+}
+.preview canvas {
+  max-width: 100%;
+}
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+}
+.transport input {
+  flex: 1;
+  padding: 0;
+}
+.transport span {
+  white-space: nowrap;
+  font: 12px monospace;
+}
+.inspector {
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.scene {
+  border: 1px solid #2b3750;
+  border-radius: 6px;
+  padding: 10px;
+  margin: 10px 0;
+}
+.job {
+  border: 1px solid #486992;
+  border-radius: 6px;
+  margin-top: 16px;
+  padding: 12px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.job progress {
+  width: 100%;
+  margin-top: 12px;
+}
+.download {
+  display: block;
+  margin-top: 10px;
+  text-align: center;
+}
+.error {
+  color: #ffbdc1;
+}
+.timeline {
+  margin-top: 26px;
+  border: 1px solid #2b3951;
+  border-radius: 8px;
+  background: #121927;
+  overflow: hidden;
+  height: 310px;
+}
+.empty {
+  text-align: center;
+  padding: 12vh 4vw;
+  color: #a8b7cc;
+  max-width: 650px;
+  margin: auto;
+}
+.empty h1 {
+  font-size: 28px;
+  color: #e1eafa;
+}
+.empty p {
+  line-height: 1.7;
+  margin-top: 18px;
+}
+.tools {
+  max-width: 760px;
+  padding: 40px 20px;
+  line-height: 1.8;
+}
+.tools pre {
+  background: #172133;
+  padding: 15px;
+  border-radius: 6px;
+  overflow: auto;
+}
+.tools p {
+  margin: 18px 0;
+}
+.tools a {
+  color: #accafa;
+}
+footer {
+  font-size: 11px;
+  color: #657793;
+  padding: 10px 28px;
+  border-top: 1px solid #253047;
+}
+.tl-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  align-items: center;
+  border-bottom: 1px solid #29364c;
+}
+.tl-toolbar button {
+  padding: 4px 7px;
+  font-size: 11px;
+}
+.tl-track {
+  border-bottom: 1px solid #273349;
+}
+.tl-track--active {
+  background: #1c2940;
+}
+.tl-toggle {
+  padding: 4px;
+  border: 0;
+  background: transparent;
+}
+.tl-clip {
+  background: #385675;
+  border: 1px solid #6084ab;
+  border-radius: 4px;
+}
+.tl-clip--audio {
+  background: #305448;
+}
+.tl-clip--title {
+  background: #655338;
+}
+.tl-clip--selected {
+  outline: 2px solid #b5d3ff;
+}
+.tl-clip__name {
+  font-size: 11px;
+  padding: 4px;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 1100px) {
+  .badge {
+    display: none;
+  }
+  .workspace {
+    grid-template-columns: 210px 1fr;
+  }
+  .production {
+    grid-template-columns: 1fr;
+  }
+  .inspector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    max-height: 240px;
+  }
+  .inspector h2 {
+    width: 100%;
+  }
+  .scene {
+    width: 200px;
+  }
+  .toolbar {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 700px) {
+  header {
+    padding: 14px;
+    flex-wrap: wrap;
+  }
+  .workspace {
+    display: block;
+  }
+  aside {
+    border-right: 0;
+    border-bottom: 1px solid #283147;
+    max-height: 250px;
+  }
+  main {
+    padding: 14px;
+  }
+  .identity small {
+    font-size: 10px;
+  }
+  .timeline {
+    height: 330px;
+  }
+  .toolbar button {
+    font-size: 12px;
+  }
+}

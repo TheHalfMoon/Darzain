@@ -1,0 +1,14 @@
+{
+  "name": "artcraft",
+  "task": "build",
+  "command": [
+    "npm.cmd",
+    "run",
+    "build",
+    "-w",
+    "artcraft"
+  ],
+  "exit": 0,
+  "signal": null,
+  "elapsedMs": 138841
+}

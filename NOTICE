@@ -1,0 +1,16 @@
+Darzain integrates source from independently owned projects.
+
+AI Video Production Editor by Ludwig Kienle: GPL-3.0-or-later.
+Origin: https://github.com/LudwigKienle/ai-video-production-editor
+Snapshot: 752cd43d3af6421d2bd6d4ce27f2d9815f7acba3
+
+Ninerr by TheHalfMoon: Apache-2.0.
+Origin: https://github.com/TheHalfMoon/Ninerr
+Snapshot: bec85aa7ee8f1b1695c689aff1631c165baa09fa
+
+Required license texts are retained in notices/. The imported files, hashes and
+modifications are recorded in docs/provenance/imports.json. Original component
+ownership and licenses remain intact. Darzain's combined distribution follows
+GPL-3.0-or-later; model weights, FFmpeg, fonts and external services are separately
+owned and are not bundled. This file is an attribution notice, not a replacement
+for the source licenses.

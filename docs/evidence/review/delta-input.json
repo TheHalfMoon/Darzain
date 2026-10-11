@@ -1,0 +1,14 @@
+{
+  "priorDiffSha256": "17f1a13854e1fa21c36f92afc895e8b0cde0ac46b049ac967ff3542d5fd3d316",
+  "deltaSha256": "b1f91ef9bceb7c32c9df8fc12f7db4f3823abf2c7bf56a344646ac356642663f",
+  "files": [
+    "core/render.ts",
+    "server/main.ts",
+    "src/main.tsx",
+    "src/donors/film-editor/components/PreviewPlayer.tsx",
+    "tests/core.test.ts",
+    "tests/http.test.ts",
+    "scripts/browser-e2e.mjs"
+  ],
+  "bytes": 29693
+}

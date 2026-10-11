@@ -1,0 +1,18 @@
+{
+  "name": "scene",
+  "reaVersion": "6.3.0",
+  "source": "storytold/artcraft",
+  "sourceSha": "28a39a0de4a2fc2eccc237df2046c24245bd12ab",
+  "method": "bounded static AST analysis",
+  "command": "rea-agents@6.3.0 analyze-javascript-application <staged-exact-source-files> --json",
+  "exit": 0,
+  "evidenceId": "ev_5269860a24a6075074dc2bc8fb7769b9303229ee4af3d8cb66ed8005ea0e2d79",
+  "artifactSha256": "32e6814f5831d2e7cadeef63ae20a0e109b70e2f7ae6ad6920e41c387c9d6169",
+  "limitations": [
+    "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+    "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+    "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+    "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+    "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+  ]
+}
