@@ -1,0 +1,25 @@
+{
+  "node": "v24.19.0",
+  "sqlite": "3.53.3",
+  "checks": [
+    "snapshot/head/request committed in one DB transaction",
+    "same-payload retry returns original revision before stale-revision check",
+    "different-payload retry rejected",
+    "stale new request rejected",
+    "process killed after snapshot INSERT rolls back snapshot and head together",
+    "integrity_check ok",
+    "committed canonical bytes available without external snapshot file"
+  ],
+  "time": {
+    "flicksPerSecond": "705600000",
+    "sample48000Ticks": 14700,
+    "legacy120000TicksPer48000Sample": 2.5,
+    "unsafeIntermediateAt213Seconds": true,
+    "counterexample": null
+  },
+  "limits": [
+    "One bounded process-kill trial; not power-loss, physical disk-full, hostile filesystems, or production integration",
+    "No hardware flush guarantee",
+    "No application-code change"
+  ]
+}

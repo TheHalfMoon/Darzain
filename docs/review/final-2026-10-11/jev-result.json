@@ -1,0 +1,7 @@
+{
+  "cli": "jev 2026.919.0",
+  "exit": 0,
+  "stdout": "{\"answers\":{\"q\":{\"noul\":0.81,\"type\":\"noul\"}},\"latency_ms\":492,\"model\":\"jev-1.13.0\",\"ok\":true,\"usage\":{\"input_tokens\":393,\"output_tokens\":20}}\n",
+  "stderr": "",
+  "limitation": "Advisory single typed judgment only; no correctness, security, E2E or approval authority"
+}

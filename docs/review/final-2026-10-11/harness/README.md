@@ -1,0 +1,15 @@
+# Final bounded experiments
+
+These are review prototypes/qualification helpers, not product implementations or final E2E passes. Windows x64, Node 24.19.0, SQLite 3.53.3. Receipts are in the parent directory. All scratch work stays in `work/`.
+
+`storage-spike.mjs`: run from a disposable working directory with `rtk proxy node <absolute path>/storage-spike.mjs`. It creates `work/storage-spike/workspace.sqlite`; use a fresh directory for each run (the unique test request assumes empty DB). Tests transactionally stored snapshot bytes/head/receipt, same-payload replay, mismatched payload and stale revision, one kill after snapshot insert and before commit, integrity and checked-time boundaries. No external snapshot file, power-loss test, real ENOSPC or production DB integration. The counterexample search found no numeric frame mismatch; the unsafe intermediate itself is observed.
+
+`batch-boundary.test.ts`: copy public pinned OpenCut `commands/base-command.ts` and `batch-command.ts` into the test's relative `rea-opencut/commands/` directory, preserving hashes. Run `rtk proxy <Bun 1.2.18 absolute path> test <test path>`. It confirms the first mutation remains when the next throws; passing the test demonstrates an unsafe assumption, not a repaired donor.
+
+Original source qualification: make a disposable copy of `opencut-classic@cf5e79e919144200294fb9fed22a222592a0aeea/apps/web/src`; set tsconfig alias `@/*` to `src/*`. Install only `opencut-wasm@0.2.10`, `culori@4.0.2`, `soundtouchjs@0.3.0` with `--ignore-scripts --no-audit --no-fund`. The first run without dependencies/loader failed: 0 pass, 5 fail, 3 errors. Preserve that result.
+
+Run Bun 1.2.18 with `test --preload ./wasm-loader.ts` for `src/timeline/placement/__tests__/resolve.test.ts`, `src/retime/__tests__/{resolve,split}.test.ts`, `src/animation/__tests__/animated-params.test.ts`, `src/masks/__tests__/snap.test.ts`. Custom loader instantiates the **actual** package WASM; no mock algorithms and no donor test/source edits. Result: 53 pass, 4 fail, 57 tests. Failures: 2 mask numeric expectation mismatches, unavailable headless text measurement context, invalid fractional-tick fixture. Separately, math/sticker tests: 23 pass. No full application build/browser integration.
+
+Bun release archive SHA-256 `240122daf8d848812d14a7f7a08deddf9c8f3768a62f360ca756c92e383227af`, official `oven-sh/bun` v1.2.18. Input manifest records 50 REA files/hashes. To reproduce static analysis use the verified REA 6.3.0 CLI `analyze-javascript-application <bounded input> --artifact-format directory --format json`; capture complete JSON locally. MCP full result exceeded transport budget after successful analysis; export retained evidence instead of treating that as an empty successful scan. Raw 20 MB source-linked capture is kept locally, not committed.
+
+Jev receipt is a single advisory API judgment; never use it for approval. Graft keyless structural build and OCR delegate selection are not model-backed review. PStack final fresh-context reports are separate. Existing Claude harnesses remain untouched and can be ported into future product tests only after founder approval.

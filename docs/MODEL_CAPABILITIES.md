@@ -1,5 +1,7 @@
 # Versioned generation and capability contract
 
+Final proposal: [master plan](IMPLEMENTATION_PLAN.md) and [operational contracts](OPERATIONAL_CONTRACTS.md) own current scope and exact protocols. Earlier evidence remains bounded; no final implementation or founder approval is implied.
+
 GenerationRequest v1 is an operation union, not a flat universal parameter list. Common fields: requestId, projectId/revision, operation, immutable input asset-version refs/hashes, prompt, optional seed, output spec, model/provider constraints, region/privacy policy, maximum cost, approved quote and consent refs. Callers cannot supply arbitrary worker paths/URLs.
 
 Operations: textToImage, imageToImage, inpaint, outpaint, textToVideo, imageToVideo, videoToVideo, extendVideo, audioToVideo, lipSync, upscale, interpolateFrames and generate3D. Camera/motion/character/multiple references are typed conditioning items with declared adapter mapping. Each operation has its own fields and limits; unsupported inputs return CAPABILITY_UNAVAILABLE before a paid call.

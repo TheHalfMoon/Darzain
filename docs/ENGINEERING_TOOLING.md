@@ -1,3 +1,20 @@
-# Historical Darzain document
+# Engineering tooling actually available
 
-This document has been superseded for the current Yamakan frontier. Read [TEST_STRATEGY.md](TEST_STRATEGY.md) and [the master plan](IMPLEMENTATION_PLAN.md). The [preserved historical version](history/darzain/ENGINEERING_TOOLING.md) records an earlier prototype scope; its requirements, phase numbering and tool qualifications do not define Yamakan approval or release status.
+Final verification 2026-10-11. Results live in [evidence](review/final-2026-10-11/evidence.json); earlier Claude tool availability remains historical. No unavailable tool is counted as passing. Tool-assisted review is separate from Windows E2E and founder approval.
+
+| Tool/provider | Actual status and run | Limit/fallback |
+|---|---|---|
+| REA | CLI/MCP 6.3.0 live identity and Codex registration verified; protocol 2025-06-18; 139 tools; 50-file OpenCut static graph exported | Full MCP response exceeded 10 MB; complete retained evidence exported. No Hopper/Ghidra/IDA configured; no native/runtime proof. Claude isolated 6.4.0 retained, not claimed current |
+| Jev | Installed 2026.919.0; one configured TypeSafe review judgment, model jev-1.13.0, probability 0.81, exit 0 | Advisory typed criterion classification only; no correctness/security/approval. Installed CLI differs from skill's example command syntax; live help used. No key printed/stored by this task |
+| Alibaba Open Code Review | CLI 1.12.13 verified; delegate preview/rules applied to final diff | Preview selected 9 of 34 staged files; Markdown is unsupported by the delegate language list, so 25 files were excluded. Relevant rules were read/applied separately to the documents. File/rule selection only; **no OCR LLM-backed review**. Configured model/key absent; not a successful model review |
+| PStack | Installed ps-doctor and ps-review skills read; capability audit and fresh-context final diff panel | Separate combined/security reviewers use inline correctness/parsimony/product/security bars because specialty profiles/ponytail not found. Scope is planning contracts, no UI/product acceptance |
+| Graft | Installed; keyless structural pass succeeds: 9 files, 95 nodes, 239 edges, 9 cards; persist callers identified | No deep LLM graph. Correct prior assumption that all Graft modes need a key; none of this proves durability |
+| Bun | Official 1.2.18 portable archive verified by GitHub SHA-256; used in isolated scratch copy | No donor modifications. Original bounded suites 53/4 plus 23/0; four failures remain explicit; source/WASM loader is not full-app proof |
+| Node/SQLite | Node 24.19.0, SQLite 3.53.3; bounded in-DB snapshot/replay/kill spike passed | One process-kill trial, not hardware flush/physical disk full/production integration |
+| FFmpeg | Installed 8.1.1 build advertises libass/HarfBuzz/FriBidi | Final binary hash/source correspondence, pinned fonts and full parity still gates; capability output is not render proof |
+| E2E/TS/lint/provenance | Existing project scripts and prior exact-head CI available; final proposal CI runs unchanged prototype suite | Planning change does not implement final MVP. Windows acceptance remains required; current GitHub workflow is Linux |
+| Ascout/Kodac | Pinned source policies/catalog inspected; Ascout review-lineage concepts considered, Kodac fallback-secret auth excluded | No runtime execution claimed; neither is independent review or auth qualification |
+
+PStack capability audit: fresh-context subagent API available; per-spawn model selection technically available but reviewers inherit session model. Specialized local correctness/security agent profiles and ponytail not found; use explicit inline bars. Docs grounding uses pinned source + connected Firecrawl official pages. Browser automation is available, but no new UI was implemented to qualify. Project Playwright/TS/lint tools remain those in package-lock; no new production dependencies. Canvas/craft providers were not needed or installed. Budget/quality targets degrade to explicit future acceptance where no runner executed, never assumed passes.
+
+Raw large REA graphs/private local source remain in scratch. Public evidence contains hashes, exact paths, commands, bounded test counts and limitations. Preserve review independence/immutable diff and use exact-head CI in every future implementation PR. No key/hardware installation is a blocker to final offline planning; optional engine/provider enablement stays gated.

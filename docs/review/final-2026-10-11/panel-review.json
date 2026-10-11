@@ -1,0 +1,40 @@
+{
+  "scope": "Fresh-context PStack planning diff review; no product/runtime qualification or approval",
+  "reviewBase": "73910ba9db870a68c9b08c7c369c4bdd1ff3f420",
+  "initialStagedDiffSha256": "2172e7f84094940d091778b6de86716e6d73a73304b728c2f8eb5954f7043b52",
+  "provider": "session-model subagents; combined correctness/parsimony/product and separate security; specialty profiles unavailable, inline bars",
+  "combined": {
+    "mustFix": [
+      "Direct FFmpeg ownership must precede execution, including launch seams.",
+      "Current phase/profile/host wording contradicted master.",
+      "Nested composition-as-clip had no bounded MVP task."
+    ],
+    "worthConsidering": [
+      "Freeze versioned hard qualification policy before T4/T8.",
+      "Move reference-preview latency spike alongside T2."
+    ]
+  },
+  "security": {
+    "mustFix": [
+      "GC recheck/external deletion requires fenced state and publication exclusion.",
+      "Backup manifest must derive from actual destination DB while GC is excluded.",
+      "Direct processes also need fail-closed ownership before execute."
+    ],
+    "worthConsidering": [
+      "Local playlist subresources need outside-workspace sentinel fixtures.",
+      "Restore future biometric deletion and provider-retention disclosure gates."
+    ]
+  },
+  "dispositions": {
+    "gc": "ready→gcPending and generation-owned quarantine, shared object lock and attach/crash tests",
+    "backup": "GC barrier through snapshot/manifest/pin establishment; immutable copies/sealed validation; concurrency restore gate",
+    "process": "service-only native Job Object lifetime, atomic assignment at CreateProcessW, fail-closed launch-seam tests; T4 probes/T5 render, no desktop",
+    "scope": "nested compositions deferred; current phase/profile corrected; preview spike early",
+    "qualification": "candidate caps + freeze policy/hard thresholds before gates; local sentinel and consent/deletion/retention restored"
+  },
+  "followup": {
+    "combined": "No remaining must-fix in revised planning scope. T4/T5 ownership/dependency, GC/backup coherence, scope/profile and 24–42-day task sum verified.",
+    "security": "No remaining must-fix in revised planning scope. GC, actual snapshot backup, atomic process launch, local sentinel and privacy gates address findings.",
+    "limitations": "Planning coherence only; no runtime, durability, security, founder or release approval."
+  }
+}

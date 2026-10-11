@@ -16,3 +16,7 @@ The installed 6.3.0 was verified. Upstream **6.4.0** (published 2026-10-11) was 
 - **OpenCut Classic web subset (cf5e79e9), 141 files:** exit 0, 29.5 s, ev_c9f0020060…afac80, 0 parse failures. Persistence is IndexedDB/OPFS behind `StorageAdapter<T>`; one canvas scene graph serves preview and export; export is held in memory (mediabunny `BufferTarget`).
 
 Direct source inspection was sufficient, so REA was not used, for: the ArtCraft consumer clients and `browser_emulation`, the Open Generative AI MuAPI routing, and ComfyUI targeted interrupt. Static graphs remain incomplete, and the absence of a finding is not proof of absence.
+
+## Final live verification
+
+Current MCP/CLI verified **6.3.0**, aligned Codex registration, negotiated protocol 2025-06-18, 139 tools. Claude's isolated 6.4.0 evidence remains historical and unchanged. New bounded 50-file OpenCut algorithm/command investigation: 124,734 bytes, zero parse failures, 708 findings. Evidence `ev_f468aa4d1595355be05ad9d6d31c6d86d257ccce597326bafed3f08ded75dbe9`. MCP response exceeded 10 MB after analysis; complete retained bundle exported successfully (20,610,544 bytes), hash in [receipt](review/final-2026-10-11/evidence.json). Source corroborates global EditorCore command glue, non-atomic BatchCommand and opencut-wasm coupling. Action: pure algorithms through canonical reducers; no editor singleton/job/persistence authority. Static text only, no native engine/runtime proof.

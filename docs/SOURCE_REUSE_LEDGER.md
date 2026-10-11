@@ -30,3 +30,7 @@ Founder source-code authorization does not cure the issues below, because they c
 | OpenCut @ e6680107; Kodac @ 406b3352 | Whole; auth helper | Placeholder; development-secret authentication |
 
 Narrow reuse retained from the draft: `core/donors/gomrey/job-transitions.ts` (transition table, to be extended) and the rule that completion requires artifact validation.
+
+## Final selection and qualification
+
+The [final import matrix](SOURCE_IMPORT_MATRIX.md) narrows exact modules and records new OpenCut failures and selected algorithm qualifications. No new product import occurred. Out-of-process execution does not itself settle AGPL or other distribution terms. Current selected unsafe donor paths remain excluded; add a complete dependency-closure check so an allowed file cannot transitively reintroduce them. Pin runtime binaries, transitive licenses and font hashes, not only repository heads.

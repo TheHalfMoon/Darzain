@@ -73,3 +73,14 @@ Complete source/model quality qualification remains partial, particularly native
 |---|---|---|
 | [ThaUnknown/jassub](https://github.com/ThaUnknown/jassub/tree/dea3d2d398569a591cf0c767d945d84e9f120484) | dea3d2d398569a591cf0c767d945d84e9f120484 | MIT; libass (ISC) compiled to WebAssembly. Candidate preview renderer for ASS titles and subtitles so preview and FFmpeg export share one text engine. Not yet built or tested. |
 | Node.js `node:sqlite` (built in, SQLite 3.53.3 in Node 24.19.0) | runtime | Workspace operational index. Measured in review T6; no new dependency. |
+
+## Final bounded discoveries (2026-10-11)
+
+The original catalog pins above remain unchanged. These extra receipts support the final [source matrix](SOURCE_IMPORT_MATRIX.md); none is a whole-stack or runtime adoption.
+
+| Candidate | Exact commit | Scope / disposition |
+|---|---|---|
+| MartinDelophy/ai-video-editor | 9514d6579eb8e1dfd27d737dbf0393d80372116f | WebMCP operation/state-token contract reference only |
+| chatman-media/timeline-studio | 9253fded22485cb087ef100842c6be6a8989dfc4 | README/license/package/Tauri configuration inspected; no measured replacement advantage |
+| libass/libass | f61db567e6593df3470e91594bcd4ad2d0473aff | Shaper/render/license source receipt; installed binary is separately qualified |
+| notofonts/noto-fonts | ffebf8c1ee449e544955a7e813c54f9b73848eac | Arabic/Latin font bytes and license hashed; no product font import or new render proof |

@@ -1,0 +1,54 @@
+{
+  "sources": [
+    {
+      "name": "Higgsfield Cinema Studio",
+      "url": "https://higgsfield.ai/cinematic-video-generator",
+      "level": "live page markdown",
+      "retrieved": "2026-10-11",
+      "claims": "Camera movement tags, references, models per shot, assistant, cast, collaboration",
+      "toolReceipt": "01a12bd3-ddb4-739b-968b-14a93e28d214",
+      "sha256": "9f05bba51abd57c4041172e8dbe4125df98741fc183f6e0e1f4961634f41471e",
+      "hashScope": "retrieved markdown"
+    },
+    {
+      "name": "Kling official motion guide",
+      "url": "https://app.klingai.com/global/quickstart/motion-control-user-guide",
+      "level": "official-domain search excerpt",
+      "retrieved": "2026-10-11",
+      "claims": "VIDEO 2.6 motion control/transfer",
+      "toolReceipt": "01a12bd4-0476-73fa-a0fa-152e86ed958f",
+      "sha256": "08cfbfe4cf428304dc020781bdebc1d1369f855f5222b4a906469f310cf24e64",
+      "hashScope": "JSON.stringify of returned search data"
+    },
+    {
+      "name": "Adobe Photoshop",
+      "url": "https://www.adobe.com/products/photoshop/generative-fill.html",
+      "level": "official search excerpt",
+      "retrieved": "2026-10-11",
+      "claims": "Prompt-based add/remove/modify image content",
+      "toolReceipt": "01a12bd8-c570-70bc-80e1-aa9006b9d7d5",
+      "sha256": "bb15c2b734948544aed028cef3107fef6331bf4733d20860c0d89d0533c46a68",
+      "hashScope": "JSON.stringify of returned search data"
+    },
+    {
+      "name": "LTX",
+      "url": "https://ltx.studio/",
+      "resolvedUrl": "https://ltx.io/studio",
+      "level": "live direct quote",
+      "retrieved": "2026-10-11",
+      "quote": "Direct every shot with precision using tools to control camera movement, define motion through keyframes, and guide outputs with visual references.\n\nELEMENTS\n\n[Dynamic Storyboard](https://ltx.io/studio#w-tabs-0-data-w-pane-0) [Timeline Editor](https://ltx.io/studio#w-tabs-0-data-w-pane-1) [Sound Design](https://ltx.io/studio#w-tabs-0-data-w-pane-2)\n\nAs an all-in-one video generation platform, you can make videos, storyboards, visual concepts, match cuts, and more — all from a simple text prompt or idea.",
+      "sha256": "82562323eadaa3dc11fada2f53b0ac3e5f6a179f22628c13b01184a8d41ef2bf",
+      "hashScope": "UTF-8 quote retained in this record"
+    },
+    {
+      "name": "DaVinci Resolve",
+      "url": "https://www.blackmagicdesign.com/products/davinciresolve",
+      "level": "live direct quote",
+      "retrieved": "2026-10-11",
+      "quote": "DaVinci Resolve is the world’s only solution that combines editing, color correction, visual effects, motion graphics, audio post production and now photo editing all in one software tool!\n\nHollywood's #1 Post Solution\n\nDaVinci Resolve is the world’s only all in one solution for editing, color, VFX, motion graphics and audio!\n\nHollywood’s most popular solution for editing, visual effects, motion graphics, color correction and audio post production, for Mac, Windows and Linux.",
+      "sha256": "ba68e50718ea3cca3fd17d4ca184526e9f214cd70d056c8a05f439b03ba21e49",
+      "hashScope": "UTF-8 quote retained in this record"
+    }
+  ],
+  "limitations": "Product claims only. No account/API entitlement or independent quality benchmark. New donor source receipts separately pinned. Hashes bind retrieval text only, not competitor outputs or web-page availability."
+}

@@ -1,70 +1,24 @@
-# Founder decision packet
+# Founder decision packet — final proposal
 
-Prepared by the independent Claude review of PR #3 at 419bc356eaa6738ba546f38310687739177da6bb. Evidence: [CLAUDE_INDEPENDENT_REVIEW](review/CLAUDE_INDEPENDENT_REVIEW.md). Each decision must be recorded against the head commit of the review branch that carries this file, not against 419bc356. **None of these is approved yet.** The founder's general source-reuse authorization does not decide any of them.
+**CONDITIONAL GO for scoped offline implementation after approval. NO-GO for release today.** Every choice remains unapproved. Read [assessment](review/FINAL_OPTIMIZATION_REVIEW.md), [plan](IMPLEMENTATION_PLAN.md), [contracts](OPERATIONAL_CONTRACTS.md) and [acceptance](E2E_ACCEPTANCE.md). Based on Claude PR #4 `73910ba9db870a68c9b08c7c369c4bdd1ff3f420`; approval binds the final PR's exact head. Earlier packets remain at their commits.
 
-Record each one as: `Decision X: Preferred | Alternative | Revised — <initials, date, commit>`.
+| Decision | Preferred and implication | Alternative / approval scope |
+|---|---|---|
+| A architecture | Refined D′: SQLite including snapshots, external immutable media, unified timeline/commands/jobs, FFmpeg/libass reference preview | Whole OpenCut only after identical acceptance/migration experiment. Mandatory MVP choice |
+| B scope | Local-web Windows offline slice, Arabic/English, API/MCP, recovery/backups; archives later; no AI/desktop prerequisite | Desktop adds estimated 8–15 days; archives separate parser gate. Mandatory MVP choice |
+| C migration | Flicks with checked BigInt/rational math, source PTS, VFR derivative; new root, originals byte-identical | Deferral requires explicitly accepting a later second migration. Mandatory MVP choice |
+| D desktop | Defer packaging; bounded later shell/IPC/install comparison and ADR. Native service-owned probe/render lifetime is mandatory in T4/T5 | Tauri provisionally preferred; hardened Electron admissible. Packaging may stay deferred |
+| E reuse/distribution | Exact hashes/notices and mandatory exclusions; meet actual GPL/source-offer obligations | AGPL/other terms need component-specific grant/distribution review; out-of-process alone is not a license exemption. Mandatory MVP choice, no blanket future-donor approval |
+| F local AI | Deferred/disabled; each hardware/model/weight/environment separately qualified | Procure/rent later under a named budget. May stay deferred |
+| G providers | Deferred/disabled; later one entitled adapter with upload consent, reservations/reconciliation and capped approved tests | Aggregator is a separate disclosed route; no ambiguous retry/cloud fallback. May stay deferred |
+| H naming | Keep `TheHalfMoon/Darzain`; product-facing Yamakan naming after approval | Eventual repository rename needs separate founder action, not automatic at MVP tag. May stay deferred |
+| I release | All MVP Windows E2E/fault/security/parity/backup/accessibility gates, exact CI and independent review | Narrow internal preview needs recorded risk and cannot be called accepted MVP. Mandatory MVP choice |
+| J residual risks | Local-account trust; hardware flush/power-loss limits; incomplete static evidence; no GPU/competitor quality proof; conditional 24–42 builder days +5–10 contingency | Stronger promises require more qualification and estimate. Mandatory MVP choice |
 
-## A. Canonical architecture
+Approval format: `Final plan <full commit SHA>: A/B/C/E/I/J approved as preferred; D/F/G/H deferred; <name, date>`. Record alternatives separately. This authorizes the ten implementation PRs and bounded qualification, **not** planning merges, production release, paid generation, repository rename or unrelated assets/weights/services.
 
-- **Preferred:** D′. One Yamakan core: owned schema, SQLite operational index, content-addressed snapshots and media, typed command registry, and FFmpeg as export authority driven by a render-plan IR. Donors are imported only as bounded modules.
-- **Alternative:** E, an OpenCut-Classic-first editor with a Yamakan server-side storage adapter.
-- **Why:** D′ is the only option already proven end to end on the target host, and it keeps one persisted authority for UI and agents. E has better editing depth but browser-local persistence, an unrun test suite and no headless path.
-- **Consequences:** Editing depth for v1 comes from qualified OpenCut Classic modules rather than its whole application. Reverse this choice only if E passes the same first-slice DoD with headless agent parity.
+Compared with Claude: reduce cross-store snapshot failures; specify replay/fencing/cancel/backup; add a shared-engine truth preview; constrain imports using real OpenCut failure evidence; move optional archives/WASM/shell work off the initial path. Compared with original Codex: retain Claude's storage/security/job/Arabic corrections and replace broad claims with executable gates. Faster effort is an estimate, not observed productivity.
 
-## B. MVP scope
+Storage builder owns B1; Security reviewer owns exclusions/loopback/ACL; Runtime builder owns jobs/lifecycle; Media builder and Arabic reviewer own text/reference parity. Optional-worker/provider blockers cannot delay offline work and cannot be waived by general source permission.
 
-- **Preferred:** A local-web MVP on Windows (Profile A) covering the first-slice DoD in [E2E_ACCEPTANCE](E2E_ACCEPTANCE.md): Arabic/English titles via libass, streaming import, SQLite-backed recovery, UI/REST/CLI/MCP-stdio parity, and archive round trip. No AI generation, no desktop installer.
-- **Alternative:** MVP plus a desktop installer (Tauri). Adds roughly 8–15 working days and native toolchain risk.
-- **Consequences:** The first user-visible release runs in a browser served from loopback. Desktop packaging becomes the first post-MVP release.
-
-## C. Data model and migration policy
-
-- **Preferred:** `yamakan.project` v1 with flicks timeline time, rational fps, per-stream source time bases, and CFR mezzanine assets for VFR sources. Legacy Darzain roots are migrated read-only into new roots, with byte-identical originals verified by hash manifests. Unknown future versions open read-only.
-- **Alternative:** Keep frame-integer time at 30 fps for the MVP and defer the time model. This is cheaper now but forces a second migration.
-- **Consequences:** One migration now. The 30 fps, 1080p and 10-minute caps are lifted under measured limits.
-
-## D. Desktop technology and qualification
-
-- **Preferred:** A parallel spike that ends in an ADR. Tauri 2 is preferred if it passes: a deny-by-default capability file (not ArtCraft's), a Job Object owning all workers, a single-instance lock, fileless token handoff, H.264/AAC playback in WebView2, and an installer under 120 MB.
-- **Alternative:** Hardened Electron (`sandbox`, `contextIsolation`, no `shell`, sender validation, utilityProcess workers, native Job Object helper).
-- **Consequences:** The desktop shell no longer blocks the MVP. Tauri on Linux (WebKitGTK codecs) is out of scope until tested.
-
-## E. Source reuse and required notices
-
-- **Preferred:** Import only through ledger entries recording repository, SHA, original and imported paths and hashes, license or notice, the founder's authorization reference, modifications and qualification. The do-not-import list in the review is mandatory and enforced by `provenance:check`. AGPL donors (OpenMontage, StoryMind) run out of process unless the founder accepts AGPL terms for the distributed product. Non-commercial assets (storyboard CC BY-NC-SA, FLUX non-commercial weights) are excluded from commercial builds unless the founder documents a separate grant.
-- **Alternative:** Relicense the product as AGPL-3.0-or-later and link AGPL modules in process.
-- **Consequences:** The repository is currently GPL-3.0-or-later and bundles FFmpeg GPL builds, so source-offer obligations apply to every desktop distribution.
-
-## F. Local inference and hardware
-
-- **Preferred:** Profile A for everyone. Profile B is disabled by default and enabled per operation only after a qualification receipt on named hardware (NVIDIA ≥ 12 GB VRAM for video, ≥ 60 GB free disk). The current laptop is a Profile A machine only.
-- **Alternative:** Procure or rent one qualified GPU host for P04/P07 qualification. The founder sets the budget.
-- **Consequences:** No local generative claim ships without a receipt.
-
-## G. BYOK and paid-provider activation
-
-- **Preferred:** An offline-only MVP. For v1, enable one provider and model chosen by the founder, using the user's own key, write-ahead submission intents, no automatic resubmission of ambiguous attempts, and a hard cap only when the price is bounded. The founder approves a capped real-test budget in writing.
-- **Alternative:** Use an aggregator (fal.ai or MuAPI) as the first route, which is faster but introduces aggregator pricing, retention and terms.
-- **Consequences:** Zero founder-funded inference in the MVP. There is no silent local-to-cloud fallback.
-
-## H. Repository naming
-
-- **Preferred:** Keep `TheHalfMoon/Darzain` until the MVP tag, then rename it to `Yamakan` (GitHub keeps redirects). Product UI and package name become Yamakan in task 2. `DARZAIN_*` environment variables and the `.darzain` root remain readable aliases for one release.
-- **Alternative:** Rename now, which disrupts open PRs and receipts that cite the old URL.
-- **Consequences:** Evidence links remain stable through the MVP.
-
-## I. Security and release acceptance
-
-- **Preferred:** The MVP release is blocked by: B1, B2, H2, H3, H4, H6, M1, M2, M4, M5, an adversarial media/archive corpus, negative loopback tests, clean-host offline network capture, and an independent review of the exact release diff.
-- **Alternative:** Ship a developer preview with M2/M5 open and documented. This is acceptable only for internal testers.
-- **Consequences:** Release gates are executable tests, not policy statements.
-
-## J. Accepted residual risks
-
-Confirm or reject each one:
-
-- AR1: power-loss durability depends on drive flush.
-- AR2: the local same-account attacker is out of scope.
-- AR3: static REA evidence is incomplete.
-- AR4: no GPU qualification on the current host.
-- AR5: the time estimates in [ROADMAP](ROADMAP.md) are planning ranges, not commitments.
+**Stop at founder approval. No decision has been inferred or recorded by this optimization.**

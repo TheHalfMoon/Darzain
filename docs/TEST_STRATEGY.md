@@ -1,5 +1,7 @@
 # Test and evidence strategy
 
+Final proposal: [master plan](IMPLEMENTATION_PLAN.md) and [operational contracts](OPERATIONAL_CONTRACTS.md) own current scope and exact protocols. Earlier evidence remains bounded; no final implementation or founder approval is implied.
+
 Contracts, builds, static graphs, actual UI/API journeys, playable output checks and human creative evaluation establish different facts. No screenshot/static audit substitutes for real export or generation.
 
 | Layer | Required checks |

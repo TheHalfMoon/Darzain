@@ -1,0 +1,255 @@
+{
+  "sourcePin": "cf5e79e919144200294fb9fed22a222592a0aeea",
+  "files": [
+    {
+      "path": "timeline/snapping/build.ts",
+      "sha256": "7cf9b8dc203a691af38e99d16ceb401cb881055b93244f9f6afa65338ef46e1a",
+      "bytes": 350
+    },
+    {
+      "path": "timeline/snapping/index.ts",
+      "sha256": "eae032113168559da7caaa925905e4a8498de7cfc99412350812104b7d3e58c7",
+      "bytes": 262
+    },
+    {
+      "path": "timeline/snapping/resolve.ts",
+      "sha256": "73f7865940cd914b09070ca3daa03325b03a31bd33ebb6766dc0975736c6fc0d",
+      "bytes": 744
+    },
+    {
+      "path": "timeline/snapping/threshold.ts",
+      "sha256": "951ed0604bcd5960384a520a14cf66f554c2580f4e0098e0307939db73ced686",
+      "bytes": 478
+    },
+    {
+      "path": "timeline/snapping/types.ts",
+      "sha256": "a7989b43f69369265e2f147dd04d2fe4a007eccee361d527037023083dd0ff6e",
+      "bytes": 438
+    },
+    {
+      "path": "timeline/placement/apply.ts",
+      "sha256": "2a2c05158fbfd5b08228f6b4db244da128bb1a5fb1ab910c869d26199d9dd073",
+      "bytes": 3544
+    },
+    {
+      "path": "timeline/placement/compatibility.ts",
+      "sha256": "2629336b2ae576e0438a59359a44178283812d6b6eb4fa9964ffd3f3f5e06ec5",
+      "bytes": 1060
+    },
+    {
+      "path": "timeline/placement/index.ts",
+      "sha256": "c4a1c354891c0ad37d19a5a2af65196bdbfd0d334e4985315a5266c33157ca04",
+      "bytes": 538
+    },
+    {
+      "path": "timeline/placement/insert-index.ts",
+      "sha256": "f4d610da8b9e184670e56d0f8026ed7e01be97ff6a402d15e17e48eb5c997b05",
+      "bytes": 1787
+    },
+    {
+      "path": "timeline/placement/main-track.ts",
+      "sha256": "00ac00f2f419dd203b49ec755979aacd11d99fbe71a6a47f96e6116ad5d2d345",
+      "bytes": 1257
+    },
+    {
+      "path": "timeline/placement/overlap.ts",
+      "sha256": "0ed2ec979ea29d56a2dbbc3f456a8e4bee0850eddb342ad9dbaa6742c16d0001",
+      "bytes": 972
+    },
+    {
+      "path": "timeline/placement/resolve.ts",
+      "sha256": "f377b534e8d6a3555543f47e0d71cd098e718a10459dd5587a90678142ffd70f",
+      "bytes": 5931
+    },
+    {
+      "path": "timeline/placement/track-factory.ts",
+      "sha256": "3798f2bf08f5fbd92f9d26d36fe90df4294db8bf6a103bcb847589f5ffc8b563",
+      "bytes": 1796
+    },
+    {
+      "path": "timeline/placement/types.ts",
+      "sha256": "82637970fd8bb4ea136b3995c29c72ab4bce16f2d55c9fb7c2bb8389643aa227",
+      "bytes": 993
+    },
+    {
+      "path": "timeline/placement/__tests__/resolve.test.ts",
+      "sha256": "e4495f2738a7a5a04af57346dee877da3a7b05cd42f9e330d80b8fb2a482bf73",
+      "bytes": 15041
+    },
+    {
+      "path": "timeline/group-move/build-group.ts",
+      "sha256": "5fb71e4a41be149f85a71c7da838ae195273c44c644d80992b53420c8e7bbb58",
+      "bytes": 2109
+    },
+    {
+      "path": "timeline/group-move/index.ts",
+      "sha256": "276581b341b3499227d1cc97d83bb2d539be0a962aa5914a6c80c5c372762069",
+      "bytes": 281
+    },
+    {
+      "path": "timeline/group-move/resolve-move.ts",
+      "sha256": "07d195708d07df3792417c03363e4e31d4f7ecaa561cf8d4deaaf25be78a304f",
+      "bytes": 11518
+    },
+    {
+      "path": "timeline/group-move/snap.ts",
+      "sha256": "fe9bc3fed428deba33e25c94aca2d84edff0e7a5ebfa66c254a70521e7b6a88a",
+      "bytes": 2566
+    },
+    {
+      "path": "timeline/group-move/track-placement.ts",
+      "sha256": "e8b4a0a2d3de5c1d80ead54aa659822d4028d15388f97bac037086fd9fdfc0be",
+      "bytes": 1735
+    },
+    {
+      "path": "timeline/group-move/types.ts",
+      "sha256": "e93d30c22fc91f51bbca112c5bab991182a47048325a587cbeb853174156157c",
+      "bytes": 823
+    },
+    {
+      "path": "commands/base-command.ts",
+      "sha256": "1681d4484f133fcfa48cd3b96942687d0aa4195463103d0eff1993308d3f62ad",
+      "bytes": 671
+    },
+    {
+      "path": "commands/batch-command.ts",
+      "sha256": "0539890f23ed924880b7c289f5495fdb1c8299242a5f6d90ef46dab381e63013",
+      "bytes": 858
+    },
+    {
+      "path": "commands/timeline/element/delete-elements.ts",
+      "sha256": "cefadf86213b72315d59fcd914cdba98a058b17400aea3977b1b19de08690a5b",
+      "bytes": 1786
+    },
+    {
+      "path": "commands/timeline/element/duplicate-elements.ts",
+      "sha256": "1078f51e701577caf42a78f4c508883ced8be4c44257e31db600ea16d3caf4e6",
+      "bytes": 3233
+    },
+    {
+      "path": "commands/timeline/element/effects/add-effect.ts",
+      "sha256": "c0967db10f7cb2a75290a2dc21ff06a8ad709e286ed8358a5bd5c329a6fbb908",
+      "bytes": 1957
+    },
+    {
+      "path": "commands/timeline/element/effects/index.ts",
+      "sha256": "6d7cb6bddf85d4c7b24b768500d3f9570a5249902e3ca4c899cc2add8ce1afbf",
+      "bytes": 305
+    },
+    {
+      "path": "commands/timeline/element/effects/remove-effect.ts",
+      "sha256": "7018743f773e0d35286f56d2d26ff4efd16f605ba445ebbfcbad21ffe9fd2e8d",
+      "bytes": 1656
+    },
+    {
+      "path": "commands/timeline/element/effects/reorder-effect.ts",
+      "sha256": "06bac0f7ecc883a1a2944a63dced953311b3cb9a1b63194942fd670ac3346593",
+      "bytes": 1809
+    },
+    {
+      "path": "commands/timeline/element/effects/toggle-effect.ts",
+      "sha256": "50ee646f9d0dafd6d2fd27e4b4c1b03e742e17401323716a3a6d00094ba8c5db",
+      "bytes": 1710
+    },
+    {
+      "path": "commands/timeline/element/effects/update-effect-params.ts",
+      "sha256": "3bb35925f1269f21f335daebbbc3b49bbc1c2d22c1d60f83e5a874ddd809c04b",
+      "bytes": 2143
+    },
+    {
+      "path": "commands/timeline/element/index.ts",
+      "sha256": "7e3f4251c13d133e4062f2c4ff87f83c23aa83802af335e14f5a9d613896c79f",
+      "bytes": 520
+    },
+    {
+      "path": "commands/timeline/element/insert-element.ts",
+      "sha256": "3e4943a2b91d4603d862e65455233812394b99d22a0acc099ec66b8a3acb9499",
+      "bytes": 7488
+    },
+    {
+      "path": "commands/timeline/element/keyframes/index.ts",
+      "sha256": "b705f90d884b56785d7c0437f3fe3f722ee802ea013066aed542ebc85bae8f66",
+      "bytes": 249
+    },
+    {
+      "path": "commands/timeline/element/keyframes/remove-effect-param-keyframe.ts",
+      "sha256": "ca8615a3b5f0cefc0ee08ac1827108f1cb3a3623fc405b28dca107cce33adc74",
+      "bytes": 1808
+    },
+    {
+      "path": "commands/timeline/element/keyframes/remove-keyframe.ts",
+      "sha256": "714c2608c35a1b2f5d127a56fdaa05dccc6e7027de59144e37c688ff7445f7dd",
+      "bytes": 2812
+    },
+    {
+      "path": "commands/timeline/element/keyframes/retime-keyframe.ts",
+      "sha256": "014fd9ebecfb71a8aa9a0f2737dab1c1577579c58d7291681db9bde4ad50564f",
+      "bytes": 2165
+    },
+    {
+      "path": "commands/timeline/element/keyframes/update-scalar-keyframe-curve.ts",
+      "sha256": "aab6503198bde44598dc03d07249fb38e71510a431a927afa13b28e5e80c646b",
+      "bytes": 2157
+    },
+    {
+      "path": "commands/timeline/element/keyframes/upsert-effect-param-keyframe.ts",
+      "sha256": "85434b076046b27ce5eb04f5c9c7bcb77b5cafaae04dd5ca8000ececbf22b223",
+      "bytes": 2919
+    },
+    {
+      "path": "commands/timeline/element/keyframes/upsert-keyframe.ts",
+      "sha256": "f1012e4b4ba9a66268c467a27118e69a2a36ccd2d4bd4516afc20a2d4c7c5843",
+      "bytes": 2664
+    },
+    {
+      "path": "commands/timeline/element/masks/delete-custom-mask-points.ts",
+      "sha256": "c4cd9046d87ee8105c91751d9131db1b292069920fa9b30acdfc1eb61994a430",
+      "bytes": 3102
+    },
+    {
+      "path": "commands/timeline/element/masks/index.ts",
+      "sha256": "edf1cee93bf45416abc4793957a61db2377469a560e9d1ea08690451d43b5fc7",
+      "bytes": 283
+    },
+    {
+      "path": "commands/timeline/element/masks/insert-custom-mask-point.ts",
+      "sha256": "f3126064d27520a7b0e0b867ecefc1c0e23cb674490b1f3b7ddfd77942987ef5",
+      "bytes": 4004
+    },
+    {
+      "path": "commands/timeline/element/masks/remove-mask.ts",
+      "sha256": "5600bb19c18d03a1feee13be51029e4939072dac58fb50bb707f823b2d34d90a",
+      "bytes": 1666
+    },
+    {
+      "path": "commands/timeline/element/masks/toggle-mask-inverted.ts",
+      "sha256": "97b643132276847f39de968630b2074d400c3a37aba4386a8161987070573fc7",
+      "bytes": 1918
+    },
+    {
+      "path": "commands/timeline/element/move-elements.ts",
+      "sha256": "054f27fa221a8cbd3a08042c3cb682be02ad09cb2e9109e3d078b244aa9c7aea",
+      "bytes": 4543
+    },
+    {
+      "path": "commands/timeline/element/split-elements.ts",
+      "sha256": "eb1a9458b79afb8611a0ef5dca3fc43224f9d6227f99dd1c547bf609e6cd8f5e",
+      "bytes": 5910
+    },
+    {
+      "path": "commands/timeline/element/toggle-source-audio-separation.ts",
+      "sha256": "050851b529f9ff832b6ef234981490a0ed227f9acedd8b0e4e0127d83fdd6d29",
+      "bytes": 3342
+    },
+    {
+      "path": "commands/timeline/element/update-elements.ts",
+      "sha256": "c1827c5477649a96cc9912cac05615407cb0f8b2cfb1003c14ac2d6131d0bf81",
+      "bytes": 1844
+    },
+    {
+      "path": "wasm/media-time.ts",
+      "sha256": "69eb73c7ba1d7ac3b6fb3ecedd4e6579b4020729ded759dd2c6e2545ab727b49",
+      "bytes": 4989
+    }
+  ]
+}

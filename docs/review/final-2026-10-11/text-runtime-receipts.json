@@ -1,0 +1,60 @@
+[
+  {
+    "repo": "libass/libass",
+    "sha": "f61db567e6593df3470e91594bcd4ad2d0473aff",
+    "paths": [
+      "libass/ass_shaper.c",
+      "libass/ass_render.c",
+      "COPYING"
+    ],
+    "files": [
+      {
+        "path": "libass/ass_shaper.c",
+        "bytes": 37282,
+        "sha256": "29872fc346f9e2dd1be3e8e29d724d0fdacf21bfcc25adeba9751d25d3c99776",
+        "url": "https://raw.githubusercontent.com/libass/libass/f61db567e6593df3470e91594bcd4ad2d0473aff/libass/ass_shaper.c"
+      },
+      {
+        "path": "libass/ass_render.c",
+        "bytes": 123764,
+        "sha256": "20705ef4101c09080f4d27798bf6e04cce0fa40dbebd073c9c7480ca8ab36440",
+        "url": "https://raw.githubusercontent.com/libass/libass/f61db567e6593df3470e91594bcd4ad2d0473aff/libass/ass_render.c"
+      },
+      {
+        "path": "COPYING",
+        "bytes": 755,
+        "sha256": "f7e30699d02798351e7f839e3d3bfeb29ce65e44efa7735c225464c4fd7dfe9c",
+        "url": "https://raw.githubusercontent.com/libass/libass/f61db567e6593df3470e91594bcd4ad2d0473aff/COPYING"
+      }
+    ]
+  },
+  {
+    "repo": "googlefonts/noto-fonts",
+    "sha": "ffebf8c1ee449e544955a7e813c54f9b73848eac",
+    "paths": [
+      "hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf",
+      "hinted/ttf/NotoSans/NotoSans-Regular.ttf",
+      "LICENSE"
+    ],
+    "files": [
+      {
+        "path": "hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf",
+        "bytes": 240456,
+        "sha256": "ceea25b464a656dc3b26849bab9356740401af62aedf1bfa8b7f0d9b75925b1b",
+        "url": "https://raw.githubusercontent.com/googlefonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf"
+      },
+      {
+        "path": "hinted/ttf/NotoSans/NotoSans-Regular.ttf",
+        "bytes": 569208,
+        "sha256": "b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5",
+        "url": "https://raw.githubusercontent.com/googlefonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSans/NotoSans-Regular.ttf"
+      },
+      {
+        "path": "LICENSE",
+        "bytes": 4377,
+        "sha256": "0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb",
+        "url": "https://raw.githubusercontent.com/googlefonts/noto-fonts/ffebf8c1ee449e544955a7e813c54f9b73848eac/LICENSE"
+      }
+    ]
+  }
+]

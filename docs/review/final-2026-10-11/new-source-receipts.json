@@ -1,0 +1,80 @@
+[
+  {
+    "repo": "MartinDelophy/ai-video-editor",
+    "sha": "9514d6579eb8e1dfd27d737dbf0393d80372116f",
+    "files": [
+      {
+        "path": "README.md",
+        "sha256": "220d5fa33cde958110bfc5c6332076d4592bdaf504f6b5cb6b3593cb4f3bc522",
+        "bytes": 17546,
+        "url": "https://raw.githubusercontent.com/MartinDelophy/ai-video-editor/9514d6579eb8e1dfd27d737dbf0393d80372116f/README.md"
+      },
+      {
+        "path": "LICENSE",
+        "sha256": "22b4aea739e33689429ebd2f326d95d18ebe185173eb9d9c47b32614fda94963",
+        "bytes": 1070,
+        "url": "https://raw.githubusercontent.com/MartinDelophy/ai-video-editor/9514d6579eb8e1dfd27d737dbf0393d80372116f/LICENSE"
+      },
+      {
+        "path": "package.json",
+        "sha256": "2534428ae689dd218abe8c7db0dcd248fa2cd547d58d77cbb8985a5ecca25d16",
+        "bytes": 2243,
+        "url": "https://raw.githubusercontent.com/MartinDelophy/ai-video-editor/9514d6579eb8e1dfd27d737dbf0393d80372116f/package.json"
+      },
+      {
+        "path": "docs/webmcp.md",
+        "sha256": "5b6246f2ba08e580483c6f2e3c4390e3ba9a22f9f532b5610afffaad2cc6b92c",
+        "bytes": 26389,
+        "url": "https://raw.githubusercontent.com/MartinDelophy/ai-video-editor/9514d6579eb8e1dfd27d737dbf0393d80372116f/docs/webmcp.md"
+      },
+      {
+        "path": "src/lib/webMcpOperationSchema.js",
+        "sha256": "181290e5a1c999850102d9e08a512c81931a675769a4aa5ca12393be5a44ff39",
+        "bytes": 6276,
+        "url": "https://raw.githubusercontent.com/MartinDelophy/ai-video-editor/9514d6579eb8e1dfd27d737dbf0393d80372116f/src/lib/webMcpOperationSchema.js"
+      },
+      {
+        "path": "src/lib/webMcpEditor.js",
+        "sha256": "31e12eea4674a9b950896a1c8050fc8a48ca2f2cdc661805ea00449da80f21ad",
+        "bytes": 30205,
+        "url": "https://raw.githubusercontent.com/MartinDelophy/ai-video-editor/9514d6579eb8e1dfd27d737dbf0393d80372116f/src/lib/webMcpEditor.js"
+      },
+      {
+        "path": "src/lib/timelineRipple.js",
+        "sha256": "1483c1465c977823e0707dd4acc632b9161b9416e3e0f4de4b9dacf0d37aa1a3",
+        "bytes": 3800,
+        "url": "https://raw.githubusercontent.com/MartinDelophy/ai-video-editor/9514d6579eb8e1dfd27d737dbf0393d80372116f/src/lib/timelineRipple.js"
+      }
+    ]
+  },
+  {
+    "repo": "chatman-media/timeline-studio",
+    "sha": "9253fded22485cb087ef100842c6be6a8989dfc4",
+    "files": [
+      {
+        "path": "README.md",
+        "sha256": "577f2a25da76a7d88d04c69fbcaf3de55a58ce7ac0d921d24e0399e0c069a599",
+        "bytes": 17132,
+        "url": "https://raw.githubusercontent.com/chatman-media/timeline-studio/9253fded22485cb087ef100842c6be6a8989dfc4/README.md"
+      },
+      {
+        "path": "LICENSE",
+        "sha256": "4ba32a0584d426556ea28b4b50d64ee6fd28b39cb802df2d8600e604fbc8de1b",
+        "bytes": 1074,
+        "url": "https://raw.githubusercontent.com/chatman-media/timeline-studio/9253fded22485cb087ef100842c6be6a8989dfc4/LICENSE"
+      },
+      {
+        "path": "package.json",
+        "sha256": "34d0af02c5c59a62280c184cc535fdf56c4d4b5ec0454cdb1764fe1dfae76cfb",
+        "bytes": 11783,
+        "url": "https://raw.githubusercontent.com/chatman-media/timeline-studio/9253fded22485cb087ef100842c6be6a8989dfc4/package.json"
+      },
+      {
+        "path": "src-tauri/tauri.conf.json",
+        "sha256": "f70ab86fd98340121a290d34e3cdbbcf9597314bf9460d624de6f077c3e6b0e6",
+        "bytes": 3051,
+        "url": "https://raw.githubusercontent.com/chatman-media/timeline-studio/9253fded22485cb087ef100842c6be6a8989dfc4/src-tauri/tauri.conf.json"
+      }
+    ]
+  }
+]

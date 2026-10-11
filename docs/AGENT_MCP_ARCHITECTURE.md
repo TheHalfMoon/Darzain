@@ -1,5 +1,7 @@
 # Agent-native command platform
 
+Final proposal: [master plan](IMPLEMENTATION_PLAN.md) and [operational contracts](OPERATIONAL_CONTRACTS.md) own current scope and exact protocols. Earlier evidence remains bounded; no final implementation or founder approval is implied.
+
 All transports use one typed command service: UI, REST, CLI, MCP and TypeScript/Python SDKs share schema validation, scopes, revision checks, audit, consent and quotas. Core production does not require browser clicks. The legacy whole-project tool surface proves a path; granular scopes/full MCP are proposed work.
 
 | Family | Tools | Scope |
@@ -19,3 +21,7 @@ Desktop MCP stdio binds an explicit workspace grant. Remote MCP needs independen
 REST OpenAPI/CLI stable JSON and generated/thin TS/Python clients use identical schema versions. Python SDK remains optional. Resume from durable stages/jobs, not chat history. Ninerr session/policy and Ascout lineage are bounded candidates; Kodac's inspected auth helper is rejected as an authority boundary.
 
 Acceptance: an external agent creates an editable multi-scene film, imports media, adds titles/audio, renders, restarts/reopens, inspects/cancels through typed tools, with no browser clicks and the same canonical project as UI.
+
+## Final registry and proposal refinement
+
+Replay checks the scoped request digest before revision conflict. Atomic batches reduce all operations and commit one revision; donor BatchCommand is not transactional. Approval binds baseRevision, operation-list hash, assets, scope and expiry. Clients cannot choose principalId or gain paths/shell privileges. Use committed outbox cursors for progress/resume. UI/REST/CLI/MCP and a thin TS SDK are MVP; broader SDKs, browser WebMCP and remote multi-user auth are later. See operational contracts and the exact UI/tool fixture acceptance.

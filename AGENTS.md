@@ -2,7 +2,7 @@
 
 @C:\Users\Shehr\.codex\RTK.md
 
-Read specs/CURRENT.md and docs/IMPLEMENTATION_PLAN.md. Independent Claude review of 419bc356 is recorded (docs/review/CLAUDE_INDEPENDENT_REVIEW.md); stop at founder approval of the reviewed plan (docs/FOUNDER_DECISION_PACKET.md). Full production implementation, durable-jobs integration, whole-application imports and repository renaming require founder approval of the reviewed plan. Bounded reversible qualification and documentation corrections are authorized.
+Read specs/CURRENT.md and docs/IMPLEMENTATION_PLAN.md. Independent Claude review and final Codex optimization are recorded; docs/IMPLEMENTATION_PLAN.md is the sole current plan. Stop at founder approval of the final exact proposal commit (docs/FOUNDER_DECISION_PACKET.md); mandatory MVP choices A/B/C/E/I/J, optional D/F/G/H may remain deferred. Full production implementation, durable-jobs integration, whole-application imports and repository renaming require founder approval of the reviewed plan. Bounded reversible qualification and documentation corrections are authorized.
 
 Use English for engineering; plan Arabic/English product support. Keep one canonical project/timeline model and one current frontier. Preserve previous work, required notices and source attribution. Record exact SHA/path/hash/modifications for imports. Founder source rights do not grant model-weight/dataset/trademark/hosted capacity rights.
 
