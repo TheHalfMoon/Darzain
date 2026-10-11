@@ -110,6 +110,11 @@ export class ProcessOwner {
       windowsHide: true,
     });
     this.#procd = child;
+    // The owner never keeps the service alive by itself: when the service
+    // exits, procd sees its stdin close and ends every job.
+    child.unref();
+    (child.stdin as unknown as { unref?: () => void }).unref?.();
+    (child.stdout as unknown as { unref?: () => void }).unref?.();
     this.#ready = new Promise<void>((resolve, reject) => {
       const lines = createInterface({ input: child.stdout! });
       lines.on("line", (line) => {

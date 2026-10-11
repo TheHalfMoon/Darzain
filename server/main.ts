@@ -17,6 +17,7 @@ import {
 import { RESOURCE_POLICY } from "../core/command/policy.ts";
 import { acquireServiceLock } from "../core/service-lock.ts";
 import { isLegacyWorkspace } from "../core/migrate.ts";
+import { closeWorkers } from "../core/process/workers.ts";
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -298,6 +299,7 @@ const close = async (code = 0) => {
   const stopped = new Promise<void>((resolve) => server.close(() => resolve()));
   await drained;
   await stopped;
+  closeWorkers();
   store.close();
   lock.release();
   process.exit(code);

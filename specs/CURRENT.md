@@ -4,16 +4,25 @@ Updated: 2026-10-11. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 
 **Phase:** P01 authority (T1–T3), implementation authorized by the [founder decision record](../docs/FOUNDER_DECISION_RECORD.md) against plan `edbaba6c4f5f2f42e968b4ab2273c8e11620d9af`. [IMPLEMENTATION_PLAN](../docs/IMPLEMENTATION_PLAN.md) is the sole task authority; [operational contracts](../docs/OPERATIONAL_CONTRACTS.md) define protocols. Release verdict: **NO-GO** until every T10 gate passes.
 
-**Verified main:** `27e3c7da` (T2 PR #7 merged at reviewed head `38459f53`; tree identical). T1 PR #6 `c1664985`; planning PRs #3–#5 merged earlier.
+**Verified main:** `539688b3` (T3 PR #8 merged at reviewed head `71f6cf19`; tree identical). T2 #7 `27e3c7da`, T1 #6 `c1664985`; planning PRs #3–#5 merged earlier.
 
 | Task | Status | Evidence |
 |---|---|---|
 | T1 command boundary and import guard | **Merged** (#6, `c1664985`) | Combined + security fresh-context reviews (3 cycles, all must-fix resolved); CI `qualify` on exact head; Windows tests + Edge E2E |
 | T2 SQLite snapshot authority | **Merged** (#7, `27e3c7da`) | Combined + security reviews (3 cycles, 3 must-fix resolved); CI `qualify` on exact head after a Linux-only permission fix; Windows tests + Edge E2E |
-| T3 canonical v1 and migration | In review on `feat/t3-canonical-migration` | See the T3 PR body |
-| T4–T10 | Not started | — |
+| T3 canonical v1 and migration | **Merged** (#8, `539688b3`) | Combined + security reviews (3 cycles; 4 must-fix resolved incl. source-aliasing writes); CI `qualify` on exact head; Windows tests + Edge E2E |
+| T4a process ownership and owned probes | In review on `feat/t4-assets-owned-probes` | See the T4a PR body |
+| T4b streaming import, asset tables, ≥2 GiB | Next | — |
+| T5–T10 | Not started | — |
 
-## T3 surface (in review)
+## T4a surface (in review)
+
+- `native/procd` (Rust, no dependencies): owns every media worker. Each worker is created suspended inside its own KILL_ON_JOB_CLOSE Job Object (atomic `PROC_THREAD_ATTRIBUTE_JOB_LIST`, no breakaway), with an inherited-handle allowlist, a minimal environment, an executable allowlist and MSVCRT-exact argument quoting. Workers resume only after the service records their identity. Service death → procd stdin EOF → jobs terminated; procd death → the OS closes the jobs.
+- `core/process/owner.ts` + `workers.ts`: one owner per service; FFmpeg/ffprobe resolved to absolute paths once. Non-Windows hosts run an explicitly unqualified development mode.
+- `probe()` runs through the owner: file-only protocol whitelist, wall-clock and Job memory limits, bounded output, `MEDIA_INVALID` without paths. Records time base and frame rate and identifies VFR.
+- Windows evidence: argv fidelity, minimal env, suspended-until-recorded, cancellation, service kill, owner kill, and owner death between create and resume all leave no live or suspended worker.
+
+## T3 surface (merged)
 
 - `core/time.ts`: integer flicks (705,600,000/s) with BigInt intermediates, explicit rounding and safe-integer checks; frame/PTS/time-base conversions.
 - `core/canonical.ts`: `yamakan.project` formatVersion 1 (flicks, rational fps, language, source time base). Newer versions are inspectable but never edited or rewritten. The 30 fps editing shape is a lossless projection; unrepresentable values fail with `CAPABILITY_UNAVAILABLE`.
@@ -57,4 +66,4 @@ Updated: 2026-10-11. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 - **Disk:** C: has ~3 GiB free (99% used); D: has ~20 GiB free. Clone and npm cache live on D:. T4's ≥2 GiB import and T10 media tests need a disk-capacity preflight and may need space freed by the founder.
 - Jev key and an OCR LLM backend are founder-provided resources; without them those reviews stay recorded as unavailable.
 
-**Next executable task:** T4 streaming assets and owned probes (needs the native Windows Job Object launch binding), after T3 merges.
+**Next executable task:** T4b streaming import, asset object/version tables, disk preflight, ENOSPC injection and the ≥2 GiB import memory gate.
