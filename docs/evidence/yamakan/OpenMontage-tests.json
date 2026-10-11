@@ -1,0 +1,22 @@
+{
+  "name": "OpenMontage",
+  "command": [
+    "rtk",
+    "proxy",
+    "C:\\Users\\Shehr\\Documents\\Codex\\2026-10-11\\files-pasted-by-the-user-darzain\\work\\qualification\\yamakan\\research-venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "tests/lib/test_checkpoint_prerequisites.py",
+    "-q",
+    "--tb=short",
+    "--basetemp=C:\\Users\\Shehr\\Documents\\Codex\\2026-10-11\\files-pasted-by-the-user-darzain\\work\\qualification\\yamakan\\tmp-905cbe96-5f90-4e09-9a84-92758d21a9e2"
+  ],
+  "cwd": "C:\\Users\\Shehr\\Documents\\Codex\\2026-10-11\\files-pasted-by-the-user-darzain\\work\\qualification\\yamakan\\OpenMontage",
+  "exit": 0,
+  "elapsedMs": 3999,
+  "summary": "[rtk] /!\\ No hook installed — run `rtk init -g` for automatic token savings\n......                                                                   [100%]\r\n6 passed in 1.70s\r\n",
+  "scope": "Original missing-predecessor, gated-predecessor, malformed-checkpoint and style validation tests. No crash/power-loss or full production pipeline test.",
+  "earlierAttempts": [
+    "Default pytest temporary root denied access; no test assertions executed"
+  ]
+}

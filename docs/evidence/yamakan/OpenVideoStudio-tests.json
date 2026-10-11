@@ -1,0 +1,25 @@
+{
+  "name": "OpenVideoStudio",
+  "command": [
+    "rtk",
+    "proxy",
+    "C:\\Users\\Shehr\\Documents\\Codex\\2026-10-11\\files-pasted-by-the-user-darzain\\work\\qualification\\yamakan\\research-venv\\Scripts\\python.exe",
+    "-m",
+    "pytest",
+    "tests/test_identity.py",
+    "tests/test_identity_provider.py",
+    "-q",
+    "--tb=short",
+    "--basetemp=C:\\Users\\Shehr\\Documents\\Codex\\2026-10-11\\files-pasted-by-the-user-darzain\\work\\qualification\\yamakan\\tmp-9ead6492-e5d5-4c8b-bef1-932f023272ae"
+  ],
+  "cwd": "C:\\Users\\Shehr\\Documents\\Codex\\2026-10-11\\files-pasted-by-the-user-darzain\\work\\qualification\\yamakan\\OpenVideoStudio\\studio",
+  "exit": 0,
+  "elapsedMs": 4528,
+  "summary": "[rtk] /!\\ No hook installed — run `rtk init -g` for automatic token savings\n......................                                                   [100%]\r\n22 passed in 2.28s\r\n",
+  "scope": "Original identity formatting, validation and provider contract tests, using donor fake-LLM fixtures. No real generation or identity-quality benchmark.",
+  "earlierAttempts": [
+    "Collection failed without requests",
+    "Collection failed without edge_tts",
+    "Relative virtualenv command failed from changed cwd"
+  ]
+}

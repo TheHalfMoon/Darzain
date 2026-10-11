@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "baseMain": "0d3bdacb51188294ba8d36ce2b218db72f6073a6",
+  "scope": "Mechanical package validation only; not Claude/architecture/runtime/security approval",
+  "status": "PASS",
+  "requiredFiles": 25,
+  "sourcePins": 58,
+  "providerRecords": 19,
+  "phases": 12,
+  "firstTenTasks": 10,
+  "files": 120,
+  "jsonParsed": 57,
+  "linksChecked": 98,
+  "historicalLinkPolicy": "Preserved historical documents refer to the original base-repository layout and are excluded from current-link validation",
+  "productionCodeChanged": false,
+  "failures": []
+}

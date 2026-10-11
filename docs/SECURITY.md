@@ -1,15 +1,22 @@
-# Security boundary
+# Security and privacy proposal
 
-The preview runs on 127.0.0.1 under a trusted local account. It rejects unexpected Host/Origin and cross-site fetches, authenticates API access, limits bodies, uses strict schemas and disallows arbitrary path/command arguments. Workspace paths reject traversal and symbolic links/junctions. Media signatures, ffprobe metadata, asset byte hashes, snapshot hashes and output media are checked. Native commands use shell=false and local protocol restrictions.
+The legacy trusted-local-account boundary is not internet tenancy or a same-account adversary defense. Planned controls below need their own qualification; static types/graphs do not prove enforcement.
 
-The filmmaker donor Electron shell disables web security and exposes broad filesystem IPC; it is not shipped. Provider keys are not stored in this browser. No telemetry or cloud upload is required. Static content uses CSP and no remote fonts.
+| Threat | Required boundary | Attack acceptance |
+|---|---|---|
+| Malicious media | Signatures plus bounded probes; decoder time/resource/stream limits | Malformed containers, huge dimensions, remote protocols |
+| Project archives | Strict manifest/entry/depth/expanded limits; separate import root | ZIP bombs, traversal/drive/UNC paths, symlinks, duplicate/case collisions |
+| Filesystem escape | Workspace grants, safe ancestry/reparse checks, verified handles | Traversal, junction swap, unauthorized outputs |
+| Workflow/plugin injection | Registered declarative nodes; sandbox arbitrary code only after qualification | eval/shell/project JSX, malicious template/skill authority |
+| Credentials | OS store or qualified secret service, opaque refs, redaction/rotation | Project/archive/log/browser/SDK leaks, stale sessions |
+| Upload/SSRF | Default-deny provider allowlists, DNS/IP/redirect checks, asset/region consent | Metadata/LAN redirects, hidden cloud fallback |
+| Unauthorized jobs | Scoped transport auth, local Host/Origin/session protection, owned workers | Cross-site bootstrap, forged grant/job/paths |
+| Resource/cost abuse | CPU/GPU/disk/queue quotas, timeout, cancellation/reserved spend | Flood/hung worker/disk full/ambiguous paid retry |
+| Agent escalation | Trusted grants separate from model content and revision/schema validation | Prompt injection, tool-output scope forgery |
+| Likeness/voice misuse | Version/purpose/use/expiry/revocation consent and provenance | Missing/revoked consent, unauthorized voice uploads |
 
-Verified negative cases include forged assets, stale saves, corrupt snapshots, malicious path IDs, disguised playlists, unknown tools, prototype names, unauthenticated API, hostile Origin and stale restart credentials.
+A photo import does not authorize voice cloning. Derived biometric/voice assets inherit access/deletion policy; avoid unnecessary raw biometric retention. Disclose provider retention/region/upload metadata. Prompts, generations and retrieved documents remain untrusted proposals.
 
-Open release gates: OS process sandboxing; streaming bounded uploads/downloads; total workspace quota and stale artifact retention; file-handle verification to narrow local TOCTOU races; crash locks; durable jobs; explicit recovery; private filesystem ACL qualification on Windows; dependency/supply-chain monitoring; portable archive defenses. A hostile local process with the same account is outside this preview's isolation guarantee. Never expose the server on a LAN.
+Executed legacy controls include bounded schemas/media probes, traversal defense, local auth, verified history and real export checks. Gaps include Windows directory fsync, stale locks/orphans, same-account path/handle races, buffered media serving, secure decoder sandbox and public tenancy. Do not inherit filmmaker unrestricted Electron IPC or Kodac development-secret auth.
 
-The application dependency audit is currently clear of known npm advisories after replacing the earlier Tailwind 3 dependency chain. A clean npm advisory result is not a security review. OCR LLM attempts failed or skipped; no clean OCR review is claimed. Three fresh-context PStack reviewers completed initial and delta reviews, and all six confirmed must-fixes were resolved with regression evidence. See evidence/review/.
-
-Recovery tools inherit the authenticated loopback API. Restore uses an optimistic raw-head fingerprint, strict revision schemas, safe workspace paths, checksum/identity validation, and asset verification. Snapshot/head reads are capped at 2 MiB; legacy media reads at 50 MiB. History inspects revisions sequentially to bound concurrent memory. Skelet storage requires private POSIX directories and rejects symlinks; Windows ACL qualification remains a release gate.
-
-Raw damaged-head fingerprinting uses 64 KiB chunks and a 10-second budget independently of bounded JSON parsing. Recovery preserves the original inode through a verified hardlink before atomic head replacement. The trusted workspace owner can mutate hardlinked evidence; this is not a forensic tamperproof store.
+Release requires fresh independent review of immutable diffs, actual adversarial media/archive/network/credential/quota tests, dependency/binary provenance, exact-head CI and clean install/update workflows. Failures and unavailable tooling remain explicit. No sandbox claim follows from Ecra/kernux policy types alone.

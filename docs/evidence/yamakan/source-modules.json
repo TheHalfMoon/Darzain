@@ -1,0 +1,794 @@
+[
+  {
+    "repo": "WyattBlue/auto-editor",
+    "sha": "4928ad4201126973ca38e5b09c245b9e75219cf0",
+    "modules": [
+      {
+        "path": "src/timeline.nim",
+        "sha256": "48dce5566498efff05ed6356c1a0d0ea9d769a3736702e97afc213c4c7417cf6",
+        "bytes": 20932
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "Blender/blender",
+    "sha": "754ebe3c4b4e1402a159df6e1e58823cc93ef887",
+    "modules": [
+      {
+        "path": "source/blender/sequencer/intern/render.cc",
+        "sha256": "8ac2746c559916e3da6fc4c8ecf9ea4c4b8e931ed7fedbeee43a5861b6a5b80f",
+        "bytes": 80550
+      },
+      {
+        "path": "source/blender/makesdna/DNA_camera_types.h",
+        "sha256": "f931efef9a68da66c64221a91e281dbd53a5dadcf0d44a79c601de2148c4c33f",
+        "bytes": 7703
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "Comfy-Org/ComfyUI-Manager",
+    "sha": "45c3fb68373e4dc09f5cf8cf221e2b56d0b27164",
+    "modules": [
+      {
+        "path": "glob/manager_server.py",
+        "sha256": "f62ff561b9cfa608ffed554b6e1611ba3e17308300aa83811a1d472530ae32bb",
+        "bytes": 81664
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "huggingface/diffusers",
+    "sha": "85c9fa4caee33d1c5b473395784471d2d7957c1b",
+    "modules": [
+      {
+        "path": "src/diffusers/pipelines/wan/pipeline_wan.py",
+        "sha256": "e80e0bbb05db93a614e5c01733482ac56f0c426dc02abe3bb11383285fddd0a3",
+        "bytes": 32495
+      },
+      {
+        "path": "src/diffusers/pipelines/flux2/pipeline_flux2.py",
+        "sha256": "2782c9a4b3271492fed8d47184c43a8e977fffcedb804ffe7e0b7dde81f2afcd",
+        "bytes": 44384
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "SYSTRAN/faster-whisper",
+    "sha": "a52b026ac844c02117865e61968547639b60a6f8",
+    "modules": [
+      {
+        "path": "faster_whisper/transcribe.py",
+        "sha256": "912f2b06178668a9ea783fd13182c90960c47533abe4abfa0786924992de4dae",
+        "bytes": 81078
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "FFmpeg/FFmpeg",
+    "sha": "b5902e69c71bf556958f9fded99d1bcea2d7298c",
+    "modules": [
+      {
+        "path": "fftools/ffmpeg_filter.c",
+        "sha256": "14ac7574ab67230bcded679b453cb008edbe71e285b3193ae04d1fa02051f24d",
+        "bytes": 121117
+      },
+      {
+        "path": "libavfilter/vf_xfade.c",
+        "sha256": "6c2abcb5ed88d4339675a327a5d86c60f62699cc8ee727cfc74db491f7b4c797",
+        "bytes": 162867
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "black-forest-labs/flux2",
+    "sha": "50fe5162777813d869182b139e83b10743caef15",
+    "modules": [
+      {
+        "path": "src/flux2/sampling.py",
+        "sha256": "f1a1e89651d450c05ab87840ed65011a2d25b83d811c61853ec6ed38e938d640",
+        "bytes": 13414
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "lllyasviel/FramePack",
+    "sha": "97fe5dbe06ac1f337ece08935b1076a35eefeeb9",
+    "modules": [
+      {
+        "path": "demo_gradio.py",
+        "sha256": "35784cd34ee8165e67ca0d3bdab0253ffce094a4f07206b4dab18130ad8021b5",
+        "bytes": 19500
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "IDEA-Research/GroundingDINO",
+    "sha": "856dde20aee659246248e20734ef9ba5214f5e44",
+    "modules": [
+      {
+        "path": "groundingdino/util/inference.py",
+        "sha256": "0c06c5dd2fa46ae89a9fa376c0eaa383d12e7fc21aa65d662bcf3e758d26b598",
+        "bytes": 9395
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "Tencent-Hunyuan/Hunyuan3D-2",
+    "sha": "f8db63096c8282cb27354314d896feba5ba6ff8a",
+    "modules": [
+      {
+        "path": "hy3dgen/shapegen/pipelines.py",
+        "sha256": "3eb438997fca59f682866f529f1984d4852d717577c24743e5d9bfd5566fa467",
+        "bytes": 31932
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "Tencent-Hunyuan/HunyuanVideo-1.5",
+    "sha": "60783e704160023913bee78f0b47036d393d4dfa",
+    "modules": [
+      {
+        "path": "hyvideo/pipelines/hunyuan_video_pipeline.py",
+        "sha256": "0af9e183b223fa5d5cde4d998ca5820a5a09d0cb8cd6b7d60603af28486b206f",
+        "bytes": 70777
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "KDE/kdenlive",
+    "sha": "89de732c70117ebb4b54bb2c6de97946cd26e3fd",
+    "modules": [
+      {
+        "path": "src/timeline2/model/timelinemodel.cpp",
+        "sha256": "0c99ce7801c99bcb1ceef3732e72c7efd3544dc5dd6249c55e28a779a0e5d4f8",
+        "bytes": 343565
+      },
+      {
+        "path": "renderer/renderjob.cpp",
+        "sha256": "9e87586ba171b94a95ca7a6a13646b4c37431a437a036872ccccec7555f70de7",
+        "bytes": 15931
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "langchain-ai/langgraph",
+    "sha": "799c2f04fd3a56186e24e9fb8bbf3568e543cfbe",
+    "modules": [
+      {
+        "path": "libs/checkpoint/langgraph/checkpoint/base/__init__.py",
+        "sha256": "e1b412fb541b47cf9ab0657f5c160c955c71ce929d8ac786f0bcc94d356481e9",
+        "bytes": 32025
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "bytedance/LatentSync",
+    "sha": "a229c3948406bc2cf6eaf4873e662e70c6a04746",
+    "modules": [
+      {
+        "path": "scripts/inference.py",
+        "sha256": "0c719555a4d2566237d7e768a5111dc0d61457a0676eb02acf16ee05bf8c91f5",
+        "bytes": 4332
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "KlingAIResearch/LivePortrait",
+    "sha": "9b294b3d0536135442ea73cb01e6cb3ca7029dd3",
+    "modules": [
+      {
+        "path": "src/live_portrait_pipeline.py",
+        "sha256": "e8dc71e0803802f802bce947dac53217b54d49319679e0e2bb3302079e92ee07",
+        "bytes": 31894
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "Lightricks/LTX-2",
+    "sha": "9ec55f9f22798a3198d9c923856824821bc3317e",
+    "modules": [
+      {
+        "path": "packages/ltx-pipelines/src/ltx_pipelines/distilled.py",
+        "sha256": "9edc9ba0fcd6bfd586bdd975e314c33cb48fb4c533be69feb593ed63d82b9735",
+        "bytes": 21737
+      },
+      {
+        "path": "packages/ltx-core/src/ltx_core/conditioning/types/keyframe_cond.py",
+        "sha256": "5aecc7124920a8282aa73ac51f2eb77bfa5630c01df34ccf0a62cfb04ef7a860",
+        "bytes": 3867
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "Vanilagy/mediabunny",
+    "sha": "9d36fc5779b254904bc609e66f2cd80ed8390b4b",
+    "modules": [
+      {
+        "path": "src/input.ts",
+        "sha256": "4f84ff252912859745da6fcdebff4bb6a4ba2603aee60778bf7a5894aae3d969",
+        "bytes": 18185
+      },
+      {
+        "path": "src/output.ts",
+        "sha256": "64aceef0cac1ce51cfe1ea83e612abc80e279a7e0f56b636098935b0fe44cd46",
+        "bytes": 35025
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "MiniMax-AI/MiniMax-MCP",
+    "sha": "0856b9aef8a9d676bb63bdd6b6426d7b640a3b7a",
+    "modules": [
+      {
+        "path": "minimax_mcp/server.py",
+        "sha256": "7a8cf05181e4c0a0b0fa2190fee7a598df732dd5ed17eb35d492ce29b9be349b",
+        "bytes": 26727
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "mltframework/mlt",
+    "sha": "77ae5f8f8cb4e2f502c5dc868d6c7cf7b45bfc54",
+    "modules": [
+      {
+        "path": "src/framework/mlt_playlist.c",
+        "sha256": "9d40eabd5e878d24d14c379df211a68f2c071feb4319041bed5146cd17d15695",
+        "bytes": 78487
+      },
+      {
+        "path": "src/framework/mlt_producer.c",
+        "sha256": "96547ca4e66fdb83c127dd75bc6881143547d624934a687c40e24897ef572404",
+        "bytes": 44458
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "harry0703/MoneyPrinterTurbo",
+    "sha": "4204d0f39afa8ada6f3edc31604141f959fe254e",
+    "modules": [
+      {
+        "path": "app/services/task.py",
+        "sha256": "42fa734773a79e94fd1e683b3a8edb98ab0b2c7372e59787ab781d67031e3c35",
+        "bytes": 70376
+      },
+      {
+        "path": "app/services/video.py",
+        "sha256": "b561f7b194984068963abd1760e97954c69f9ff234a2bf4c55a8c653e7942fdb",
+        "bytes": 75416
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "calesthio/OpenMontage",
+    "sha": "9327439db69021ab4b0e2776729bf3b58fdb5a87",
+    "modules": [
+      {
+        "path": "lib/checkpoint.py",
+        "sha256": "2082cc353fa0c71f268f137e1018b3a467edc12318e2c922f6d4bbe42277eace",
+        "bytes": 23829
+      },
+      {
+        "path": "lib/pipeline_loader.py",
+        "sha256": "7e3eb9c266a9c49ab2b8501cf11b53e1758e672eaae011a30e20b74f5f11f7ef",
+        "bytes": 8029
+      },
+      {
+        "path": "tests/lib/test_checkpoint_prerequisites.py",
+        "sha256": "c2278bdf59f6446205c36873a06ed50abae369570b4ee3558a301a648f593ca7",
+        "bytes": 4184
+      },
+      {
+        "path": "lib/paths.py",
+        "sha256": "207a642d273ccdaf24a22629fdf55c00500292e4785e0679c26d3ce0d20ae0fa",
+        "bytes": 605
+      },
+      {
+        "path": "schemas/artifacts/__init__.py",
+        "sha256": "b298af5bb8b73ceeb193220b3b722bfea842a7bf4cfbbf6fcbbdee9532595599",
+        "bytes": 1324
+      },
+      {
+        "path": "tests/contracts/test_phase0_contracts.py",
+        "sha256": "59d93dfd11552e5754a5a07164d741058c70e65d68f9a88c825467923401cb67",
+        "bytes": 22419
+      },
+      {
+        "path": "schemas/checkpoints/checkpoint.schema.json",
+        "sha256": "39db408cd797cc5902ee55835a1f659ba26ba3d94c218d7111a6ff4df3da0833",
+        "bytes": 1721
+      },
+      {
+        "path": "remotion-composer/src/CinematicRenderer.tsx",
+        "sha256": "bcc1ac21c1e52d63870ff373e2e6c02f5964094422c261e15c7628ee94ffb462",
+        "bytes": 15476
+      },
+      {
+        "path": "remotion-composer/src/cinematic/types.ts",
+        "sha256": "a8fe55f89d274352bb08807cdfa84e0e2f048a78f7eba349346248293b748795",
+        "bytes": 1566
+      },
+      {
+        "path": "remotion-composer/src/components/CaptionOverlay.tsx",
+        "sha256": "566543055b4e963c6edc7c8be541eab5ace9007b38bf5339b5e6ee8fce96b97b",
+        "bytes": 4976
+      }
+    ],
+    "missing": [
+      "/^tools\\/planning\\/scene_consistency.py$/"
+    ]
+  },
+  {
+    "repo": "AcademySoftwareFoundation/OpenTimelineIO",
+    "sha": "00c22fa3a64256d8d3dcafbc7276492185dd970d",
+    "modules": [
+      {
+        "path": "src/opentimelineio/timeline.cpp",
+        "sha256": "bac3760a6e2fdcbefa51b03e966a5d6f8a5ea1c18dc7a10232c7a4bf043198b6",
+        "bytes": 2116
+      },
+      {
+        "path": "src/opentimelineio/track.cpp",
+        "sha256": "a4b77ad9f4f02d1c4869d3b4ddf542aa264e9b4dc2a2f9b460b77bcab143c196",
+        "bytes": 8128
+      }
+    ],
+    "missing": [
+      "/opentimelineio\\/schema\\/timeline.cpp$/",
+      "/opentimelineio\\/schema\\/track.cpp$/"
+    ]
+  },
+  {
+    "repo": "mne03005-png/OpenVideoStudio",
+    "sha": "175da9960411fbe740932b0a08d57e32a4a36a18",
+    "modules": [
+      {
+        "path": "studio/creative/pipeline.py",
+        "sha256": "e0e68d53db663b5c7390236a894788665ff364b1ffb40218d10d6e888ece2825",
+        "bytes": 29705
+      },
+      {
+        "path": "studio/providers/base.py",
+        "sha256": "0278058decdd63a00cfbdaf6286a28b4768024153fa48b8f755aec2dd12dd18f",
+        "bytes": 2994
+      },
+      {
+        "path": "studio/core/render.py",
+        "sha256": "e0b00b575b3833005e30b700b667540e938649685e1e68118d31fb9e4bcc6e55",
+        "bytes": 13965
+      },
+      {
+        "path": "studio/identity/models.py",
+        "sha256": "160268fce36d2dfc31a8454c4c474b487031005598a65ccea04a862f66435364",
+        "bytes": 1199
+      },
+      {
+        "path": "studio/tests/test_identity.py",
+        "sha256": "ddaae47e52871e7fcc5842f23bda8f0b6443ee4540c872ad1e95badbab1f8ef5",
+        "bytes": 8542
+      },
+      {
+        "path": "studio/tests/test_identity_provider.py",
+        "sha256": "d81e43d071e23f463adef451bebf6357d44ee60c05124abb0e876d2c0338a243",
+        "bytes": 5186
+      },
+      {
+        "path": "studio/providers/identity_text.py",
+        "sha256": "e8166375e86650aa7eab576e68487e7977258d37a91dc67c6582d560b4018c5f",
+        "bytes": 1822
+      },
+      {
+        "path": "studio/identity/__init__.py",
+        "sha256": "e8212a1312876e07f007c7f4e76ac07f25ab34c49781866d289e1097d0951cd8",
+        "bytes": 410
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "hzwer/Practical-RIFE",
+    "sha": "bbfd2ea90910789a860ea3e2b32a240cd577b75e",
+    "modules": [
+      {
+        "path": "inference_video.py",
+        "sha256": "72070ee3a8f0f6878179c41a754748440e3dbf1614d3c923ef52f3030f68854c",
+        "bytes": 11008
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "pmndrs/react-three-fiber",
+    "sha": "9e53355ce499ea518ac3729de7fd4dcc06d8cdb9",
+    "modules": [
+      {
+        "path": "packages/fiber/src/core/renderer.ts",
+        "sha256": "a4267a97cb6cf4d253884da42a8b974443f6231fb4f27e14f98839e772bd0995",
+        "bytes": 2406
+      }
+    ],
+    "missing": [
+      "/^packages\\/fiber\\/src\\/core\\/renderer.tsx$/"
+    ]
+  },
+  {
+    "repo": "openvideodev/react-video-editor",
+    "sha": "9a8c5296da4b258f66dfb7ad73de96be62478bca",
+    "modules": [
+      {
+        "path": "src/types/project.ts",
+        "sha256": "05d432f42a1ba00cb15d2e9aed0c00d647014b215ab7fbdd2060ab5a91b69d8c",
+        "bytes": 878
+      },
+      {
+        "path": "src/lib/project.ts",
+        "sha256": "ee5a84b1a44a2cf898036c2a73846c9d3037d4e365e1126d8242164ee18cbc23",
+        "bytes": 775
+      },
+      {
+        "path": "src/hooks/use-export.ts",
+        "sha256": "b4450802aa18383635bf111497fcfd928928fee716bae4d5113858ad0076fe88",
+        "bytes": 7502
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "xinntao/Real-ESRGAN",
+    "sha": "a4abfb2979a7bbff3f69f58f58ae324608821e27",
+    "modules": [
+      {
+        "path": "realesrgan/utils.py",
+        "sha256": "185df0ef68f96891bdbb99280aac5b8b62fd4e4baac74bad37f53cf408668db1",
+        "bytes": 12605
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "remotion-dev/remotion",
+    "sha": "9fdd1fc403b4f6b9231860b714285e99d18d5940",
+    "modules": [
+      {
+        "path": "packages/renderer/src/render-media.ts",
+        "sha256": "d731584f9a1d4faa393808a826d362b176510e3cc5f439e96c0e3d84c1dd68a7",
+        "bytes": 35509
+      }
+    ],
+    "missing": [
+      "/packages\\/core\\/src\\/sequence.tsx$/"
+    ]
+  },
+  {
+    "repo": "facebookresearch/sam2",
+    "sha": "2b90b9f5ceec907a1c18123530e92e794ad901a4",
+    "modules": [
+      {
+        "path": "sam2/sam2_video_predictor.py",
+        "sha256": "912555920a77f72ded07839efa33fcceecc79f3523abbec783f0be46ee2c55c2",
+        "bytes": 58921
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "crashtestoz/storyboard",
+    "sha": "f804e2a16018d927a4123bc2a47db9bd4eb2bf19",
+    "modules": [
+      {
+        "path": "server/continuity_ledger.py",
+        "sha256": "e26f3d8d82e3ce99159c340eadcbac00dcb98997bcd907a8ffa444647887bb40",
+        "bytes": 32201
+      },
+      {
+        "path": "server/store.py",
+        "sha256": "53b582ea30a2e36584e8fe80881ae3513b3d1f149e77f53cd50513994ea67b16",
+        "bytes": 63064
+      },
+      {
+        "path": "server/hardware.py",
+        "sha256": "387ecb1ba67d15ecef43456c66c9a10606cc1280230828b61001d053a2ad668a",
+        "bytes": 9115
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "LinHao-city/StoryMind",
+    "sha": "00f9a0c7f67eeb3a076cf0a4a449ae7c856739ac",
+    "modules": [
+      {
+        "path": "tools/planning/storyboard_planner.py",
+        "sha256": "96b42738795f3591a684f8db2e3791ad74841c88bc55b19b87cb725a35ce79d2",
+        "bytes": 11111
+      },
+      {
+        "path": "tools/planning/scene_consistency.py",
+        "sha256": "bc7fbb145d24b146c59565f75987c765fbfaabd433446d82a940e1878c981b17",
+        "bytes": 9514
+      },
+      {
+        "path": "lib/checkpoint.py",
+        "sha256": "ceea491f844dfaf5eeeaf61e512e135e3b3b9f2200c2fc6ac2a0c4f20810ce81",
+        "bytes": 12114
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "tldraw/tldraw",
+    "sha": "7937be360bcb8239d89e420850843f81313fc07b",
+    "modules": [
+      {
+        "path": "packages/editor/src/lib/editor/Editor.ts",
+        "sha256": "5150a918bb6049b506b470d03dbf9de85c3c38fa7fbc9518e5114fde07a6ee85",
+        "bytes": 348103
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "microsoft/TRELLIS",
+    "sha": "442aa1e1afb9014e80681d3bf604e8d728a86ee7",
+    "modules": [
+      {
+        "path": "trellis/pipelines/trellis_image_to_3d.py",
+        "sha256": "a9a6eab500dd0693f6f5aa86d42291a4921596988c5c6460aa17fad6fe66b833",
+        "bytes": 15345
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "ali-vilab/Wan-Move",
+    "sha": "80c58a7d2ad175fa82a4d57f79f2a1415317dcfa",
+    "modules": [
+      {
+        "path": "generate.py",
+        "sha256": "1376d97ccf76ee66a52385fedc4b0173fb62d9dec30f7735bc7120031643816e",
+        "bytes": 20825
+      }
+    ],
+    "missing": [
+      "/^wan\\/image2video.py$/"
+    ]
+  },
+  {
+    "repo": "Wan-Video/Wan2.2",
+    "sha": "1ea34ff48f87168174e12956e200b1d908b1c5ff",
+    "modules": [
+      {
+        "path": "wan/textimage2video.py",
+        "sha256": "228f2fabf23014ed41ec6b8cd713d5be7371bb558501c71a62a0258b491a877b",
+        "bytes": 24031
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "deepbeepmeep/Wan2GP",
+    "sha": "6479db36bdc2619a904a852bba9c2d78e1a83f82",
+    "modules": [
+      {
+        "path": "wgp.py",
+        "sha256": "3cc996fb3ae47515bdbd2670ca87342a41510a9c3dcffe83e69ae80b1d7f9563",
+        "bytes": 870424
+      },
+      {
+        "path": "shared/api.py",
+        "sha256": "f648af6efd6ada29ebbb9e20f1220520c7949dc38c395fe49bb16646eceda586",
+        "bytes": 78318
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "xyflow/xyflow",
+    "sha": "3d35b57317576b0916c0bfeaaedd573aaacc2839",
+    "modules": [
+      {
+        "path": "packages/system/src/types/nodes.ts",
+        "sha256": "3421fe3bb9d71e719f0bce458eda7d5c26e313f745d295b11eb4007d1a4bcc0d",
+        "bytes": 5114
+      }
+    ],
+    "missing": []
+  },
+  {
+    "repo": "TheHalfMoon/Ascout",
+    "sha": "ca6b6f514e5a8881e2cfa2789b5e5ea43e3aaaad",
+    "modules": [
+      {
+        "path": "src/assurance/review/independence-policy.ts",
+        "sha256": "f72262e498b15b0475002301bb8099a55e8197f4b7d57e9cbfff7fa4f17e31e6",
+        "bytes": 4065
+      },
+      {
+        "path": "src/assurance/contracts/policy.ts",
+        "sha256": "3f6b9b9582586ac0c4cba8ee3cf9ea1eb535bfc4ba0b640c9002894dc8f0a1b4",
+        "bytes": 21905
+      }
+    ]
+  },
+  {
+    "repo": "TheHalfMoon/Diffcipline",
+    "sha": "1e6d14f77b95bb132b42276f10d67f1018ab5bb6",
+    "modules": [
+      {
+        "path": "benchmarks/harness/sandbox_exec.py",
+        "sha256": "f35287c49027204fd5b739cfc934c793916cd5633fbb5639e03c42c8689ad765",
+        "bytes": 4010
+      }
+    ]
+  },
+  {
+    "repo": "TheHalfMoon/Ecra",
+    "sha": "0e2ff8c687c93e6f158da6984a7a6915339b5f3f",
+    "modules": [
+      {
+        "path": "crates/ecra-run/src/budget.rs",
+        "sha256": "b5cc2fbc21bdd49a6b027b280206808d34ff8f894e3d6df0538fc4603e201961",
+        "bytes": 7923
+      },
+      {
+        "path": "crates/ecra-run/src/recovery.rs",
+        "sha256": "df1e69e7c3faa06406e1d5af6403a8f52d3b09193313a0c2f41e59f75248db0c",
+        "bytes": 5815
+      }
+    ]
+  },
+  {
+    "repo": "TheHalfMoon/Gomrey",
+    "sha": "5f299a7a6174ad3a1180f827778db5f4400a4d71",
+    "modules": [
+      {
+        "path": "servers/fastapi/gomrey/budgets.py",
+        "sha256": "3561cc0a3979ee95da6bfd119d1f25e05ab09a3919bd8865a1e33405d7a8b2e0",
+        "bytes": 3330
+      },
+      {
+        "path": "servers/fastapi/gomrey/jobs.py",
+        "sha256": "804a7b291d832048665b5737a006db0e414458613a15525ca3b91429df3f8921",
+        "bytes": 5802
+      }
+    ]
+  },
+  {
+    "repo": "TheHalfMoon/Inercative",
+    "sha": "3a4713c47d36722c564f185bc4a8c02ad57da05c",
+    "modules": [
+      {
+        "path": "packages/control-plane/next-env.d.ts",
+        "sha256": "1862ac4bbbc5192d4bf562161df66ea547ed3e67173100656ab606ae9797db2b",
+        "bytes": 288
+      },
+      {
+        "path": "packages/control-plane/src/control-plane-store.test.ts",
+        "sha256": "ff27f319bf20ce2616a480313a86ab47aeb5d5f8d6fefc7e920df88d1b479fa4",
+        "bytes": 6253
+      }
+    ]
+  },
+  {
+    "repo": "TheHalfMoon/kernux",
+    "sha": "2085b6ed1121b1a94c66c076bdd6b578da4dad0d",
+    "modules": [
+      {
+        "path": "crates/kernux-policy/src/egress.rs",
+        "sha256": "203ab65694384905221101d90fd4f760a3a7ab6d0d99e5a4c322c0a837449435",
+        "bytes": 58664
+      },
+      {
+        "path": "crates/kernux-policy/src/decision.rs",
+        "sha256": "f4912da5d091512abd7c72de421a70cd33b10e414ead83d02718359041dccbeb",
+        "bytes": 20283
+      }
+    ]
+  },
+  {
+    "repo": "TheHalfMoon/Kodac",
+    "sha": "406b335277f2df1e3dedf24cdb45847dff919d44",
+    "modules": [
+      {
+        "path": "nexusmcp/omni-bridge/src/auth/middleware.ts",
+        "sha256": "a23cf94ff69452403c0dc3fc5b439122551934e946794940c225dee5cbd0d5dc",
+        "bytes": 1870
+      }
+    ]
+  },
+  {
+    "repo": "TheHalfMoon/Morize",
+    "sha": "62fc04d01d398da93b4dacf0ab2f33e3f1440462",
+    "modules": [
+      {
+        "path": "crates/morize-core/src/bounded.rs",
+        "sha256": "d3827a1a6e219885f6c62a7e121d9236e826b8f07ca5048ca8306ea0f739d86f",
+        "bytes": 9003
+      },
+      {
+        "path": "crates/morize-core/src/bounded_collection.rs",
+        "sha256": "76d50dbcaaeb16eb03bdd61d047fd440ee7f2f1cde592798b0204e865db0b633",
+        "bytes": 13021
+      }
+    ]
+  },
+  {
+    "repo": "TheHalfMoon/Ninerr",
+    "sha": "bec85aa7ee8f1b1695c689aff1631c165baa09fa",
+    "modules": [
+      {
+        "path": "packages/agent-runtime/src/session.ts",
+        "sha256": "bf38c2cd7c8f61880aed4d4e147403e5f797e05ed2103172ece60b5faebcf445",
+        "bytes": 25376
+      },
+      {
+        "path": "packages/network-policy/src/policy.ts",
+        "sha256": "eb2e32a54229beac406efb5461190a6c9ade8ebae0407f8d64ff67753fcb1518",
+        "bytes": 10256
+      }
+    ]
+  },
+  {
+    "repo": "TheHalfMoon/Orcel",
+    "sha": "961befc1547cf7e947ad33e915c33d52c38e6977",
+    "modules": []
+  },
+  {
+    "repo": "TheHalfMoon/Pluma",
+    "sha": "a5c0ff3e9bf1ce7ef5c7770c8a2658ce2edd4682",
+    "modules": [
+      {
+        "path": "src/recovery.rs",
+        "sha256": "5a283e06862147b00f52963a89d0ea5645f3e1b3fde31961407b517cb0e5ed2c",
+        "bytes": 41333
+      },
+      {
+        "path": "src/canonical.rs",
+        "sha256": "b69556909784fa7d23aa6a572dddfdf4370b28ac02be4062841f030c35e5d8ed",
+        "bytes": 99695
+      }
+    ]
+  },
+  {
+    "repo": "TheHalfMoon/Skelet",
+    "sha": "5d4778636de8fbb3c8ef71efbfe46d473f8e97e3",
+    "modules": [
+      {
+        "path": "packages/storage/src/storage.ts",
+        "sha256": "67deb21124c581eb5b099a073f11b71c47eb3aa0892e7aabb8835570fbaf3e20",
+        "bytes": 13378
+      }
+    ]
+  },
+  {
+    "repo": "TheHalfMoon/SpecGrain",
+    "sha": "5de7d6499bb0a9e3a191fc0934399cf099d1980a",
+    "modules": [
+      {
+        "path": "src/specgrain/verification.py",
+        "sha256": "a9cacb96c83661d655fa7e45930eb1b13cd8b04524e2f272696b0508cf102128",
+        "bytes": 29078
+      }
+    ]
+  }
+]
