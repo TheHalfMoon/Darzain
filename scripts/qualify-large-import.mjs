@@ -170,6 +170,10 @@ try {
   const peak = Math.max(...samples);
   const receipt = {
     qualification: "T4 large import",
+    commit: execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: repo,
+      encoding: "utf8",
+    }).trim(),
     date: new Date().toISOString(),
     host: {
       platform: process.platform,

@@ -212,6 +212,8 @@ const server = createServer(async (req, res) => {
           String(req.headers["x-asset-name"] || ""),
         );
         // Uploads stream to disk; the declared size bounds the work up front.
+        // A rejected upload closes its connection instead of draining the body.
+        res.setHeader("Connection", "close");
         const length = String(req.headers["content-length"] ?? "");
         if (!/^\d{1,16}$/.test(length))
           throw new CommandError(
@@ -306,6 +308,9 @@ const server = createServer(async (req, res) => {
     fail(toCommandError(e));
   }
 });
+// Long uploads and downloads stay open while data flows; idle sockets close.
+server.requestTimeout = 0;
+server.setTimeout(120_000);
 server.listen(port, "127.0.0.1", () =>
   console.log(`Yamakan is running at ${origin}; workspace ${root}`),
 );

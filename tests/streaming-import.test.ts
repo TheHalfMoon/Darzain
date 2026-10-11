@@ -1,13 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { mkdtemp, readFile, readdir } from "node:fs/promises";
+import { execFileSync, spawnSync } from "node:child_process";
+import {
+  mkdtemp,
+  open,
+  readFile,
+  readdir,
+  truncate,
+  writeFile,
+} from "node:fs/promises";
 import { createReadStream } from "node:fs";
+import { PassThrough } from "node:stream";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { ProjectStore } from "../core/store.ts";
 import { mediaTools } from "../core/process/workers.ts";
+import { probe } from "../core/media.ts";
 import { CommandError, toCommandError } from "../core/command/errors.ts";
 
 const ffmpeg = (args: string[]) =>
@@ -169,7 +178,7 @@ test("a version 1 workspace database upgrades step by step to the current versio
   store.close();
   const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
   db.exec(
-    "DROP TABLE attempts; DROP TABLE jobs; DROP TABLE supervisor; DROP TABLE asset_versions; DROP TABLE asset_objects; PRAGMA user_version = 1",
+    "DROP TABLE attempts; DROP TABLE jobs; DROP TABLE supervisor; DROP TABLE asset_versions; DROP TABLE asset_objects; DROP TABLE pending_work; PRAGMA user_version = 1",
   );
   db.close();
   const reopened = new ProjectStore(root);
@@ -189,4 +198,231 @@ test("a version 1 workspace database upgrades step by step to the current versio
 
 test("CommandError codes stay stable for streaming failures", () => {
   assert.equal(new CommandError("LIMIT_EXCEEDED", "x").retryable, false);
+});
+
+test("the same bytes imported twice share one object with two versions", async () => {
+  const { root, store, project } = await workspace();
+  const wav = path.join(root, "tone.wav");
+  ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", wav]);
+  const bytes = await readFile(wav);
+  const first = await store.importAsset(project.id, "a.wav", bytes);
+  // A reader holding the stored object open does not block a second import.
+  const held = await open(
+    (await store.assetFile(project.id, first.asset.id)).file,
+    "r",
+  );
+  try {
+    const second = await store.importAsset(project.id, "b.wav", bytes);
+    assert.equal(second.asset.hash, first.asset.hash);
+    assert.notEqual(second.asset.id, first.asset.id);
+  } finally {
+    await held.close();
+  }
+  assert.equal(rows(root, "asset_objects"), 1);
+  assert.equal(rows(root, "asset_versions"), 2);
+  store.close();
+});
+
+test("a damaged stored object is refused rather than served", async () => {
+  const { root, store, project } = await workspace();
+  const wav = path.join(root, "tone.wav");
+  ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", wav]);
+  const { asset } = await store.importAsset(
+    project.id,
+    "a.wav",
+    await readFile(wav),
+  );
+  const { file } = await store.assetFile(project.id, asset.id);
+  await truncate(file, 100);
+  await assert.rejects(
+    store.assetFile(project.id, asset.id),
+    (e: unknown) => e instanceof CommandError && e.code === "RECOVERY_REQUIRED",
+  );
+  store.close();
+});
+
+test("playlist and concat files cannot reach other files or the network", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "yamakan-playlist-"));
+  const target = path.join(root, "secret.wav");
+  ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", target]);
+  const playlists = {
+    "list.m3u8": `#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXTINF:1,\n${target}\n#EXTINF:1,\nhttp://127.0.0.1:9/x.ts\n#EXT-X-ENDLIST\n`,
+    "list.ffconcat": `ffconcat version 1.0\nfile '${target.replaceAll("\\", "/")}'\n`,
+  };
+  for (const [name, text] of Object.entries(playlists)) {
+    const file = path.join(root, name);
+    await writeFile(file, text);
+    // Control: without the format whitelist, ffprobe treats the file as a
+    // playlist and reaches for the local file it names.
+    const control = spawnSync(
+      mediaTools().ffprobe,
+      [
+        "-v",
+        "error",
+        "-protocol_whitelist",
+        "file",
+        "-show_entries",
+        "format=format_name",
+        "-of",
+        "csv=p=0",
+        file,
+      ],
+      { encoding: "utf8", windowsHide: true },
+    );
+    assert.match(
+      `${control.stdout}${control.stderr}`,
+      /concat|secret\.wav/,
+      `${name} would be followed without the whitelist`,
+    );
+    await assert.rejects(
+      probe(file),
+      (e: unknown) => e instanceof CommandError && e.code === "MEDIA_INVALID",
+      name,
+    );
+  }
+});
+
+test("upgrading to schema v2 registers existing assets (ready, or quarantined if damaged)", async () => {
+  const { root, store, project } = await workspace();
+  const wav = path.join(root, "tone.wav");
+  ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", wav]);
+  const good = await store.importAsset(
+    project.id,
+    "good.wav",
+    await readFile(wav),
+  );
+  ffmpeg(["-f", "lavfi", "-i", "sine=frequency=220:duration=1", wav]);
+  const bad = await store.importAsset(
+    project.id,
+    "bad.wav",
+    await readFile(wav),
+  );
+  const badFile = (await store.assetFile(project.id, bad.asset.id)).file;
+  store.close();
+  await truncate(badFile, 10);
+  const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
+  db.exec(
+    "DROP TABLE attempts; DROP TABLE jobs; DROP TABLE supervisor; DROP TABLE asset_versions; DROP TABLE asset_objects; DROP TABLE pending_work; PRAGMA user_version = 1",
+  );
+  db.close();
+  const reopened = new ProjectStore(root);
+  await reopened.initialize();
+  assert.equal(reopened.assetVersion(good.asset.id)!.state, "ready");
+  assert.equal(reopened.assetVersion(bad.asset.id)!.state, "quarantined");
+  await reopened.assetFile(project.id, good.asset.id);
+  await assert.rejects(
+    reopened.assetFile(project.id, bad.asset.id),
+    /not ready/,
+  );
+  reopened.close();
+});
+
+test("an injected out-of-space failure while publishing commits nothing", async () => {
+  const { root, store, project } = await workspace({
+    fault: (point: string) => {
+      if (point === "stage-publish")
+        throw Object.assign(new Error("ENOSPC: no space left on device"), {
+          code: "ENOSPC",
+        });
+    },
+  });
+  const wav = path.join(root, "tone.wav");
+  ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", wav]);
+  await assert.rejects(
+    store.importAsset(project.id, "tone.wav", await readFile(wav)),
+    (e: unknown) => toCommandError(e).code === "LIMIT_EXCEEDED",
+  );
+  assert.deepEqual(await staged(root, project.id), []);
+  assert.equal(rows(root, "asset_objects"), 0);
+  store.close();
+});
+
+test("slow uploads time out and concurrent uploads are capped, releasing their reservations", async () => {
+  const { root, store, project } = await workspace({ uploadGraceMs: 300 });
+  const wav = path.join(root, "tone.wav");
+  ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", wav]);
+  const bytes = await readFile(wav);
+  // Two uploads that send their header and then stall.
+  const stalled = [new PassThrough(), new PassThrough()];
+  const pending = stalled.map((s, i) => {
+    s.write(bytes.subarray(0, 64));
+    return store
+      .importAsset(project.id, `slow-${i}.wav`, s, 8 * 1024 * 1024)
+      .then(
+        () => "imported",
+        (e: unknown) => toCommandError(e).code,
+      );
+  });
+  await new Promise((r) => setTimeout(r, 50));
+  await assert.rejects(
+    store.importAsset(project.id, "third.wav", bytes),
+    (e: unknown) => e instanceof CommandError && e.code === "BUSY",
+  );
+  // 8 MiB at the 1 MiB/s minimum plus a 300 ms grace: both stall out.
+  assert.deepEqual(
+    await Promise.all(
+      pending.map((p) =>
+        Promise.race([
+          p,
+          new Promise((r) => setTimeout(() => r("still-open"), 30_000)),
+        ]),
+      ),
+    ),
+    ["LIMIT_EXCEEDED", "LIMIT_EXCEEDED"],
+  );
+  // Reservations and slots were released: a normal import works again.
+  assert.equal(
+    (await store.importAsset(project.id, "after.wav", bytes)).asset.bytes,
+    bytes.length,
+  );
+  assert.deepEqual(await staged(root, project.id), []);
+  store.close();
+});
+
+test("an interrupted v2 backfill resumes on the next start", async () => {
+  const { root, store, project } = await workspace();
+  const wav = path.join(root, "tone.wav");
+  ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", wav]);
+  const { asset } = await store.importAsset(
+    project.id,
+    "a.wav",
+    await readFile(wav),
+  );
+  store.close();
+  // As if the process died after the schema step committed, before the backfill.
+  const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
+  db.exec(
+    "DELETE FROM asset_versions; DELETE FROM asset_objects; INSERT INTO pending_work(name) VALUES ('asset-backfill')",
+  );
+  db.close();
+  const reopened = new ProjectStore(root);
+  await reopened.initialize();
+  assert.equal(reopened.assetVersion(asset.id)!.state, "ready");
+  assert.equal(rows(root, "pending_work"), 0);
+  reopened.close();
+});
+
+test("imports started in the same tick still respect the concurrency cap", async () => {
+  const { root, store, project } = await workspace({ uploadGraceMs: 200 });
+  const wav = path.join(root, "tone.wav");
+  ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", wav]);
+  const header = (await readFile(wav)).subarray(0, 64);
+  const outcomes = await Promise.all(
+    [0, 1, 2].map((i) => {
+      const s = new PassThrough();
+      s.write(header);
+      return store
+        .importAsset(project.id, `race-${i}.wav`, s, 1024 * 1024)
+        .then(
+          () => "imported",
+          (e: unknown) => toCommandError(e).code,
+        );
+    }),
+  );
+  assert.deepEqual(outcomes.sort(), [
+    "BUSY",
+    "LIMIT_EXCEEDED",
+    "LIMIT_EXCEEDED",
+  ]);
+  store.close();
 });

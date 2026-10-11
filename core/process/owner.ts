@@ -16,6 +16,9 @@ import { createInterface } from "node:readline";
 import { CommandError } from "../command/errors.ts";
 
 export type Ownership = "windows-job-object" | "posix-unqualified";
+// How workers are owned on this host. Only Windows Job Objects are qualified.
+export const ownershipMode = (): Ownership =>
+  process.platform === "win32" ? "windows-job-object" : "posix-unqualified";
 
 export type RunOptions = {
   executable: string;
@@ -92,8 +95,7 @@ export class ProcessOwner {
   #closed = false;
 
   constructor(allowedExecutables: string[]) {
-    this.ownership =
-      process.platform === "win32" ? "windows-job-object" : "posix-unqualified";
+    this.ownership = ownershipMode();
     this.#allow = allowedExecutables.map((e) => path.resolve(e));
   }
   get ownerPid() {
@@ -147,7 +149,12 @@ export class ProcessOwner {
         else if (kind === "ERROR")
           p.failed(Buffer.from(value ?? "", "hex").toString("utf8"));
       });
-      child.once("error", reject);
+      child.once("error", (e) => {
+        // A failed start is retried on the next run, not cached.
+        this.#ready = null;
+        this.#procd = null;
+        reject(e);
+      });
       child.once("exit", () => {
         // The owner is gone, and with it every job it held.
         const pending = [...this.#pending.values()];
