@@ -30,6 +30,8 @@ const LegacySchema = z
 export type CommandRequest = {
   operation: string;
   requestId: string;
+  // Only client-supplied IDs are replayable; generated ones only trace the call.
+  clientRequestId: boolean;
   parameters: unknown;
 };
 
@@ -41,6 +43,7 @@ export function parseEnvelope(body: unknown): CommandRequest {
     return {
       operation: e.data.operation,
       requestId: e.data.requestId ?? randomUUID(),
+      clientRequestId: e.data.requestId !== undefined,
       parameters: e.data.parameters ?? {},
     };
   }
@@ -50,6 +53,7 @@ export function parseEnvelope(body: unknown): CommandRequest {
   return {
     operation: legacy.data.name,
     requestId: randomUUID(),
+    clientRequestId: false,
     parameters: legacy.data.arguments ?? {},
   };
 }

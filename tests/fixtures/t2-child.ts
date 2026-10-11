@@ -29,18 +29,29 @@ if (mode === "lock") {
     },
   });
   await store.initialize();
+  // Load before reporting ready so the proposal is always revision 0 and the
+  // writer must contend inside the transaction, not fail an early check.
+  const current = await store.load(projectId);
   report({ ready: true });
   process.once("message", async () => {
+    const started = performance.now();
     try {
-      const current = await store.load(projectId);
       const saved = await store.save({ ...current, name }, 0, {
         principalId: "local-client",
         requestId,
         digest: name,
       });
-      report({ ok: true, revision: saved.revision });
+      report({
+        ok: true,
+        revision: saved.revision,
+        ms: performance.now() - started,
+      });
     } catch (e) {
-      report({ ok: false, code: toCommandError(e).code });
+      report({
+        ok: false,
+        code: toCommandError(e).code,
+        ms: performance.now() - started,
+      });
     }
     store.close();
   });

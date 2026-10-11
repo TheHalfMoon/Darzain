@@ -2,7 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fork } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
-import { mkdtemp, rm, access, readdir } from "node:fs/promises";
+import {
+  mkdtemp,
+  rm,
+  access,
+  readdir,
+  readFile,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -85,9 +92,11 @@ test("two processes racing the same revision produce exactly one commit and one 
     b.send("go");
     await new Promise((r) => setTimeout(r, 200));
     writeFileSync(release, "");
-    const outcomes = [await resultA, await resultB];
-    assert.deepEqual(outcomes[0], { ok: true, revision: 1 });
-    assert.deepEqual(outcomes[1], { ok: false, code: "REVISION_CONFLICT" });
+    const [outA, outB] = [await resultA, await resultB];
+    assert.deepEqual([outA.ok, outA.revision], [true, 1]);
+    assert.deepEqual([outB.ok, outB.code], [false, "REVISION_CONFLICT"]);
+    // B proposed revision 0 and was blocked on A's write lock until release.
+    assert.ok(outB.ms >= 150, `B waited only ${outB.ms} ms`);
     const head = await store.load(project.id);
     assert.equal(head.name, "From A");
     assert.equal(head.revision, 1);
@@ -261,27 +270,79 @@ test("reopen needs only the database; snapshots and history live in SQLite", asy
   reopened.close();
 });
 
-test("oversized snapshots and newer database versions are refused without writes", async () => {
-  const { root, store, project } = await workspace();
-  const huge = { ...project, clips: [], scenes: [], name: "x" };
-  // 200 titles of 500 characters stay inside the schema but exceed nothing; a
-  // snapshot cap is exercised by forcing a lower limit through a large asset list.
-  await store.save(huge, 0);
-  store.close();
-  const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
-  db.exec("PRAGMA user_version = 99");
-  db.close();
-  const newer = new ProjectStore(root);
+test("snapshots over the byte limit are refused and commit nothing", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "yamakan-limit-"));
+  const store = new ProjectStore(root, { snapshotBytes: 300 });
+  await store.initialize();
   await assert.rejects(
-    newer.initialize(),
+    store.create("A name long enough to exceed a 300 byte snapshot limit"),
+    (e: unknown) => e instanceof CommandError && e.code === "LIMIT_EXCEEDED",
+  );
+  assert.equal(snapshotCount(root), 0);
+  assert.deepEqual(await store.list(), []);
+  store.close();
+});
+
+test("a newer or foreign database is refused and left byte-identical", async () => {
+  const { root, store } = await workspace();
+  store.close();
+  const file = path.join(root, "workspace.sqlite");
+  const db = new DatabaseSync(file);
+  db.exec(
+    "PRAGMA wal_checkpoint(TRUNCATE); PRAGMA journal_mode = DELETE; PRAGMA user_version = 99",
+  );
+  db.close();
+  const before = await readFile(file);
+  await assert.rejects(
+    new ProjectStore(root).initialize(),
     (e: unknown) => e instanceof CommandError && e.code === "RECOVERY_REQUIRED",
   );
-  assert.deepEqual(
-    (await readdir(root))
-      .filter((f) => f.startsWith("workspace.sqlite"))
-      .sort()[0],
-    "workspace.sqlite",
+  assert.deepEqual(await readFile(file), before);
+  assert.ok(!existsSync(`${file}-wal`), "no WAL was created");
+
+  const foreign = await mkdtemp(path.join(tmpdir(), "yamakan-foreign-"));
+  const other = new DatabaseSync(path.join(foreign, "workspace.sqlite"));
+  other.exec("CREATE TABLE notes(text TEXT)");
+  other.close();
+  await assert.rejects(
+    new ProjectStore(foreign).initialize(),
+    /not a Yamakan workspace database/,
   );
+});
+
+test("a damaged lock file is set aside and the lock is acquired", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "yamakan-lockfile-"));
+  await writeFile(path.join(root, "service.lock"), "x".repeat(4096));
+  const lock = await acquireServiceLock(root);
+  lock.release();
+  assert.ok(
+    (await readdir(root)).some((f) => f.startsWith("service.lock.damaged-")),
+    "damaged metadata is preserved for diagnosis",
+  );
+});
+
+test("server-generated request IDs are not stored as replay receipts", async () => {
+  const { root, store, project } = await workspace();
+  const queue = new RenderQueue(store);
+  await execute(
+    {
+      store,
+      queue,
+      principal: { id: "local-client", scopes: new Set(Scopes) },
+    },
+    "yamakan.project.save",
+    { project: { ...project, name: "No receipt" }, expectedRevision: 0 },
+  );
+  const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
+  const n = (
+    db.prepare("SELECT count(*) AS n FROM command_receipts").get() as {
+      n: number;
+    }
+  ).n;
+  db.close();
+  assert.equal(n, 0);
+  await queue.close();
+  store.close();
 });
 
 test("explicit restore replaces a damaged head and preserves the damaged evidence", async () => {

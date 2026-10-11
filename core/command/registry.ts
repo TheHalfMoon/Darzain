@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ProjectSchema, Id } from "../project.ts";
+import { SNAPSHOT_FORMAT } from "../store.ts";
 import type { ProjectStore, RequestReceipt } from "../store.ts";
 import { canonicalJson, sha256Hex } from "../donors/ninerr/canonical.ts";
 import type { RenderQueue } from "../render.ts";
@@ -75,9 +76,14 @@ export const commands = {
   "yamakan.project.history": define({
     scope: "project:read",
     mutation: false,
-    summary: "List retained revisions and verify the head.",
-    input: z.object({ projectId: Id }).strict(),
-    run: ({ store }, a) => store.history(a.projectId),
+    summary: "List the newest retained revisions and verify them.",
+    input: z
+      .object({
+        projectId: Id,
+        limit: z.number().int().min(1).max(500).optional(),
+      })
+      .strict(),
+    run: ({ store }, a) => store.history(a.projectId, a.limit),
   }),
   "yamakan.project.restore": define({
     scope: "project:recover",
@@ -189,7 +195,14 @@ export async function execute(
       ? {
           principalId: ctx.principal.id,
           requestId: ctx.requestId,
-          digest: sha256Hex(canonicalJson({ operation, input })),
+          digest: sha256Hex(
+            canonicalJson({
+              apiVersion: API_VERSION,
+              format: SNAPSHOT_FORMAT,
+              operation,
+              input,
+            }),
+          ),
         }
       : undefined;
   return { operation, result: await command.run({ ...ctx, receipt }, input) };

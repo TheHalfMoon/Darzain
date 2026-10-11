@@ -127,7 +127,10 @@ const elapsedMs = Math.round(performance.now() - started);
 const output = await store.file(p.id, ...artifact.split("/"));
 const metadata = await probe(output),
   bytes = await readFile(output);
-const reopened = await new ProjectStore(store.root).load(p.id);
+const second = new ProjectStore(store.root);
+await second.initialize();
+const reopened = await second.load(p.id);
+second.close();
 if (
   metadata.durationFrames !== 900 ||
   !metadata.hasAudio ||
