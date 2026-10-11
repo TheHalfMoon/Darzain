@@ -23,7 +23,7 @@ const FORBIDDEN = [
   ],
   [/(?<![\w$.])exec\s*\(/, "shell-interpreting exec"],
   [/["']?\bshell["']?\s*:\s*(?!false\b)/, "shell option"],
-  [/\beval\s*\(|(?<![\w$])Function\s*\(/, "dynamic code evaluation"],
+  [/\beval\b\s*[(),]|(?<![\w$])Function\s*\(/, "dynamic code evaluation"],
   // Module specifiers must be one complete string literal.
   [/\bimport\s*\(\s*(?!(["'])[^"'`]*\1\s*\))/, "computed dynamic import"],
   [/\brequire\s*\(\s*(?!(["'])[^"'`]*\1\s*\))/, "computed require"],
@@ -71,7 +71,14 @@ export function checkImports({ files, read, ledger, policy }) {
     if (!production) continue;
     const text = read(file);
     const allowed = policy.processSpawnAllowlist.includes(file);
-    for (const line of text.split("\n")) {
+    // Formatters wrap long named imports; judge each import as one statement.
+    const statements = text.replace(
+      /import\s*\{[^}]*\}\s*from\s*["'][^"']+["'];?/g,
+      (m) => m.replace(/\s+/g, " "),
+    );
+    if (allowed && /\bshell\b/.test(text))
+      violations.push(`Shell reference in a process module: ${file}`);
+    for (const line of statements.split("\n")) {
       if (!PROCESS_ACCESS.test(line)) continue;
       if (!allowed || !ALLOWED_PROCESS_IMPORT.test(line.trim())) {
         violations.push(

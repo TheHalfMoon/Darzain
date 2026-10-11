@@ -320,10 +320,11 @@ export class RenderQueue {
           job.state = "COMPLETED";
         } catch (e) {
           job.state = controller.signal.aborted ? "CANCELLED" : "FAILED";
+          // Job status is a public result: never expose workspace paths.
           job.error = controller.signal.aborted
             ? null
             : e instanceof Error
-              ? e.message
+              ? e.message.replaceAll(this.store.root, "[workspace]")
               : "Render failed.";
         } finally {
           this.controllers.delete(id);
