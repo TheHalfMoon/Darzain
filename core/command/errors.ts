@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 export const ErrorCodes = [
   "VALIDATION",
   "UNAUTHENTICATED",
+  "FORBIDDEN_ORIGIN",
   "SCOPE_DENIED",
   "NOT_FOUND",
   "REVISION_CONFLICT",
@@ -20,6 +21,7 @@ export type ErrorCode = (typeof ErrorCodes)[number];
 const retryable: Record<ErrorCode, boolean> = {
   VALIDATION: false,
   UNAUTHENTICATED: false,
+  FORBIDDEN_ORIGIN: false,
   SCOPE_DENIED: false,
   NOT_FOUND: false,
   REVISION_CONFLICT: false,
@@ -36,6 +38,7 @@ const retryable: Record<ErrorCode, boolean> = {
 export const httpStatus: Record<ErrorCode, number> = {
   VALIDATION: 400,
   UNAUTHENTICATED: 401,
+  FORBIDDEN_ORIGIN: 403,
   SCOPE_DENIED: 403,
   NOT_FOUND: 404,
   REVISION_CONFLICT: 409,
@@ -64,6 +67,7 @@ export class CommandError extends Error {
 // so every transport reports the same code. Unrecognized failures are INTERNAL.
 const classified: [RegExp, ErrorCode][] = [
   [/^Revision conflict/, "REVISION_CONFLICT"],
+  [/changed during (reading|preservation)|fingerprint time limit/, "BUSY"],
   [/not found\.$/i, "NOT_FOUND"],
   [
     /integrity check failed|hash mismatch|identity mismatch/i,
@@ -75,7 +79,7 @@ const classified: [RegExp, ErrorCode][] = [
   ],
   [/Insufficient free disk space/, "LIMIT_EXCEEDED"],
   [/^Media |media streams|Media signature/, "MEDIA_INVALID"],
-  [/closing|shutting down/i, "UNAVAILABLE"],
+  [/^Render queue is closing.$|^Server is shutting down.$/, "UNAVAILABLE"],
   [
     /^Path escapes|Symbolic links|Invalid idempotency|Unknown tool|must be added|no active picture|Artifact is not complete/,
     "VALIDATION",
@@ -93,11 +97,18 @@ export function toCommandError(error: unknown): CommandError {
         .map((i) => `${i.path.join(".") || "input"}: ${i.message}`)
         .join("; "),
     );
+  if (error instanceof URIError)
+    return new CommandError("VALIDATION", "Malformed percent-encoding.");
   if (error instanceof SyntaxError)
     return new CommandError("VALIDATION", "Request body is not valid JSON.");
   const errno = (error as NodeJS.ErrnoException | null)?.code;
   if (errno === "ENOENT")
-    return new CommandError("NOT_FOUND", "Resource not found.");
+    return (error as NodeJS.ErrnoException).syscall?.startsWith("spawn")
+      ? new CommandError(
+          "CAPABILITY_UNAVAILABLE",
+          "A required media tool is not installed.",
+        )
+      : new CommandError("NOT_FOUND", "Resource not found.");
   if (errno === "ENOSPC")
     return new CommandError("LIMIT_EXCEEDED", "Insufficient free disk space.");
   const message = error instanceof Error ? error.message : "Operation failed.";

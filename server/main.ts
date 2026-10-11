@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { ProjectStore } from "../core/store.ts";
 import { CreativeAPI, principals } from "./api.ts";
 import { safePath } from "../core/paths.ts";
-import { resolveOperation } from "../core/command/registry.ts";
+import { authorize } from "../core/command/registry.ts";
 import type { Principal } from "../core/command/registry.ts";
 import { parseEnvelope } from "../core/command/envelope.ts";
 import {
@@ -67,12 +67,11 @@ function authenticate(
     req.headers.cookie || "",
   )?.[1];
   if (!cookie || !sameToken(cookie, sessionToken)) return null;
-  // Cookie-authenticated state changes must come from the Yamakan page itself.
-  if (
-    req.method !== "GET" &&
-    req.headers.origin !== origin &&
-    req.headers["sec-fetch-site"] !== "same-origin"
-  )
+  // Cookie requests must come from the Yamakan page itself: state changes carry
+  // our exact Origin; reads reject other sites, including other loopback ports.
+  const site = req.headers["sec-fetch-site"];
+  if (req.method !== "GET" && req.headers.origin !== origin) return null;
+  if (site !== undefined && site !== "same-origin" && site !== "none")
     return null;
   return principals["browser-ui"];
 }
@@ -167,7 +166,9 @@ const server = createServer(async (req, res) => {
       (req.headers.origin && req.headers.origin !== origin) ||
       req.headers["sec-fetch-site"] === "cross-site"
     )
-      return fail(new CommandError("SCOPE_DENIED", "Origin is not allowed."));
+      return fail(
+        new CommandError("FORBIDDEN_ORIGIN", "Origin is not allowed."),
+      );
     const url = new URL(req.url || "/", origin);
     if (url.pathname.startsWith("/api/")) {
       const principal = authenticate(req);
@@ -186,14 +187,18 @@ const server = createServer(async (req, res) => {
           ),
         );
         requestId = request.requestId;
-        const operation = resolveOperation(request.operation);
-        const result = await api.call(operation, request.parameters, principal);
+        const { operation, result } = await api.execute(
+          request.operation,
+          request.parameters,
+          principal,
+        );
         return json(200, { apiVersion: 1, requestId, operation, result });
       }
       const upload = /^\/api\/v1\/projects\/([^/]+)\/assets$/.exec(
         url.pathname,
       );
       if (req.method === "POST" && upload) {
+        authorize(principal, "yamakan.project.save");
         const name = decodeURIComponent(
           String(req.headers["x-asset-name"] || ""),
         );
@@ -210,6 +215,7 @@ const server = createServer(async (req, res) => {
         url.pathname,
       );
       if (req.method === "GET" && asset) {
+        authorize(principal, "yamakan.project.open");
         const { file, asset: a } = await store.assetFile(asset[1], asset[2]);
         const bytes = await readFile(file);
         const mime: Record<string, string> = {
@@ -229,6 +235,7 @@ const server = createServer(async (req, res) => {
         url.pathname,
       );
       if (req.method === "GET" && exportMatch) {
+        authorize(principal, "yamakan.job.status");
         const job = api.queue.status(exportMatch[1]);
         if (job.state !== "COMPLETED" || !job.artifact)
           throw new Error("Artifact is not complete.");

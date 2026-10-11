@@ -10,15 +10,13 @@ import {
   catalog,
   execute,
   resolveOperation,
+  RESOURCE_POLICY_HASH,
   Scopes,
 } from "../core/command/registry.ts";
 import type { Principal, Scope } from "../core/command/registry.ts";
 import { parseEnvelope } from "../core/command/envelope.ts";
 import { CommandError, toCommandError } from "../core/command/errors.ts";
-import {
-  RESOURCE_POLICY,
-  RESOURCE_POLICY_HASH,
-} from "../core/command/policy.ts";
+import { RESOURCE_POLICY } from "../core/command/policy.ts";
 import { canonicalJson, sha256Hex } from "../core/donors/ninerr/canonical.ts";
 import { ProjectStore } from "../core/store.ts";
 import { RenderQueue } from "../core/render.ts";
@@ -179,6 +177,17 @@ test("core failures map to stable, structured error codes", () => {
     [z.object({ a: z.string() }).safeParse({}).error, "VALIDATION"],
     [new Error("something unexpected"), "INTERNAL"],
     ["not an error", "INTERNAL"],
+    [
+      Object.assign(new Error("spawn ffprobe ENOENT"), {
+        code: "ENOENT",
+        syscall: "spawn ffprobe",
+      }),
+      "CAPABILITY_UNAVAILABLE",
+    ],
+    [new Error("Project head changed during reading."), "BUSY"],
+    [new Error("Project head fingerprint time limit exceeded."), "BUSY"],
+    [new Error("Nothing is closing here."), "INTERNAL"],
+    [new URIError("URI malformed"), "VALIDATION"],
   ];
   for (const [input, code] of cases)
     assert.equal(toCommandError(input).code, code);
@@ -280,6 +289,40 @@ test("import guard accepts the repository and rejects unsafe imports", () => {
     entry,
     { ...entry, imported: "src/donors/x/gone.ts" },
   ]);
+  // Bypass attempts reported by the independent T1 reviews.
+  const bypasses: Record<string, string> = {
+    "core/media.ts":
+      'import * as cp from "node:child_process"; cp.execSync(`ffmpeg ${x}`);',
+    "core/render.ts": 'import { exec } from "node:child_process";',
+    "server/a.ts": 'createRequire(import.meta.url)("child_process")',
+    "server/b.ts": 'require ("child_process")',
+    "server/c.ts": 'process.getBuiltinModule("node:child_process")',
+    "server/d.ts": 'process.binding("spawn_sync")',
+    "server/e.ts": 'import "node:child_process";',
+    "server/f.ts": 'await import("child_" + "process")',
+    "server/g.ts": "await import(`child_process`)",
+    "server/h.ts": 'spawn(f, a, { "shell": true })',
+    "server/i.ts": "Function('return 1')()",
+    "server/j.ts": "globalThis.eval('1')",
+    "server/k.ts": 'import vm from "node:vm";',
+    "server/l.ts": 'new Worker(src, { eval: true }); import "worker_threads";',
+    "server/m.ts": "require(name)",
+  };
+  for (const [file, text] of Object.entries(bypasses))
+    assert.ok(
+      run({ ...clean, [file]: text }).some((v) => v.endsWith(file)),
+      `guard missed ${file}: ${text}`,
+    );
+  assert.deepEqual(
+    run({
+      ...clean,
+      "core/render.ts":
+        'import { spawn } from "node:child_process";\nconst m = /x/.exec(line);',
+      "server/ok.ts": 'const { readFile } = await import("node:fs/promises");',
+    }),
+    [],
+    "named spawn import, RegExp#exec and literal dynamic imports are allowed",
+  );
   assert.deepEqual(
     run({
       ...clean,

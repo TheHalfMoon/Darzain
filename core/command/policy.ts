@@ -1,5 +1,4 @@
-import { canonicalJson, sha256Hex } from "../donors/ninerr/canonical.ts";
-
+// Pure constants: imported by browser code (core/project.ts), so no Node APIs.
 const MiB = 1024 * 1024;
 const GiB = 1024 * MiB;
 
@@ -14,6 +13,7 @@ export const RESOURCE_POLICY = Object.freeze({
     assetImportBytes: 50 * MiB,
     assetsPerProject: 200,
     timelineFrames: 18000,
+    // The render queue is a single serial tail; this documents, not configures, it.
     activeRenderWorkers: 1,
     renderJobsPerSession: 100,
     renderThreads: 2,
@@ -32,5 +32,3 @@ export const RESOURCE_POLICY = Object.freeze({
     diagnosticOutputBytes: 1 * MiB,
   }),
 });
-
-export const RESOURCE_POLICY_HASH = sha256Hex(canonicalJson(RESOURCE_POLICY));

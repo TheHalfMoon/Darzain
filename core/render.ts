@@ -12,6 +12,7 @@ import { ProjectSchema } from "./project.ts";
 import type { Project } from "./project.ts";
 import { ProjectStore } from "./store.ts";
 import { probe } from "./media.ts";
+import { RESOURCE_POLICY } from "./command/policy.ts";
 export type RenderJob = {
   id: string;
   projectId: string;
@@ -76,7 +77,7 @@ export async function renderProject(
     "-nostdin",
     "-y",
     "-threads",
-    "2",
+    String(RESOURCE_POLICY.enforced.renderThreads),
     "-filter_complex_threads",
     "1",
   ];
@@ -177,11 +178,12 @@ export async function renderProject(
         },
       );
       let error = "",
-        progress = "";
+        progress = "",
+        timedOut = false;
       const cancel = () => child.kill();
       signal.addEventListener("abort", cancel, { once: true });
       const timer = setTimeout(() => {
-        error = "Render time limit exceeded.";
+        timedOut = true;
         child.kill();
       }, 180000);
       child.stdout.on("data", (chunk) => {
@@ -197,13 +199,22 @@ export async function renderProject(
       child.stderr.on("data", (chunk) => {
         error = (error + String(chunk)).slice(-8000);
       });
-      child.on("error", reject);
+      // Public messages never carry FFmpeg stderr, which contains host paths;
+      // the bounded stderr tail stays server-side as the error cause.
+      child.on("error", (cause) =>
+        reject(new Error("FFmpeg is not available.", { cause })),
+      );
       child.on("close", (code) => {
         clearTimeout(timer);
         signal.removeEventListener("abort", cancel);
         if (signal.aborted) reject(new Error("Cancelled."));
+        else if (timedOut) reject(new Error("Render time limit exceeded."));
         else if (code !== 0)
-          reject(new Error(error || `FFmpeg exited ${code}`));
+          reject(
+            new Error(`FFmpeg failed to render the timeline (exit ${code}).`, {
+              cause: error,
+            }),
+          );
         else resolve();
       });
     });
@@ -270,7 +281,8 @@ export class RenderQueue {
     const fingerprint = `${p.id}:${p.revision}:${key}`;
     const prior = this.keys.get(fingerprint);
     if (prior) return this.status(prior);
-    if (this.jobs.size >= 100) throw new Error("Job session limit reached.");
+    if (this.jobs.size >= RESOURCE_POLICY.enforced.renderJobsPerSession)
+      throw new Error("Job session limit reached.");
     const id = randomUUID(),
       controller = new AbortController();
     const job: RenderJob = {

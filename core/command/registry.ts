@@ -3,6 +3,10 @@ import { ProjectSchema, Id } from "../project.ts";
 import type { ProjectStore } from "../store.ts";
 import type { RenderQueue } from "../render.ts";
 import { CommandError } from "./errors.ts";
+import { RESOURCE_POLICY } from "./policy.ts";
+import { canonicalJson, sha256Hex } from "../donors/ninerr/canonical.ts";
+
+export const RESOURCE_POLICY_HASH = sha256Hex(canonicalJson(RESOURCE_POLICY));
 
 export const API_VERSION = 1;
 

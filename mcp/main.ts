@@ -57,8 +57,12 @@ async function tools() {
 }
 
 async function handle(message: Message) {
-  const { id, method, params = {} } = message;
+  const { id, method } = message;
+  const params =
+    message.params && typeof message.params === "object" ? message.params : {};
   const notification = id === undefined;
+  // Notifications never receive responses, even for request methods.
+  if (notification && !method?.startsWith("notifications/")) return;
   switch (method) {
     case "initialize": {
       const requested = String(params.protocolVersion ?? "");
@@ -112,6 +116,7 @@ async function handle(message: Message) {
 }
 
 let buffer = "";
+const inFlight = new Set<Promise<unknown>>();
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk: string) => {
   buffer += chunk;
@@ -140,13 +145,18 @@ process.stdin.on("data", (chunk: string) => {
       continue;
     }
     // Transport failures (no token file, service not listening) never echo host paths.
-    handle(message).catch(() =>
+    const pending = handle(message).catch(() =>
       error(
         message.id,
         -32603,
         "Yamakan service is not running or its workspace credential is unavailable.",
       ),
     );
+    inFlight.add(pending);
+    void pending.finally(() => inFlight.delete(pending));
   }
 });
-process.stdin.on("end", () => process.exit(0));
+process.stdin.on("end", async () => {
+  await Promise.allSettled(inFlight);
+  process.exit(0);
+});

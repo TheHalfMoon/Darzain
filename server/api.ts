@@ -2,18 +2,16 @@ import { ProjectStore } from "../core/store.ts";
 import { RenderQueue } from "../core/render.ts";
 import {
   API_VERSION,
+  RESOURCE_POLICY_HASH,
   Scopes,
   catalog,
   execute,
 } from "../core/command/registry.ts";
 import type { Principal } from "../core/command/registry.ts";
-import {
-  RESOURCE_POLICY,
-  RESOURCE_POLICY_HASH,
-} from "../core/command/policy.ts";
+import { RESOURCE_POLICY } from "../core/command/policy.ts";
 
 // MVP trust model: one local account. Both principals hold the MVP scopes, but
-// they authenticate through separate credentials and are audited separately.
+// they authenticate through separate credentials.
 export const principals: Record<Principal["id"], Principal> = {
   "browser-ui": { id: "browser-ui", scopes: new Set(Scopes) },
   "local-client": { id: "local-client", scopes: new Set(Scopes) },
@@ -30,7 +28,12 @@ export class CreativeAPI {
     return {
       apiVersion: API_VERSION,
       service: "yamakan",
-      resourcePolicy: { ...RESOURCE_POLICY, hash: RESOURCE_POLICY_HASH },
+      // Only enforced limits are advertised; candidates are unqualified targets.
+      resourcePolicy: {
+        policy: RESOURCE_POLICY.policy,
+        enforced: RESOURCE_POLICY.enforced,
+        hash: RESOURCE_POLICY_HASH,
+      },
       tools: catalog(),
       assetImport: {
         method: "POST",
@@ -41,16 +44,18 @@ export class CreativeAPI {
       },
     };
   }
+  execute(name: unknown, args: unknown, principal: Principal) {
+    return execute(
+      { store: this.store, queue: this.queue, principal },
+      name,
+      args,
+    );
+  }
   async call(
     name: unknown,
     args: unknown,
     principal: Principal = principals["local-client"],
   ) {
-    const { result } = await execute(
-      { store: this.store, queue: this.queue, principal },
-      name,
-      args,
-    );
-    return result;
+    return (await this.execute(name, args, principal)).result;
   }
 }
