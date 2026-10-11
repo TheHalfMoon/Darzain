@@ -1,11 +1,11 @@
 import { createServer } from "node:http";
-import { readFile, writeFile, open, access } from "node:fs/promises";
+import { readFile, writeFile, access } from "node:fs/promises";
 import { randomBytes, timingSafeEqual, randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ProjectStore } from "../core/store.ts";
 import { CreativeAPI, principals } from "./api.ts";
-import { safePath } from "../core/paths.ts";
+import { safePath, initializeRoot } from "../core/paths.ts";
 import { resolveOperation } from "../core/command/registry.ts";
 import type { Principal } from "../core/command/registry.ts";
 import { parseEnvelope } from "../core/command/envelope.ts";
@@ -15,6 +15,7 @@ import {
   toCommandError,
 } from "../core/command/errors.ts";
 import { RESOURCE_POLICY } from "../core/command/policy.ts";
+import { acquireServiceLock } from "../core/service-lock.ts";
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -33,13 +34,12 @@ async function defaultRoot() {
   return !(await exists(current)) && (await exists(legacy)) ? legacy : current;
 }
 const root = path.resolve(env("WORKSPACE") || (await defaultRoot()));
+await initializeRoot(root);
+// The OS-owned lock is taken before the database is read and is released by
+// the operating system if this process dies.
+const lock = await acquireServiceLock(root);
 const store = new ProjectStore(root);
 await store.initialize();
-const lock = await open(await safePath(root, "server.lock"), "wx").catch(() => {
-  throw new Error(
-    "Workspace server is already running or a previous server left a lock. Verify no server is running before removing server.lock.",
-  );
-});
 // Separate credentials: the browser session secret exists only in memory and in
 // an HttpOnly cookie; explicit local clients (CLI, MCP, SDK) read the bearer file.
 const sessionToken = randomBytes(32).toString("hex");
@@ -187,7 +187,12 @@ const server = createServer(async (req, res) => {
         );
         requestId = request.requestId;
         const operation = resolveOperation(request.operation);
-        const result = await api.call(operation, request.parameters, principal);
+        const result = await api.call(
+          operation,
+          request.parameters,
+          principal,
+          request.requestId,
+        );
         return json(200, { apiVersion: 1, requestId, operation, result });
       }
       const upload = /^\/api\/v1\/projects\/([^/]+)\/assets$/.exec(
@@ -283,9 +288,8 @@ const close = async (code = 0) => {
   const stopped = new Promise<void>((resolve) => server.close(() => resolve()));
   await drained;
   await stopped;
-  await lock.close();
-  const { unlink } = await import("node:fs/promises");
-  await unlink(await safePath(root, "server.lock")).catch(() => {});
+  store.close();
+  lock.release();
   process.exit(code);
 };
 process.once("SIGINT", () => void close());

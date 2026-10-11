@@ -45,9 +45,10 @@ export class CreativeAPI {
     name: unknown,
     args: unknown,
     principal: Principal = principals["local-client"],
+    requestId?: string,
   ) {
     const { result } = await execute(
-      { store: this.store, queue: this.queue, principal },
+      { store: this.store, queue: this.queue, principal, requestId },
       name,
       args,
     );

@@ -11,8 +11,8 @@ import {
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
-import { ProjectStore } from "../core/store.ts";
-import { CreativeAPI } from "../server/api.ts";
+// The pre-database file store remains the read-only source for legacy migration (T3).
+import { LegacyProjectStore as ProjectStore } from "../core/legacy-store.ts";
 import { ProjectSchema } from "../core/project.ts";
 
 async function fixture() {
@@ -67,8 +67,7 @@ test("explicit recovery preserves corrupt head and damaged snapshot, then reopen
   await writeFile(damaged, "damaged snapshot");
   const head = await store.file(project.id, "head.json"),
     bytes = await readFile(head);
-  const api = new CreativeAPI(store),
-    history = await store.history(project.id);
+  const history = await store.history(project.id);
   assert.equal(history.currentRevision, null);
   assert.deepEqual(
     history.snapshots.map((x) => [x.revision, x.verified]),
@@ -79,11 +78,7 @@ test("explicit recovery preserves corrupt head and damaged snapshot, then reopen
     ],
   );
   const restored = ProjectSchema.parse(
-    await api.call("darzain.project.restore", {
-      projectId: project.id,
-      revision: 1,
-      expectedHeadFingerprint: history.headFingerprint,
-    }),
+    await store.restore(project.id, 1, history.headFingerprint),
   );
   assert.equal(restored.name, "Recovered edit");
   assert.equal(restored.revision, 3);
