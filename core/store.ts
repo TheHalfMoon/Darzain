@@ -154,26 +154,34 @@ export class ProjectStore {
   }
   async initialize() {
     await initializeRoot(this.root);
-    await mkdir(await safePath(this.root, "projects"), { recursive: true });
     const file = await safePath(this.root, "workspace.sqlite");
-    // Inspect before writing anything: a database this build refuses is left
-    // exactly as it was found (no journal-mode change, no schema).
-    if (
-      await access(file).then(
+    const present = (p: string) =>
+      access(p).then(
         () => true,
         () => false,
-      )
-    ) {
+      );
+    const sideFiles = [`${file}-wal`, `${file}-shm`];
+    const hadSideFiles = await Promise.all(sideFiles.map(present));
+    // Inspect before writing anything: a database this build refuses is left
+    // exactly as it was found (no journal-mode change, no schema).
+    if (await present(file)) {
       const probe = new DatabaseSync(file, { readOnly: true });
+      let refusal: unknown = null;
       try {
         probe.exec("PRAGMA busy_timeout = 5000");
         acceptable(probe);
       } catch (e) {
-        throw isBusy(e)
+        refusal = isBusy(e)
           ? new CommandError("BUSY", "Workspace database is busy.")
           : e;
       } finally {
         probe.close();
+      }
+      if (refusal) {
+        // Remove only WAL side files this read-only check itself created.
+        for (const [i, side] of sideFiles.entries())
+          if (!hadSideFiles[i]) await unlink(side).catch(() => {});
+        throw refusal;
       }
     }
     const db = new DatabaseSync(file, { enableForeignKeyConstraints: true });
@@ -200,6 +208,7 @@ export class ProjectStore {
         : e;
     }
     this.#db = db;
+    await mkdir(await safePath(this.root, "projects"), { recursive: true });
   }
   close() {
     this.#db?.close();
@@ -255,10 +264,16 @@ export class ProjectStore {
       if (c.receipt) {
         const prior = db
           .prepare(
-            "SELECT r.request_digest, s.bytes AS result FROM command_receipts r JOIN revisions v ON v.receipt_id = r.id JOIN snapshots s ON s.hash = v.snapshot_hash WHERE r.principal_id = ? AND r.project_id = ? AND r.request_id = ?",
+            "SELECT r.request_digest, v.project_id, v.revision, v.snapshot_hash FROM command_receipts r JOIN revisions v ON v.receipt_id = r.id WHERE r.principal_id = ? AND r.project_id = ? AND r.request_id = ?",
           )
           .get(c.receipt.principalId, scope, c.receipt.requestId) as
-          { request_digest: string; result: Uint8Array } | undefined;
+          | {
+              request_digest: string;
+              project_id: string;
+              revision: number;
+              snapshot_hash: string;
+            }
+          | undefined;
         if (prior) {
           db.exec("ROLLBACK");
           if (prior.request_digest !== c.receipt.digest)
@@ -266,8 +281,11 @@ export class ProjectStore {
               "IDEMPOTENCY_MISMATCH",
               "Request ID was already used for a different request.",
             );
-          return ProjectSchema.parse(
-            JSON.parse(Buffer.from(prior.result).toString("utf8")),
+          // The original result, re-verified like any stored snapshot.
+          return this.#snapshot(
+            prior.snapshot_hash,
+            prior.project_id,
+            prior.revision,
           );
         }
       }
@@ -426,15 +444,23 @@ export class ProjectStore {
     return listed;
   }
   // Newest first and bounded: each listed revision is decoded and hash-checked.
-  async history(id: string, limit = 100): Promise<ProjectHistory> {
+  async history(
+    id: string,
+    limit = 100,
+    beforeRevision?: number,
+  ): Promise<ProjectHistory> {
     Id.parse(id);
     const head = this.#head(id);
     if (!head) throw new Error("Project not found.");
     const rows = this.#database
       .prepare(
-        "SELECT revision, snapshot_hash FROM revisions WHERE project_id = ? ORDER BY revision DESC LIMIT ?",
+        "SELECT revision, snapshot_hash FROM revisions WHERE project_id = ? AND revision < ? ORDER BY revision DESC LIMIT ?",
       )
-      .all(id, Math.min(Math.max(1, limit), 500)) as Head[];
+      .all(
+        id,
+        beforeRevision ?? MAX_REVISION + 1,
+        Math.min(Math.max(1, limit), 500),
+      ) as Head[];
     return {
       projectId: id,
       headFingerprint: ProjectStore.fingerprint(head),

@@ -81,9 +81,12 @@ export const commands = {
       .object({
         projectId: Id,
         limit: z.number().int().min(1).max(500).optional(),
+        // Page older revisions: list only revisions below this one.
+        beforeRevision: z.number().int().min(1).max(10001).optional(),
       })
       .strict(),
-    run: ({ store }, a) => store.history(a.projectId, a.limit),
+    run: ({ store }, a) =>
+      store.history(a.projectId, a.limit, a.beforeRevision),
   }),
   "yamakan.project.restore": define({
     scope: "project:recover",
