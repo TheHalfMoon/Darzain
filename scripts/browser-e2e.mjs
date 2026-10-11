@@ -7,13 +7,18 @@ import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { once } from "node:events";
 import assert from "node:assert/strict";
-const root = mkdtempSync(join(tmpdir(), "darzain-browser-"));
-const output = resolve(process.env.DARZAIN_E2E_OUTPUT || "work/browser-e2e");
+const root = mkdtempSync(join(tmpdir(), "yamakan-browser-"));
+const output = resolve(
+  process.env.YAMAKAN_E2E_OUTPUT ||
+    process.env.DARZAIN_E2E_OUTPUT ||
+    "work/browser-e2e",
+);
 mkdirSync(output, { recursive: true });
 const png = join(root, "reference.png"),
   wav = join(root, "music.wav");
 const video = join(root, "motion-with-sound.mp4");
-const ffmpeg = process.env.DARZAIN_FFMPEG || "ffmpeg";
+const ffmpeg =
+  process.env.YAMAKAN_FFMPEG || process.env.DARZAIN_FFMPEG || "ffmpeg";
 execFileSync(
   ffmpeg,
   [
@@ -86,8 +91,8 @@ const child = fork(
   {
     env: {
       ...process.env,
-      DARZAIN_WORKSPACE: join(root, "workspace"),
-      DARZAIN_PORT: String(port),
+      YAMAKAN_WORKSPACE: join(root, "workspace"),
+      YAMAKAN_PORT: String(port),
     },
     silent: true,
     windowsHide: true,
@@ -103,7 +108,7 @@ try {
       10000,
     );
     child.stdout.on("data", (chunk) => {
-      if (String(chunk).includes("Darzain is running")) {
+      if (String(chunk).includes("Yamakan is running")) {
         clearTimeout(timer);
         resolveReady();
       }
@@ -113,8 +118,14 @@ try {
       reject(new Error(`Server exited ${code}: ${serverError}`));
     });
   });
+  const agent = {
+    Authorization: `Bearer ${(await readFile(join(root, "workspace", "token"), "utf8")).trim()}`,
+  };
   browser = await chromium.launch({
-    channel: process.env.DARZAIN_BROWSER_CHANNEL || "msedge",
+    channel:
+      process.env.YAMAKAN_BROWSER_CHANNEL ||
+      process.env.DARZAIN_BROWSER_CHANNEL ||
+      "msedge",
     headless: true,
   });
   const page = await browser.newPage({
@@ -122,7 +133,7 @@ try {
   });
   await page.addInitScript(() => {
     const elements = [];
-    Object.defineProperty(window, "__darzainMedia", { value: elements });
+    Object.defineProperty(window, "__yamakanMedia", { value: elements });
     const create = document.createElement.bind(document);
     document.createElement = (...args) => {
       const element = create(...args);
@@ -163,7 +174,7 @@ try {
   await page.getByRole("button", { name: "music.wav audio" }).click();
   await page.getByRole("button", { name: "Add scene", exact: true }).click();
   await page.getByLabel("Focal length (mm)").fill("85");
-  await page.getByLabel("Title text").fill("Darzain · Local production");
+  await page.getByLabel("Title text").fill("Yamakan · Local production");
   await page.getByRole("button", { name: "Add title", exact: true }).click();
   // Exercise adopted editor controls and verify their canonical result, not just clicks.
   await page.getByTitle("reference.png · 00:00:00:00 → 00:00:03:00").click();
@@ -176,7 +187,8 @@ try {
     .waitFor();
   const listing = await (
     await page.request.post(`${url}/api/v1/call`, {
-      data: { name: "darzain.project.list", arguments: {} },
+      headers: agent,
+      data: { name: "yamakan.project.list", arguments: {} },
     })
   ).json();
   const projectId = listing.result[0].id;
@@ -184,7 +196,8 @@ try {
     (
       await (
         await page.request.post(`${url}/api/v1/call`, {
-          data: { name: "darzain.project.open", arguments: { projectId } },
+          headers: agent,
+          data: { name: "yamakan.project.open", arguments: { projectId } },
         })
       ).json()
     ).result;
@@ -224,9 +237,9 @@ try {
   );
   assert.equal(response.ok(), true);
   const bytes = await response.body();
-  writeFileSync(join(output, "darzain-browser-workflow.mp4"), bytes);
+  writeFileSync(join(output, "yamakan-browser-workflow.mp4"), bytes);
   await page.screenshot({
-    path: join(output, "darzain-workspace.png"),
+    path: join(output, "yamakan-workspace.png"),
     fullPage: true,
   });
   await page.reload();
@@ -256,7 +269,7 @@ try {
   // portrait video with embedded sound, then verify real preview media instances.
   const imported = await (
     await page.request.post(`${url}/api/v1/projects/${projectId}/assets`, {
-      headers: { "X-Asset-Name": "motion-with-sound.mp4" },
+      headers: { ...agent, "X-Asset-Name": "motion-with-sound.mp4" },
       data: await readFile(video),
     })
   ).json();
@@ -281,8 +294,9 @@ try {
     title: null,
   });
   const changedResponse = await page.request.post(`${url}/api/v1/call`, {
+    headers: agent,
     data: {
-      name: "darzain.project.save",
+      name: "yamakan.project.save",
       arguments: { project: changed, expectedRevision: changed.revision },
     },
   });
@@ -294,22 +308,22 @@ try {
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.waitForFunction(
     () =>
-      window.__darzainMedia.filter(
+      window.__yamakanMedia.filter(
         (e) => e instanceof HTMLAudioElement && e.getAttribute("src"),
       ).length === 2 &&
-      window.__darzainMedia.some(
+      window.__yamakanMedia.some(
         (e) =>
           e instanceof HTMLVideoElement && e.getAttribute("src") && e.muted,
       ),
   );
   await page.waitForFunction(() =>
-    window.__darzainMedia
+    window.__yamakanMedia
       .filter((e) => e instanceof HTMLAudioElement && e.getAttribute("src"))
       .every((e) => e.readyState >= 2),
   );
   await page.waitForTimeout(350);
   const audioTimes = await page.evaluate(() =>
-    window.__darzainMedia
+    window.__yamakanMedia
       .filter((e) => e instanceof HTMLAudioElement && e.getAttribute("src"))
       .map((e) => e.currentTime)
       .sort((a, b) => a - b),
@@ -384,7 +398,7 @@ try {
     "Unsaved draft retained during recovery",
   );
   await page.screenshot({
-    path: join(output, "darzain-recovery.png"),
+    path: join(output, "yamakan-recovery.png"),
     fullPage: true,
   });
   await page
@@ -403,7 +417,10 @@ try {
   assert.equal((await getProject()).revision, restored.revision + 1);
   assert.deepEqual(errors, []);
   const receipt = {
-    runtime: process.env.DARZAIN_BROWSER_CHANNEL || "Microsoft Edge",
+    runtime:
+      process.env.YAMAKAN_BROWSER_CHANNEL ||
+      process.env.DARZAIN_BROWSER_CHANNEL ||
+      "Microsoft Edge",
     fixture: "FFmpeg test pattern and sine audio; not AI generation",
     steps: [
       "project create",

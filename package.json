@@ -1,5 +1,5 @@
 {
-  "name": "darzain",
+  "name": "yamakan",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,12 +14,13 @@
     "test": "node --test tests/*.test.ts tests/*.test.mjs src/donors/film-editor/utils/*.test.ts",
     "typecheck": "tsc --noEmit",
     "cli": "node cli/main.ts",
-    "lint": "oxlint --deny-warnings core server cli src/main.tsx src/adapter.ts tests scripts",
-    "format": "prettier --write \"core/*.ts\" server cli src/main.tsx src/adapter.ts src/style.css tests scripts vite.config.ts tsconfig.json package.json",
-    "format:check": "prettier --check \"core/*.ts\" server cli src/main.tsx src/adapter.ts src/style.css tests scripts vite.config.ts tsconfig.json package.json",
+    "lint": "oxlint --deny-warnings core server cli sdk mcp src/main.tsx src/adapter.ts tests scripts",
+    "format": "prettier --write \"core/*.ts\" core/command server cli sdk mcp src/main.tsx src/adapter.ts src/style.css tests scripts vite.config.ts tsconfig.json package.json",
+    "format:check": "prettier --check \"core/*.ts\" core/command server cli sdk mcp src/main.tsx src/adapter.ts src/style.css tests scripts vite.config.ts tsconfig.json package.json",
     "test:e2e": "node scripts/browser-e2e.mjs",
     "provenance:check": "node scripts/provenance.mjs",
-    "benchmark": "node scripts/benchmark-production.ts"
+    "benchmark": "node scripts/benchmark-production.ts",
+    "mcp": "node mcp/main.ts"
   },
   "dependencies": {
     "react": "18.3.1",

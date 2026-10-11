@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { RESOURCE_POLICY } from "./command/policy.ts";
+const { timelineFrames, mediaDimension } = RESOURCE_POLICY.enforced;
 export const Id = z.uuid();
-const frame = z.number().int().min(0).max(18000);
+const frame = z.number().int().min(0).max(timelineFrames);
 export const AssetSchema = z
   .object({
     id: Id,
@@ -25,8 +27,8 @@ export const AssetSchema = z
       .positive()
       .max(50 * 1024 * 1024),
     durationFrames: frame,
-    width: z.number().int().min(0).max(4096),
-    height: z.number().int().min(0).max(4096),
+    width: z.number().int().min(0).max(mediaDimension),
+    height: z.number().int().min(0).max(mediaDimension),
   })
   .strict();
 export const TrackSchema = z
@@ -110,7 +112,7 @@ export const ProjectSchema = z
       const track = p.tracks.find((t) => t.id === c.trackId);
       const asset = p.assets.find((a) => a.id === c.assetId);
       if (!track) fail("Clip track is missing.");
-      if (c.startFrame + c.durationFrames > 18000)
+      if (c.startFrame + c.durationFrames > timelineFrames)
         fail("Timeline exceeds ten minutes.");
       if (c.title !== null) {
         if (c.assetId !== null || track?.kind !== "video")

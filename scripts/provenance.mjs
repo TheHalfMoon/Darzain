@@ -1,6 +1,10 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { checkImports } from "./import-guard.mjs";
 const ledger = JSON.parse(readFileSync("docs/provenance/imports.json", "utf8"));
+const policy = JSON.parse(
+  readFileSync("docs/provenance/import-policy.json", "utf8"),
+);
 for (const entry of ledger) {
   if (!/^[a-f0-9]{40}$/.test(entry.sha))
     throw new Error(`Unpinned source: ${entry.imported}`);
@@ -19,6 +23,29 @@ for (const file of [
   "notices/Ninerr-LICENSE",
 ])
   if (!existsSync(file)) throw new Error(`Missing notice: ${file}`);
+const skip = new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  "work",
+  ".yamakan",
+  ".darzain",
+  "graft",
+]);
+const files = readdirSync(".", { recursive: true, withFileTypes: true })
+  .filter((d) => d.isFile())
+  .map((d) =>
+    `${d.parentPath}/${d.name}`.replaceAll("\\", "/").replace(/^\.\//, ""),
+  )
+  .filter((f) => !skip.has(f.split("/")[0]));
+const violations = checkImports({
+  files,
+  read: (f) => readFileSync(f, "utf8"),
+  ledger,
+  policy,
+});
+if (violations.length)
+  throw new Error(`Import guard failed:\n${violations.join("\n")}`);
 console.log(
-  `Verified ${ledger.length} pinned source records and required notices.`,
+  `Verified ${ledger.length} pinned source records, required notices and import guard over ${files.length} files.`,
 );

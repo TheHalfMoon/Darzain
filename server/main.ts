@@ -1,18 +1,38 @@
 import { createServer } from "node:http";
-import { readFile, writeFile, open } from "node:fs/promises";
+import { readFile, writeFile, open, access } from "node:fs/promises";
 import { randomBytes, timingSafeEqual, randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ProjectStore } from "../core/store.ts";
-import { CreativeAPI } from "./api.ts";
+import { CreativeAPI, principals } from "./api.ts";
 import { safePath } from "../core/paths.ts";
+import { authorize } from "../core/command/registry.ts";
+import type { Principal } from "../core/command/registry.ts";
+import { parseEnvelope } from "../core/command/envelope.ts";
+import {
+  CommandError,
+  httpStatus,
+  toCommandError,
+} from "../core/command/errors.ts";
+import { RESOURCE_POLICY } from "../core/command/policy.ts";
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
 );
-const root = path.resolve(
-  process.env.DARZAIN_WORKSPACE || path.join(projectRoot, ".darzain"),
-);
+const env = (name: string) =>
+  process.env[`YAMAKAN_${name}`] || process.env[`DARZAIN_${name}`];
+// A pre-rename default workspace keeps working until T3 migrates it to a new root.
+async function defaultRoot() {
+  const current = path.join(projectRoot, ".yamakan");
+  const legacy = path.join(projectRoot, ".darzain");
+  const exists = (p: string) =>
+    access(p).then(
+      () => true,
+      () => false,
+    );
+  return !(await exists(current)) && (await exists(legacy)) ? legacy : current;
+}
+const root = path.resolve(env("WORKSPACE") || (await defaultRoot()));
 const store = new ProjectStore(root);
 await store.initialize();
 const lock = await open(await safePath(root, "server.lock"), "wx").catch(() => {
@@ -20,15 +40,40 @@ const lock = await open(await safePath(root, "server.lock"), "wx").catch(() => {
     "Workspace server is already running or a previous server left a lock. Verify no server is running before removing server.lock.",
   );
 });
-const token = randomBytes(32).toString("hex");
-await writeFile(await safePath(root, "token"), token, { mode: 0o600 });
+// Separate credentials: the browser session secret exists only in memory and in
+// an HttpOnly cookie; explicit local clients (CLI, MCP, SDK) read the bearer file.
+const sessionToken = randomBytes(32).toString("hex");
+const clientToken = randomBytes(32).toString("hex");
+await writeFile(await safePath(root, "token"), clientToken, { mode: 0o600 });
 const api = new CreativeAPI(store);
-const port = Number(process.env.DARZAIN_PORT || 4318);
+const port = Number(env("PORT") || 4318);
 const origin = `http://127.0.0.1:${port}`;
-function sameToken(value: string) {
+function sameToken(value: string, expected: string) {
   const a = Buffer.from(value),
-    b = Buffer.from(token);
+    b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+function authenticate(
+  req: import("node:http").IncomingMessage,
+): Principal | null {
+  const authorization = req.headers.authorization;
+  if (authorization !== undefined) {
+    const bearer = /^Bearer ([a-f0-9]{64})$/.exec(authorization)?.[1];
+    return bearer && sameToken(bearer, clientToken)
+      ? principals["local-client"]
+      : null;
+  }
+  const cookie = /(?:^|; )yamakan=([a-f0-9]{64})(?:;|$)/.exec(
+    req.headers.cookie || "",
+  )?.[1];
+  if (!cookie || !sameToken(cookie, sessionToken)) return null;
+  // Cookie requests must come from the Yamakan page itself: state changes carry
+  // our exact Origin; reads reject other sites, including other loopback ports.
+  const site = req.headers["sec-fetch-site"];
+  if (req.method !== "GET" && req.headers.origin !== origin) return null;
+  if (site !== undefined && site !== "same-origin" && site !== "none")
+    return null;
+  return principals["browser-ui"];
 }
 async function body(req: import("node:http").IncomingMessage, max: number) {
   const chunks: Buffer[] = [];
@@ -42,7 +87,7 @@ async function body(req: import("node:http").IncomingMessage, max: number) {
 }
 let closing = false;
 const server = createServer(async (req, res) => {
-  const requestId = randomUUID();
+  let requestId: string = randomUUID();
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("Cache-Control", "no-store");
@@ -50,13 +95,25 @@ const server = createServer(async (req, res) => {
     res.writeHead(status, { "Content-Type": "application/json" });
     res.end(JSON.stringify(value));
   };
+  const fail = (error: CommandError) =>
+    json(httpStatus[error.code], {
+      apiVersion: 1,
+      requestId,
+      error: {
+        code: error.code,
+        message: error.message
+          .replaceAll(root, "[workspace]")
+          .replaceAll(projectRoot, "[application]"),
+        retryable: error.retryable,
+      },
+    });
   const media = (bytes: Buffer, type: string, attachment = false) => {
     res.setHeader("Accept-Ranges", "bytes");
     res.setHeader("Content-Type", type);
     if (attachment)
       res.setHeader(
         "Content-Disposition",
-        'attachment; filename="darzain.mp4"',
+        'attachment; filename="yamakan.mp4"',
       );
     const range = req.headers.range;
     if (!range) {
@@ -103,40 +160,45 @@ const server = createServer(async (req, res) => {
   };
   try {
     if (closing)
-      return json(503, { error: "Server is shutting down.", requestId });
+      return fail(new CommandError("UNAVAILABLE", "Server is shutting down."));
     if (
       req.headers.host !== `127.0.0.1:${port}` ||
       (req.headers.origin && req.headers.origin !== origin) ||
       req.headers["sec-fetch-site"] === "cross-site"
     )
-      return json(403, { error: "Origin is not allowed.", requestId });
+      return fail(
+        new CommandError("FORBIDDEN_ORIGIN", "Origin is not allowed."),
+      );
     const url = new URL(req.url || "/", origin);
     if (url.pathname.startsWith("/api/")) {
-      const credential =
-        req.headers.authorization?.replace(/^Bearer /, "") ||
-        /(?:^|; )darzain=([a-f0-9]+)/.exec(req.headers.cookie || "")?.[1] ||
-        "";
-      if (!sameToken(credential))
-        return json(401, { error: "Authentication required.", requestId });
+      const principal = authenticate(req);
+      if (!principal)
+        return fail(
+          new CommandError("UNAUTHENTICATED", "Authentication required."),
+        );
       if (req.method === "GET" && url.pathname === "/api/v1/tools")
         return json(200, api.catalog());
       if (req.method === "POST" && url.pathname === "/api/v1/call") {
         if (!req.headers["content-type"]?.startsWith("application/json"))
-          return json(415, { error: "JSON content type required.", requestId });
-        const payload = JSON.parse(
-          (await body(req, 2 * 1024 * 1024)).toString(),
+          throw new CommandError("VALIDATION", "JSON content type required.");
+        const request = parseEnvelope(
+          JSON.parse(
+            (await body(req, RESOURCE_POLICY.enforced.requestBytes)).toString(),
+          ),
         );
-        if (
-          Object.keys(payload).some((k) => !["name", "arguments"].includes(k))
-        )
-          throw new Error("Unsupported call property.");
-        const result = await api.call(payload.name, payload.arguments);
-        return json(200, { apiVersion: 1, requestId, result });
+        requestId = request.requestId;
+        const { operation, result } = await api.execute(
+          request.operation,
+          request.parameters,
+          principal,
+        );
+        return json(200, { apiVersion: 1, requestId, operation, result });
       }
       const upload = /^\/api\/v1\/projects\/([^/]+)\/assets$/.exec(
         url.pathname,
       );
       if (req.method === "POST" && upload) {
+        authorize(principal, "yamakan.project.save");
         const name = decodeURIComponent(
           String(req.headers["x-asset-name"] || ""),
         );
@@ -145,7 +207,7 @@ const server = createServer(async (req, res) => {
           await store.importAsset(
             upload[1],
             name,
-            await body(req, 50 * 1024 * 1024),
+            await body(req, RESOURCE_POLICY.enforced.assetImportBytes),
           ),
         );
       }
@@ -153,6 +215,7 @@ const server = createServer(async (req, res) => {
         url.pathname,
       );
       if (req.method === "GET" && asset) {
+        authorize(principal, "yamakan.project.open");
         const { file, asset: a } = await store.assetFile(asset[1], asset[2]);
         const bytes = await readFile(file);
         const mime: Record<string, string> = {
@@ -172,6 +235,7 @@ const server = createServer(async (req, res) => {
         url.pathname,
       );
       if (req.method === "GET" && exportMatch) {
+        authorize(principal, "yamakan.job.status");
         const job = api.queue.status(exportMatch[1]);
         if (job.state !== "COMPLETED" || !job.artifact)
           throw new Error("Artifact is not complete.");
@@ -182,14 +246,14 @@ const server = createServer(async (req, res) => {
         media(await readFile(file), "video/mp4", true);
         return;
       }
-      return json(404, { error: "Endpoint not found.", requestId });
+      return fail(new CommandError("NOT_FOUND", "Endpoint not found."));
     }
     if (req.method !== "GET")
-      return json(405, { error: "Method not allowed.", requestId });
+      return fail(new CommandError("VALIDATION", "Method not allowed."));
     // Local navigation grants a session cookie; cross-site requests were rejected above.
     res.setHeader(
       "Set-Cookie",
-      `darzain=${token}; HttpOnly; SameSite=Strict; Path=/`,
+      `yamakan=${sessionToken}; HttpOnly; SameSite=Strict; Path=/`,
     );
     res.setHeader(
       "Content-Security-Policy",
@@ -213,17 +277,11 @@ const server = createServer(async (req, res) => {
     });
     res.end(bytes);
   } catch (e) {
-    const reason = e instanceof Error ? e.message : "Operation failed.";
-    const message = reason.includes("Revision conflict")
-      ? reason
-      : reason
-          .replaceAll(root, "[workspace]")
-          .replaceAll(projectRoot, "[application]");
-    json(400, { error: message, requestId });
+    fail(toCommandError(e));
   }
 });
 server.listen(port, "127.0.0.1", () =>
-  console.log(`Darzain is running at ${origin}; workspace ${root}`),
+  console.log(`Yamakan is running at ${origin}; workspace ${root}`),
 );
 const close = async (code = 0) => {
   if (closing) return;

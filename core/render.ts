@@ -12,6 +12,7 @@ import { ProjectSchema } from "./project.ts";
 import type { Project } from "./project.ts";
 import { ProjectStore } from "./store.ts";
 import { probe } from "./media.ts";
+import { RESOURCE_POLICY } from "./command/policy.ts";
 export type RenderJob = {
   id: string;
   projectId: string;
@@ -22,7 +23,7 @@ export type RenderJob = {
   artifact: string | null;
 };
 // Adapted from the donor's buildTimelineCommand: ordered overlays, source trimming,
-// normalized timestamps, scale-to-fit, and a deterministic black canvas. Darzain adds
+// normalized timestamps, scale-to-fit, and a deterministic black canvas. Yamakan adds
 // explicit audio mixing, safe title text files, cancellation and verified atomic output.
 export async function renderProject(
   store: ProjectStore,
@@ -51,6 +52,7 @@ export async function renderProject(
   await mkdir(dir, { recursive: false });
   if (active.some((c) => c.title !== null)) {
     const fonts = [
+      process.env.YAMAKAN_FONT,
       process.env.DARZAIN_FONT,
       process.env.WINDIR ? `${process.env.WINDIR}/Fonts/arial.ttf` : null,
       "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -66,7 +68,7 @@ export async function renderProject(
     }
     if (!font)
       throw new Error(
-        "No local title font found. Configure DARZAIN_FONT to a readable TTF font.",
+        "No local title font found. Configure YAMAKAN_FONT to a readable TTF font.",
       );
     await copyFile(font, `${dir}/font.ttf`);
   }
@@ -75,7 +77,7 @@ export async function renderProject(
     "-nostdin",
     "-y",
     "-threads",
-    "2",
+    String(RESOURCE_POLICY.enforced.renderThreads),
     "-filter_complex_threads",
     "1",
   ];
@@ -166,17 +168,22 @@ export async function renderProject(
         reject(new Error("Cancelled."));
         return;
       }
-      const child = spawn(process.env.DARZAIN_FFMPEG || "ffmpeg", args, {
-        cwd: dir,
-        windowsHide: true,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      const child = spawn(
+        process.env.YAMAKAN_FFMPEG || process.env.DARZAIN_FFMPEG || "ffmpeg",
+        args,
+        {
+          cwd: dir,
+          windowsHide: true,
+          stdio: ["ignore", "pipe", "pipe"],
+        },
+      );
       let error = "",
-        progress = "";
+        progress = "",
+        timedOut = false;
       const cancel = () => child.kill();
       signal.addEventListener("abort", cancel, { once: true });
       const timer = setTimeout(() => {
-        error = "Render time limit exceeded.";
+        timedOut = true;
         child.kill();
       }, 180000);
       child.stdout.on("data", (chunk) => {
@@ -192,13 +199,22 @@ export async function renderProject(
       child.stderr.on("data", (chunk) => {
         error = (error + String(chunk)).slice(-8000);
       });
-      child.on("error", reject);
+      // Public messages never carry FFmpeg stderr, which contains host paths;
+      // the bounded stderr tail stays server-side as the error cause.
+      child.on("error", (cause) =>
+        reject(new Error("FFmpeg is not available.", { cause })),
+      );
       child.on("close", (code) => {
         clearTimeout(timer);
         signal.removeEventListener("abort", cancel);
         if (signal.aborted) reject(new Error("Cancelled."));
+        else if (timedOut) reject(new Error("Render time limit exceeded."));
         else if (code !== 0)
-          reject(new Error(error || `FFmpeg exited ${code}`));
+          reject(
+            new Error(`FFmpeg failed to render the timeline (exit ${code}).`, {
+              cause: error,
+            }),
+          );
         else resolve();
       });
     });
@@ -265,7 +281,8 @@ export class RenderQueue {
     const fingerprint = `${p.id}:${p.revision}:${key}`;
     const prior = this.keys.get(fingerprint);
     if (prior) return this.status(prior);
-    if (this.jobs.size >= 100) throw new Error("Job session limit reached.");
+    if (this.jobs.size >= RESOURCE_POLICY.enforced.renderJobsPerSession)
+      throw new Error("Job session limit reached.");
     const id = randomUUID(),
       controller = new AbortController();
     const job: RenderJob = {
@@ -303,10 +320,11 @@ export class RenderQueue {
           job.state = "COMPLETED";
         } catch (e) {
           job.state = controller.signal.aborted ? "CANCELLED" : "FAILED";
+          // Job status is a public result: never expose workspace paths.
           job.error = controller.signal.aborted
             ? null
             : e instanceof Error
-              ? e.message
+              ? e.message.replaceAll(this.store.root, "[workspace]")
               : "Render failed.";
         } finally {
           this.controllers.delete(id);

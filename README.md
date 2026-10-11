@@ -1,12 +1,23 @@
-# Yamakan final architecture optimization
+# Yamakan
 
-Product identity: **Yamakan**. Verified repository: [TheHalfMoon/Darzain](https://github.com/TheHalfMoon/Darzain). Verified main: **0d3bdacb51188294ba8d36ce2b218db72f6073a6** (2026-10-11). The owner connection did not resolve a Yamakan repository. This documentation branch does not rename the repository or application code.
+Yamakan is an AI-native creative production platform. Canonical repository: [TheHalfMoon/Yamakan](https://github.com/TheHalfMoon/Yamakan) (formerly `TheHalfMoon/Darzain`). The current product is an **offline local-web engineering preview**, not a release.
 
-Read [CURRENT](specs/CURRENT.md), [the authoritative master plan](docs/IMPLEMENTATION_PLAN.md), [architecture recommendation](docs/ARCHITECTURE_DECISION.md), then [final assessment](docs/review/FINAL_OPTIMIZATION_REVIEW.md) and [founder packet](docs/FOUNDER_DECISION_PACKET.md). The final P00–P09 roadmap supersedes prior numbering; Claude's handoff and original machine phase plan remain historical. Historical prototype evidence remains historical.
+**Phase: implementation (P01).** The founder approved the final plan `edbaba6c` on 2026-10-11 ([decision record](docs/FOUNDER_DECISION_RECORD.md)). [CURRENT](specs/CURRENT.md) is the live frontier and [the master plan](docs/IMPLEMENTATION_PLAN.md) is the sole task authority. The planning PRs #3–#5 are merged.
 
-**STOPPED AT THE FOUNDER APPROVAL GATE.** Independent Claude review of 419bc356 is recorded in [CLAUDE_INDEPENDENT_REVIEW](docs/review/CLAUDE_INDEPENDENT_REVIEW.md) (CONDITIONAL GO for the revised plan; NO-GO for the package as submitted). Founder decisions are pending: [decision packet](docs/FOUNDER_DECISION_PACKET.md). No new production implementation is authorized by this package. The original 59 pinned catalog rows and bounded final discoveries were examined at varying depths; complete application/model runtime qualification remains partial. No paid inference, commercial software purchase or model-weight download was conducted.
+## Run locally
 
-This package contains review-ready proposals and actual bounded evidence. It is not an installable Yamakan release. The existing Darzain prototype and staged unmerged durable-jobs work are preserved. Source/weight/service rights and capability availability remain distinct.
+```bash
+npm ci
+npm run build
+npm start
+```
 
+Open http://127.0.0.1:4318. Agents use `npm run cli -- yamakan.project.list {}` or the MCP stdio server (`npm run mcp`) against the running service; both authenticate with the workspace client token, separately from the browser session.
+
+Source/weight/service rights and capability availability remain distinct. No paid inference, cloud account or model weights are used.
+
+## Planning package (historical)
+
+The planning package below is preserved as reviewed at `edbaba6c`; `manifest.json` and `validation.json` describe that package, not later implementation.
 
 Read the self-contained [research report](docs/RESEARCH_REPORT.md) for source names, bounded reuse qualifications, ranked risks, MVP scope and remaining work. Package integrity is recorded in manifest.json; validation.json distinguishes mechanical document validation from architecture or Claude approval. Historical documents are under docs/history; their old MVP/phase/tool statements do not control the new frontier.
