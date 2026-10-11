@@ -1,14 +1,13 @@
 // Owned worker processes (plan T4/T5, contract "Durable jobs and owned
 // processes"). On Windows every worker is launched through yamakan-procd,
-// which creates it suspended and already inside its own kill-on-close Job
-// Object; the worker only runs after the caller has recorded its identity
-// (`onCreated`). If this service dies, procd sees its stdin close and ends
+// which creates it suspended and already inside its own kill-on-close,
+// single-process Job Object; the worker only runs after the caller has
+// recorded its identity (`onCreated`). Output arrives over procd's own
+// anonymous pipes. If this service dies, procd sees its stdin close and ends
 // every job; if procd dies, Windows closes the jobs. Elsewhere the owner runs
 // in an explicitly unqualified development mode.
 import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
-import { createServer } from "node:net";
-import type { Server, Socket } from "node:net";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -35,7 +34,6 @@ export type RunOptions = {
 export type RunResult = { code: number; pid: number; stderr: string };
 
 const hex = (text: string) => Buffer.from(text, "utf8").toString("hex");
-const unhex = (text: string) => Buffer.from(text, "hex").toString("utf8");
 
 function defaultProcd() {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -76,25 +74,48 @@ export function resolveExecutable(name: string): string {
 
 type Pending = {
   created: (pid: number) => void;
+  stdout: (chunk: Buffer) => void;
+  stderr: (chunk: Buffer) => void;
   exited: (code: number) => void;
   failed: (message: string) => void;
 };
 
 export class ProcessOwner {
   readonly ownership: Ownership;
-  get ownerPid() {
-    return this.#procd?.pid ?? null;
-  }
   readonly #allow: string[];
   #procd: ChildProcess | null = null;
   #ready: Promise<void> | null = null;
   #pending = new Map<string, Pending>();
+  #posix = new Set<ChildProcess>();
+  // Runs in progress, from the first await until settled.
+  #active = 0;
   #closed = false;
 
   constructor(allowedExecutables: string[]) {
     this.ownership =
       process.platform === "win32" ? "windows-job-object" : "posix-unqualified";
     this.#allow = allowedExecutables.map((e) => path.resolve(e));
+  }
+  get ownerPid() {
+    return this.#procd?.pid ?? null;
+  }
+
+  // procd keeps the service alive only while work is pending; when the
+  // service exits, procd sees its stdin close and ends every job.
+  #refresh() {
+    const child = this.#procd;
+    if (!child) return;
+    const streams = [child.stdin, child.stdout] as unknown as {
+      ref?: () => void;
+      unref?: () => void;
+    }[];
+    if (this.#active > 0) {
+      child.ref();
+      streams.forEach((s) => s.ref?.());
+    } else {
+      child.unref();
+      streams.forEach((s) => s.unref?.());
+    }
   }
 
   #start() {
@@ -110,11 +131,8 @@ export class ProcessOwner {
       windowsHide: true,
     });
     this.#procd = child;
-    // The owner never keeps the service alive by itself: when the service
-    // exits, procd sees its stdin close and ends every job.
-    child.unref();
-    (child.stdin as unknown as { unref?: () => void }).unref?.();
-    (child.stdout as unknown as { unref?: () => void }).unref?.();
+    // A write after procd died must never crash the service.
+    child.stdin!.on("error", () => {});
     this.#ready = new Promise<void>((resolve, reject) => {
       const lines = createInterface({ input: child.stdout! });
       lines.on("line", (line) => {
@@ -122,37 +140,35 @@ export class ProcessOwner {
         if (kind === "READY") return resolve();
         const p = this.#pending.get(id);
         if (!p) return;
-        if (kind === "CREATED") p.created(Number(value));
-        else if (kind === "EXITED") {
-          this.#pending.delete(id);
-          p.exited(Number(value));
-        } else if (kind === "ERROR") {
-          this.#pending.delete(id);
-          p.failed(unhex(value || ""));
-        }
+        if (kind === "OUT") p.stdout(Buffer.from(value ?? "", "hex"));
+        else if (kind === "ERR") p.stderr(Buffer.from(value ?? "", "hex"));
+        else if (kind === "CREATED") p.created(Number(value));
+        else if (kind === "EXITED") p.exited(Number(value));
+        else if (kind === "ERROR")
+          p.failed(Buffer.from(value ?? "", "hex").toString("utf8"));
       });
       child.once("error", reject);
       child.once("exit", () => {
         // The owner is gone, and with it every job it held.
-        for (const [id, p] of this.#pending) {
-          this.#pending.delete(id);
-          p.failed("The process owner exited.");
-        }
+        const pending = [...this.#pending.values()];
+        this.#pending.clear();
         this.#ready = null;
         this.#procd = null;
+        for (const p of pending) p.failed("The process owner exited.");
         reject(new Error("The process owner exited."));
       });
     });
+    this.#ready.catch(() => {});
+    this.#refresh();
     return this.#ready;
   }
 
+  // Returns false when procd is gone; its jobs died with it.
   #send(line: string) {
-    if (!this.#procd?.stdin?.writable)
-      throw new CommandError(
-        "UNAVAILABLE",
-        "The process owner is not running.",
-      );
-    this.#procd.stdin.write(`${line}\n`);
+    const stdin = this.#procd?.stdin;
+    if (!stdin?.writable) return false;
+    stdin.write(`${line}\n`);
+    return true;
   }
 
   async run(options: RunOptions): Promise<RunResult> {
@@ -165,57 +181,54 @@ export class ProcessOwner {
         "Executable is not on the worker allowlist.",
       );
     if (this.ownership !== "windows-job-object") return this.#runPosix(options);
+    this.#active++;
+    try {
+      return await this.#runOwned(options, executable);
+    } finally {
+      this.#active--;
+      this.#refresh();
+    }
+  }
+
+  async #runOwned(options: RunOptions, executable: string): Promise<RunResult> {
     await this.#start();
     const id = randomUUID();
     const limit = options.stderrLimit ?? 64 * 1024;
     let stderr = "";
-    // The worker's output pipes are created here, so only this service can read them.
-    const pipe = async (suffix: string, sink: (b: Buffer) => void) => {
-      const name = `\\\\.\\pipe\\yamakan-${id}-${suffix}`;
-      const sockets: Socket[] = [];
-      let resolveClosed!: () => void;
-      const closed = new Promise<void>((r) => (resolveClosed = r));
-      const server: Server = createServer((socket) => {
-        sockets.push(socket);
-        socket.on("data", sink);
-        socket.on("close", resolveClosed);
-        socket.on("error", resolveClosed);
-        server.close();
-      });
-      await new Promise<void>((resolve, reject) => {
-        server.once("error", reject);
-        server.listen(name, resolve);
-      });
-      return { name, closed, server };
-    };
-    const out = await pipe("out", (b) => options.onStdout?.(b));
-    const err = await pipe("err", (b) => {
-      options.onStderr?.(b);
-      stderr = (stderr + b.toString("utf8")).slice(-limit);
-    });
     let pid = 0;
     try {
       const code = await new Promise<number>((resolve, reject) => {
-        const kill = () => this.#send(`KILL\t${id}`);
+        const kill = () => void this.#send(`KILL\t${id}`);
+        const settle = () => options.signal?.removeEventListener("abort", kill);
         this.#pending.set(id, {
-          created: async (createdPid) => {
+          created: (createdPid) => {
             pid = createdPid;
-            try {
-              if (options.signal?.aborted) return kill();
-              await options.onCreated?.(createdPid);
-              if (options.signal?.aborted) return kill();
-              this.#send(`RESUME\t${id}`);
-            } catch (e) {
-              kill();
-              reject(e);
-            }
+            void (async () => {
+              try {
+                if (options.signal?.aborted) return kill();
+                await options.onCreated?.(createdPid);
+                if (options.signal?.aborted || !this.#send(`RESUME\t${id}`))
+                  kill();
+              } catch (e) {
+                kill();
+                settle();
+                this.#pending.delete(id);
+                this.#refresh();
+                reject(e);
+              }
+            })();
+          },
+          stdout: (chunk) => options.onStdout?.(chunk),
+          stderr: (chunk) => {
+            options.onStderr?.(chunk);
+            stderr = (stderr + chunk.toString("utf8")).slice(-limit);
           },
           exited: (exitCode) => {
-            options.signal?.removeEventListener("abort", kill);
+            settle();
             resolve(exitCode);
           },
           failed: (message) => {
-            options.signal?.removeEventListener("abort", kill);
+            settle();
             reject(
               new CommandError(
                 "CAPABILITY_UNAVAILABLE",
@@ -224,43 +237,49 @@ export class ProcessOwner {
             );
           },
         });
+        this.#refresh();
         options.signal?.addEventListener("abort", kill, { once: true });
-        this.#send(
+        const sent = this.#send(
           [
             "SPAWN",
             id,
             hex(executable),
             hex(path.resolve(options.cwd)),
-            hex(out.name),
-            hex(err.name),
             String(options.memoryBytes ?? 0),
             String(options.args.length),
             ...options.args.map(hex),
           ].join("\t"),
         );
+        if (!sent) {
+          settle();
+          reject(
+            new CommandError(
+              "UNAVAILABLE",
+              "The process owner is not running.",
+            ),
+          );
+        }
       });
-      // Drain output written before exit (bounded wait: the pipes close with the job).
-      await Promise.race([
-        Promise.all([out.closed, err.closed]),
-        new Promise((r) => setTimeout(r, 2000)),
-      ]);
       return { code, pid, stderr };
     } finally {
       this.#pending.delete(id);
-      out.server.close();
-      err.server.close();
     }
   }
 
-  // Development fallback outside Windows: no kernel-enforced ownership. The
-  // service kills workers it knows about on shutdown, but a crash can orphan
-  // them. Never presented as qualified.
+  // Development fallback outside Windows: no kernel-enforced ownership. Known
+  // workers get a minimal environment and are killed on close, but a service
+  // crash can orphan them. Reported as "posix-unqualified", never as qualified.
   #runPosix(options: RunOptions): Promise<RunResult> {
     return new Promise((resolve, reject) => {
+      const env: NodeJS.ProcessEnv = {};
+      for (const key of ["PATH", "TMPDIR", "LANG"])
+        if (process.env[key]) env[key] = process.env[key];
       const child = spawn(path.resolve(options.executable), options.args, {
         cwd: options.cwd,
+        env,
         stdio: ["ignore", "pipe", "pipe"],
       });
+      this.#posix.add(child);
       const limit = options.stderrLimit ?? 64 * 1024;
       let stderr = "";
       const kill = () => child.kill("SIGKILL");
@@ -270,9 +289,15 @@ export class ProcessOwner {
         options.onStderr?.(b);
         stderr = (stderr + b.toString("utf8")).slice(-limit);
       });
-      child.once("spawn", () => void options.onCreated?.(child.pid!));
+      child.once("spawn", () => {
+        Promise.resolve(options.onCreated?.(child.pid!)).catch((e) => {
+          kill();
+          reject(e);
+        });
+      });
       child.once("error", reject);
       child.once("close", (code, signal) => {
+        this.#posix.delete(child);
         options.signal?.removeEventListener("abort", kill);
         resolve({
           code: code ?? (signal ? 1 : 0),
@@ -283,9 +308,10 @@ export class ProcessOwner {
     });
   }
 
-  // Ends every job and the owner itself.
+  // Ends every job (and every known POSIX worker) and the owner itself.
   close() {
     this.#closed = true;
+    for (const child of this.#posix) child.kill("SIGKILL");
     this.#procd?.stdin?.end();
   }
 }

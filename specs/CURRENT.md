@@ -17,10 +17,10 @@ Updated: 2026-10-11. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 
 ## T4a surface (in review)
 
-- `native/procd` (Rust, no dependencies): owns every media worker. Each worker is created suspended inside its own KILL_ON_JOB_CLOSE Job Object (atomic `PROC_THREAD_ATTRIBUTE_JOB_LIST`, no breakaway), with an inherited-handle allowlist, a minimal environment, an executable allowlist and MSVCRT-exact argument quoting. Workers resume only after the service records their identity. Service death → procd stdin EOF → jobs terminated; procd death → the OS closes the jobs.
+- `native/procd` (Rust, no dependencies): owns probe workers now; FFmpeg rendering moves onto it in T5. Each worker is created suspended inside its own KILL_ON_JOB_CLOSE, single-process Job Object (atomic `PROC_THREAD_ATTRIBUTE_JOB_LIST`, no breakaway), with an inherited-handle allowlist, a minimal environment, an executable allowlist and MSVCRT-exact argument quoting. Output travels over anonymous pipes relayed by procd (no named objects). Workers resume only after the service records their identity. Service death → procd stdin EOF → jobs terminated; procd death → the OS closes the jobs.
 - `core/process/owner.ts` + `workers.ts`: one owner per service; FFmpeg/ffprobe resolved to absolute paths once. Non-Windows hosts run an explicitly unqualified development mode.
 - `probe()` runs through the owner: file-only protocol whitelist, wall-clock and Job memory limits, bounded output, `MEDIA_INVALID` without paths. Records time base and frame rate and identifies VFR.
-- Windows evidence: argv fidelity, minimal env, suspended-until-recorded, cancellation, service kill, owner kill, and owner death between create and resume all leave no live or suspended worker.
+- Windows evidence: argv fidelity, minimal env, suspended-until-recorded, cancellation, service kill, owner kill, owner death between create and resume, and service death during identity recording all leave no live or suspended worker; a worker cannot start children; malformed protocol input is refused.
 
 ## T3 surface (merged)
 

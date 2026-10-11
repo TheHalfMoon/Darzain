@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fork, spawnSync } from "node:child_process";
+import { fork, spawn, spawnSync } from "node:child_process";
+import { createInterface } from "node:readline";
 import type { ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { tmpdir } from "node:os";
@@ -40,6 +41,13 @@ function withMarker(marker: string) {
     },
   ).stdout;
   return out.split(/\s+/).filter(Boolean).map(Number);
+}
+async function noMarker(marker: string, exclude: number[] = []) {
+  for (let t = 0; t < 5000; t += 250) {
+    if (!withMarker(marker).some((pid) => !exclude.includes(pid))) return true;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return false;
 }
 const node = (code: string, ...args: string[]) => ({
   executable: process.execPath,
@@ -164,10 +172,10 @@ test(
   },
 );
 
-async function service(marker: string) {
+async function service(marker: string, mode = "run") {
   const child: ChildProcess = fork(
     fileURLToPath(new URL("./fixtures/t4-service.ts", import.meta.url)),
-    [marker],
+    [marker, mode],
     { stdio: ["ignore", "ignore", "pipe", "ipc"], windowsHide: true },
   );
   const [ids] = (await once(child, "message")) as [
@@ -222,13 +230,109 @@ test(
     try {
       await assert.rejects(
         owner.run(node("setInterval(() => {}, 1000)", marker)),
-        /owner exited|launch failed/,
+        /owner exited/,
       );
-      await new Promise((r) => setTimeout(r, 500));
-      assert.deepEqual(withMarker(marker), [], "no suspended worker survives");
+      assert.ok(await noMarker(marker), "no suspended worker survives");
     } finally {
       delete process.env.YAMAKAN_PROCD_FAULT;
       owner.close();
+    }
+  },
+);
+
+test(
+  "killing the service while it records a suspended worker's identity leaves no worker",
+  { skip: !windows },
+  async () => {
+    const marker = `yamakan-orphan-${crypto.randomUUID()}`;
+    const { child, worker } = await service(marker, "hang");
+    assert.ok(alive(worker), "the worker exists, still suspended");
+    const exited = once(child, "exit");
+    child.kill("SIGKILL");
+    await exited;
+    assert.ok(await gone(worker));
+    assert.ok(await noMarker(marker));
+  },
+);
+
+test(
+  "a script without a server waits for its workers and exits",
+  { skip: !windows },
+  () => {
+    const result = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL("./fixtures/t4-bare.ts", import.meta.url))],
+      { encoding: "utf8", windowsHide: true, timeout: 60000 },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, "done");
+  },
+);
+
+test(
+  "a worker cannot start child processes inside its job",
+  { skip: !windows },
+  async () => {
+    const owner = new ProcessOwner([process.execPath]);
+    try {
+      let out = "";
+      const result = await owner.run({
+        ...node(
+          "const r = require('child_process').spawnSync(process.execPath, ['-e', '1']); process.stdout.write(String(r.error ? r.error.code : r.status))",
+        ),
+        onStdout: (b) => (out += b.toString("utf8")),
+      });
+      assert.equal(result.code, 0);
+      assert.notEqual(out, "0", "the child must not run");
+    } finally {
+      owner.close();
+    }
+  },
+);
+
+test(
+  "procd rejects malformed requests without dying and accepts zero-argument spawns",
+  { skip: !windows },
+  async () => {
+    const procd = spawn(
+      fileURLToPath(
+        new URL(
+          "../native/procd/target/release/yamakan-procd.exe",
+          import.meta.url,
+        ),
+      ),
+      [process.execPath],
+      { stdio: ["pipe", "pipe", "inherit"], windowsHide: true },
+    );
+    const lines: string[] = [];
+    createInterface({ input: procd.stdout! }).on("line", (l) => lines.push(l));
+    const waitFor = async (predicate: (l: string) => boolean) => {
+      for (let t = 0; t < 5000; t += 20) {
+        const hit = lines.find(predicate);
+        if (hit) return hit;
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      throw new Error(`timeout; saw ${lines.join(" | ")}`);
+    };
+    const hex = (s: string) => Buffer.from(s).toString("hex");
+    try {
+      await waitFor((l) => l === "READY");
+      procd.stdin!.write("SPAWN\tbad1\ta\u00e9\t00\t0\t0\n");
+      await waitFor((l) => l.startsWith("ERROR\tbad1"));
+      procd.stdin!.write("SPAWN\tbad2\tzz\t00\t0\t0\n");
+      await waitFor((l) => l.startsWith("ERROR\tbad2"));
+      procd.stdin!.write(
+        `SPAWN\tok1\t${hex(process.execPath)}\t${hex(tmpdir())}\t0\t0\n`,
+      );
+      await waitFor((l) => l.startsWith("CREATED\tok1"));
+      procd.stdin!.write("KILL\tok1\n");
+      await waitFor((l) => l.startsWith("EXITED\tok1"));
+      const exited = once(procd, "exit");
+      procd.stdin!.write("x".repeat(300 * 1024));
+      procd.stdin!.write("\n");
+      await exited;
+    } finally {
+      procd.kill();
     }
   },
 );
