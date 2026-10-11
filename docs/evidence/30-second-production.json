@@ -1,0 +1,21 @@
+{
+  "fixture": "FFmpeg test pattern, motion pattern and sine audio; not AI generation",
+  "resolution": [
+    1280,
+    720
+  ],
+  "durationFrames": 900,
+  "hasAudio": true,
+  "clipCount": 7,
+  "scenes": 3,
+  "elapsedMs": 6052,
+  "artifactBytes": 3320493,
+  "artifactSha256": "89c1349d1ff74b24be1d0ccd5d6793ea3e56e01efc90a570e34b535c8013ae77",
+  "hardware": {
+    "platform": "win32",
+    "cpu": "13th Gen Intel(R) Core(TM) i5-13420H",
+    "logicalCpus": 12,
+    "memoryGiB": 16
+  },
+  "cameraEffect": "shot intent metadata only"
+}

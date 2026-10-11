@@ -1,0 +1,37 @@
+{
+  "tool": "Alibaba Open Code Review",
+  "version": "1.12.13",
+  "provider": "existing local Ollama",
+  "model": "qwen3:4b-instruct-2507-q4_K_M",
+  "result": "No completed LLM review; independent review uses fresh-context PStack judges",
+  "attempts": [
+    {
+      "scope": "core,server,cli,src/main.tsx,src/adapter.ts",
+      "budget": 80000,
+      "concurrency": 2,
+      "taskTimeoutMinutes": 4,
+      "result": "Repeated per-file caller deadlines; stopped owned review process after bounded failures"
+    },
+    {
+      "scope": "server/api.ts",
+      "budget": 18000,
+      "result": "Dispatch skipped for estimated budget; zero LLM tokens; CLI exit 0 does not establish review"
+    },
+    {
+      "scope": "server/api.ts",
+      "budget": 40000,
+      "noPlan": true,
+      "noDedup": true,
+      "noSummary": true,
+      "requestTimeoutSeconds": 90,
+      "taskTimeoutMinutes": 3,
+      "exitCode": 1,
+      "sessionId": "5811230c-2381-43de-affb-d4274490d314",
+      "result": "LLM request timeout; all one file scans failed"
+    }
+  ],
+  "limitations": [
+    "Partial/failed attempts are not clean security/correctness evidence",
+    "No reviewer configuration, model weights or secrets changed"
+  ]
+}

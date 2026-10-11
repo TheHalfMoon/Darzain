@@ -1,0 +1,42 @@
+{
+  "panel": "full: backend and frontend correctness, inline parsimony/product, separate security; three fresh-context session-model judges",
+  "specializedProviders": "unavailable; explicitly degraded to inline bars",
+  "cycles": 3,
+  "mustFixResolved": 6,
+  "remainingMustFix": 0,
+  "remainingNarrowFindings": 0,
+  "scope": "P01 engineering preview only; release gates remain open",
+  "graft": {
+    "layer": "wiring",
+    "files": 35,
+    "nodes": 524,
+    "edges": 853,
+    "buildExit": 0,
+    "checkExit": 0,
+    "semanticTier": "not built; no semantic correctness claim"
+  },
+  "jev": {
+    "classification": "probabilistic status judgment only; not deterministic validation",
+    "exit": 0,
+    "result": {
+      "answers": {
+        "q": {
+          "choice": "preview",
+          "confidence": 1,
+          "probabilities": {
+            "preview": 1,
+            "release": 0
+          },
+          "type": "choice"
+        }
+      },
+      "latency_ms": 567,
+      "model": "jev-1.13.0",
+      "ok": true,
+      "usage": {
+        "input_tokens": 547,
+        "output_tokens": 31
+      }
+    }
+  }
+}

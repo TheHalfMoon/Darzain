@@ -1,0 +1,14 @@
+{
+  "judge": "security-final",
+  "provider": "fresh-context inline ps-review security bar",
+  "cycle": 3,
+  "priorDeltaSha256": "b1f91ef9bceb7c32c9df8fc12f7db4f3823abf2c7bf56a344646ac356642663f",
+  "sourceHash": "5bf61133d098a78fc04aed6fb0e16d05fd1e2c16b622bdeb528e4017e6fadbfb",
+  "scope": "Suffix byte-range parser only",
+  "checksPerformed": [
+    {"check": "Parser and authorization source trace", "result": "Only a single digits-only range accepted. Suffix must be a positive safe integer. Start clamps to zero, end derives from buffer length. Empty, zero, unsafe and reversed ranges reject before slicing. Authentication and asset checks still precede this parser."},
+    {"command": "rtk node --test tests/http.test.ts", "exitCode": 0, "testsPassed": 1, "result": "Actual bytes=-16 request returned 206 and exactly the last 16 imported bytes; existing direct-range, malformed-range, authentication and Origin assertions passed."}
+  ],
+  "findings": {"must-fix": [], "worth-considering": [], "skip-it": []},
+  "verdict": "pass: no reproducible security regression in suffix-range delta"
+}

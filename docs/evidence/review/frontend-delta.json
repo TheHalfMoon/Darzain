@@ -1,0 +1,47 @@
+{
+  "reviewer": "frontend delta, inline correctness/parsimony/product",
+  "priorDiffSha256": "17f1a13854e1fa21c36f92afc895e8b0cde0ac46b049ac967ff3542d5fd3d316",
+  "deltaSha256": "b1f91ef9bceb7c32c9df8fc12f7db4f3823abf2c7bf56a344646ac356642663f",
+  "checks": [
+    "Read delta-input.json and recomputed matching delta.diff SHA256.",
+    "Reviewed frontend delta: autosave before create/open; source/destination lock guard; per-clip media allocation, retention and unmount cleanup; muted video; contain sizing; seek pauses playback.",
+    "Read actual updated browser receipt and the corresponding regression assertions in the delta. Receipt reports locked duplicate rejection, autosave switch, embedded-video muting and independent audio offsets 0.358153 and 1.358153 seconds; pageErrors is empty.",
+    "Inspected updated main.tsx lines 173-199 for lock guard behavior on new duplicate clips. No new tests or browser run executed by this reviewer."
+  ],
+  "resolved": [
+    { "id": "FE-01", "evidence": "Create/open saves dirty current history before accept; failure interrupts the switch. Browser create-switch-reopen preserves scene name." },
+    { "id": "FE-02", "evidence": "Central updateClips guard rejects additions or moves onto locked destination tracks, including Ctrl+D. Browser asserts the clip count remains four." },
+    { "id": "FE-03", "evidence": "Video elements are muted, preserving explicit-audio renderer semantics. Browser regression confirms the imported video's preview element is muted." },
+    { "id": "FE-04", "evidence": "Playback instances are allocated and accessed by clip id, with removed and unmounted media paused and unloaded. Browser observes two active audio instances separated by exactly one second." },
+    { "id": "FE-05", "evidence": "The reachable normal video branch now uses min(width ratio,height ratio) contain sizing. Browser imports portrait video, though receipt does not verify canvas geometry." },
+    { "id": "FE-06-seek", "evidence": "Timeline onPlayheadUpdate pauses before seeking, ending the original playback timer. Duration changes during uninterrupted playback remain an optional issue below." }
+  ],
+  "mustFix": [],
+  "worthConsidering": [
+    {
+      "id": "FE-D01",
+      "priority": "P2",
+      "bar": "correctness",
+      "file": "src/main.tsx",
+      "line": 184,
+      "issue": "A locked occurrence of an asset can incorrectly prevent duplicating another occurrence on an unlocked track.",
+      "reproduction": "Use the same image/audio asset on track A and track B, with A's clip first in p.clips. Lock A, select B's unlocked clip and Duplicate. Its new id misses the id lookup, the asset lookup picks A's clip, and the source-track guard rejects the valid addition to B.",
+      "fix": "Distinguish existing-id updates from additions. Apply the old/source-track lock check only to the actual existing-id clip; always check the destination track. Copy-to-unlocked-track can then work without weakening locked-track edits.",
+      "validation": "Source-confirmed path; supplied browser regression covers duplication into the locked track itself, not this shared-asset case."
+    },
+    {
+      "id": "FE-06-duration",
+      "priority": "P2",
+      "bar": "correctness",
+      "file": "src/main.tsx",
+      "line": 108,
+      "issue": "Adding or shortening clips while playing retains the timeline duration captured when playback began.",
+      "fix": "Pause on duration-changing edits or read current timeline duration in the transport tick. This unchanged optional issue does not undermine the fixed seek path."
+    }
+  ],
+  "skipIt": [
+    "The transition-video branch retains width-based sizing, but this adapter exposes no transitions; no current preview workflow regression is asserted.",
+    "No new abstraction or dependency is needed for the fixes; the direct guards and per-clip element map are proportionate."
+  ],
+  "manifest": "frontend delta: inline correctness + parsimony + product; browser judged from actual supplied regression receipt; original must-fix findings resolved"
+}

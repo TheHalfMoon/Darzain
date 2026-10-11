@@ -1,0 +1,31 @@
+{
+  "judge": "fresh-context backend delta correctness and inline parsimony",
+  "priorDiffSha256": "17f1a13854e1fa21c36f92afc895e8b0cde0ac46b049ac967ff3542d5fd3d316",
+  "deltaSha256": "b1f91ef9bceb7c32c9df8fc12f7db4f3823abf2c7bf56a344646ac356642663f",
+  "verdict": "pass",
+  "checksPerformed": [
+    "Read delta-input.json and delta.diff, restricting judgment to core/render.ts, server/main.ts, and corresponding tests.",
+    "Independently computed delta.diff SHA256; it matches the supplied hash.",
+    "Executed rtk proxy node --test tests/core.test.ts tests/http.test.ts from work/Darzain: all 9 tests passed, 0 failed. This includes real FFmpeg cancellation at destination resolution, deferred-load queue closure, HTTP partial byte response and invalid range checks."
+  ],
+  "resolvedFindings": [
+    {"id": "BACKEND-1", "status": "resolved", "evidence": "Destination resolution now precedes the cancellation check; a second check follows rename with artifact removal. The queue also checks the controller before COMPLETED. The exact destination-resolution regression rejects and verifies both final and partial outputs absent."},
+    {"id": "BACKEND-2", "status": "resolved", "evidence": "close sets admission closed synchronously; submit checks before and after project load. The regression rejects the deferred submission and leaves no jobs. HTTP closing rejects new handlers and starts server closure before waiting for queue drain."}
+  ],
+  "findings": [
+    {
+      "id": "BACKEND-DELTA-1",
+      "classification": "worth-considering",
+      "severity": "P3",
+      "file": "server/main.ts",
+      "line": 68,
+      "issue": "The new Range parser rejects valid suffix byte ranges such as bytes=-16 with 416, even for a nonempty asset where that range is satisfiable.",
+      "reproduction": "Static path inspection: request an imported nonempty media asset with Range: bytes=-16. The required numeric start in the regex prevents a match and enters the 416 branch. This suffix case was not executed in this review.",
+      "fix": "Support suffix ranges with start=max(0,length-suffixLength), or ignore unsupported syntax and return the complete 200 response. Add a suffix boundary assertion when broader client range interoperability is needed.",
+      "blocking": false
+    }
+  ],
+  "parsimony": {"verdict": "pass", "findings": [], "reason": "The cancellation and admission guards are small targeted fixes; the media response helper removes duplicated output handling."},
+  "limits": ["Did not execute the browser suite or suffix-range case; the 15-test complete suite result is caller-provided, while this judge independently executed the 9 core/HTTP tests."],
+  "manifest": "backend correctness: fresh-context inline delta review; parsimony: inline bar; no unresolved must-fixes"
+}

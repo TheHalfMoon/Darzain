@@ -1,0 +1,113 @@
+{
+  "judge": "security",
+  "provider": "fresh-context inline ps-review bar; specialized security provider unavailable",
+  "base": "f9e032f5384b649258f06728d17d118095a67461",
+  "diffSha256": "17f1a13854e1fa21c36f92afc895e8b0cde0ac46b049ac967ff3542d5fd3d316",
+  "inputHash": "17f1a13854e1fa21c36f92afc895e8b0cde0ac46b049ac967ff3542d5fd3d316",
+  "scope": "P01 auth, upload, deserialization, paths, FFprobe/FFmpeg, browser rendering; loopback trusted local account engineering preview",
+  "sourceChecks": [
+    {
+      "file": "core/paths.ts",
+      "matchesFrozenAddedContent": true
+    },
+    {
+      "file": "core/media.ts",
+      "matchesFrozenAddedContent": true
+    },
+    {
+      "file": "core/project.ts",
+      "matchesFrozenAddedContent": true
+    },
+    {
+      "file": "core/store.ts",
+      "matchesFrozenAddedContent": true
+    },
+    {
+      "file": "core/render.ts",
+      "matchesFrozenAddedContent": true
+    },
+    {
+      "file": "server/api.ts",
+      "matchesFrozenAddedContent": true
+    },
+    {
+      "file": "server/main.ts",
+      "matchesFrozenAddedContent": true
+    },
+    {
+      "file": "tests/core.test.ts",
+      "matchesFrozenAddedContent": true
+    },
+    {
+      "file": "tests/http.test.ts",
+      "matchesFrozenAddedContent": true
+    },
+    {
+      "file": "docs/SECURITY.md",
+      "matchesFrozenAddedContent": true
+    },
+    {
+      "file": "docs/RELEASE.md",
+      "matchesFrozenAddedContent": true
+    },
+    {
+      "file": "cli/main.ts",
+      "matchesFrozenAddedContent": true
+    }
+  ],
+  "checksPerformed": [
+    {
+      "check": "Authorization and web boundary source trace",
+      "result": "All /api/ routes authenticate; exact Host/Origin and cross-site fetch rejection precede cookie bootstrap; cookie HttpOnly/SameSite=Strict; static CSP and nosniff."
+    },
+    {
+      "command": "rtk node --test tests/http.test.ts",
+      "exitCode": 0,
+      "testsPassed": 1,
+      "result": "Unauthenticated, hostile Origin, cross-site fetch, traversal ID, prototype tool name and stale restart credentials rejected; reopen preserved edits."
+    },
+    {
+      "command": "rtk node --test --test-name-pattern=\"malicious paths|revision conflicts|unknown tools|corrupt asset\" tests/core.test.ts",
+      "exitCode": 0,
+      "testsPassed": 4,
+      "result": "Path traversal/junction, disguised raw playlist, forged asset metadata, snapshot corruption, unknown tools and schema extra keys rejected."
+    },
+    {
+      "check": "FFprobe polyglot probes",
+      "command": "rtk node work/evidence/review/security-probe.mjs",
+      "exitCode": 0,
+      "result": "On installed FFprobe 8.1.1, ID3-prefix HLS rejected as invalid MP3; ID3-prefix concat detected then rejected at first keyword. Debug logs show no attempted canary external file open. These probes establish only those two payload outcomes."
+    },
+    {
+      "check": "Command and asset integrity source trace",
+      "result": "spawn/execFile use argument arrays with default shell=false; schema-bounded numeric filters; title content in UUID textfiles with expansion=none; generated immutable paths; hashes checked before asset use and output checked before publish."
+    },
+    {
+      "command": "rtk rg -n \"dangerouslySetInnerHTML|innerHTML|eval\\(|new Function\" src core server cli",
+      "exitCode": 1,
+      "result": "No matches; examined user text rendered as React text."
+    }
+  ],
+  "findings": {
+    "must-fix": [],
+    "worth-considering": [],
+    "skip-it": [
+      {
+        "location": "docs/SECURITY.md",
+        "issue": "Same-account hostile processes, Windows ACL qualification, TOCTOU hardening and OS decoder isolation are explicitly deferred release gates.",
+        "disposition": "Not current in-scope vulnerabilities; preserve the engineering-preview designation and qualify before broader release."
+      }
+    ]
+  },
+  "clean": [
+    "No reproducible cross-origin credential/bootstrap bypass found",
+    "No reachable arbitrary command/filter injection found",
+    "No API traversal or forged immutable asset bypass found",
+    "No unsafe DOM/eval sink found"
+  ],
+  "verdict": "pass for documented trusted-local-account engineering preview; no reproducible in-scope must-fix security finding",
+  "limitations": [
+    "Not an exhaustive codec fuzzing or native-binary audit",
+    "No claim of OS sandboxing, local-account isolation or release-grade resource isolation"
+  ]
+}

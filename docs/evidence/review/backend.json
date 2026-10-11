@@ -1,0 +1,56 @@
+{
+  "judge": "fresh-context backend correctness and inline parsimony",
+  "diffSha256": "17f1a13854e1fa21c36f92afc895e8b0cde0ac46b049ac967ff3542d5fd3d316",
+  "base": "f9e032f5384b649258f06728d17d118095a67461",
+  "verdict": "must-fix",
+  "scope": "Engineering preview imported-media persistence, rendering, queue, HTTP/CLI boundaries; future MVP/V1 release gates excluded",
+  "checksPerformed": [
+    "Read ps-review/SKILL.md and RTK.md.",
+    "Verified frozen initial.diff SHA256 and scoped new-file sections for core/*.ts, server/*.ts, cli/main.ts and tests/*.ts; read their implementation and tests.",
+    "Read docs/PRODUCT.md and docs/RELEASE.md; inspected README and UI disclosures only to clarify imported video audio policy.",
+    "Executed rtk proxy node --test tests/core.test.ts tests/http.test.ts from work/Darzain: 7 tests passed, 0 failed; real FFmpeg image/audio/title export and HTTP restart covered.",
+    "Executed rtk proxy node work/evidence/review/backend-repro.mjs: real title export returned render.mp4 and artifactExists=true while signalAborted=true.",
+    "Executed rtk proxy node work/evidence/review/backend-close-repro.mjs: deferred load resumed after close and submit returned QUEUED; job subsequently executed and FAILED on the intentionally empty timeline."
+  ],
+  "findings": [
+    {
+      "id": "BACKEND-1",
+      "classification": "must-fix",
+      "severity": "P2",
+      "file": "core/render.ts",
+      "line": 220,
+      "relatedLines": [221, 225, 283, 290],
+      "issue": "Cancellation accepted during final path resolution or rename is lost: the renderer checks the signal before asynchronous publication and returns success afterward, so the queue marks the cancelled running job COMPLETED.",
+      "reproduction": "Run backend-repro.mjs. It builds a real one-second title-only project and wraps store.file to abort when the final render.mp4 destination is resolved. The original renderer returned an existing artifact despite signalAborted=true.",
+      "reproductionScript": "work/evidence/review/backend-repro.mjs",
+      "observed": {"signalAborted": true, "returnedArtifact": "exports/<jobId>/render.mp4", "artifactExists": true},
+      "fix": "Recheck cancellation after publication awaits, delete a published artifact when cancelling at that boundary, and check the controller before setting COMPLETED so cancelled jobs cannot expose an artifact. Add a regression that aborts during destination resolution/publication."
+    },
+    {
+      "id": "BACKEND-2",
+      "classification": "must-fix",
+      "severity": "P2",
+      "file": "core/render.ts",
+      "line": 243,
+      "relatedLines": [244, 245, 255, 258, 274, 277],
+      "issue": "close() does not stop admission: submit awaiting store.load can enqueue after close has returned, and the HTTP server continues accepting requests until after queue.close finishes. Shutdown can exit with newly started export work unawaited.",
+      "reproduction": "Run backend-close-repro.mjs. Hold load unresolved, invoke submit, await queue.close, then resolve load. submit succeeds with QUEUED and its render executes after closure.",
+      "reproductionScript": "work/evidence/review/backend-close-repro.mjs",
+      "observed": {"acceptedAfterClose": "QUEUED", "executedAfterClose": true},
+      "fix": "Set a closing flag synchronously and reject submissions both before and after the load await; stop HTTP admission before draining the queue. Test deferred-load submission overlapping close."
+    }
+  ],
+  "correctnessClean": [
+    "Same-store revision serialization rejects concurrent overwrites; imported asset metadata stays immutable and reads check hashes.",
+    "Source ranges, dimensions, references and schema versions are validated; render uses argument arrays and title text files with expansion disabled.",
+    "Sequential queue/idempotency behavior and queued cancellation pass existing tests.",
+    "Authenticated local HTTP calls and persisted project reopening pass the restart test."
+  ],
+  "parsimony": {"verdict": "pass", "findings": [], "reason": "Small schema/store/renderer/API layers directly serve this preview; no concrete unnecessary abstraction merits a finding."},
+  "limits": [
+    "Did not independently compare decoded title pixels/audio waveforms; existing tests prove real export plus stream verification but only assert file size for its content.",
+    "Imported video sound requires a separate audio asset per the explicit UI disclosure, so its omission from the render mix is not a defect in this scope.",
+    "Durable jobs, portable/recoverable projects, generation, production packaging and other explicit future release gates are not must-fixes for this preview."
+  ],
+  "manifest": "correctness backend: fresh-context inline bar; parsimony: inline bar; specialized reviewer providers unavailable"
+}

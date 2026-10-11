@@ -1,0 +1,12 @@
+{
+  "name": "ai-video-production-editor",
+  "task": "build",
+  "command": [
+    "npm.cmd",
+    "run",
+    "build:web"
+  ],
+  "exit": 0,
+  "signal": null,
+  "elapsedMs": 44966
+}

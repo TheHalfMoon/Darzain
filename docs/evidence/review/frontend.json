@@ -1,0 +1,96 @@
+{
+  "reviewer": "fresh-context frontend correctness, parsimony and product inline bars",
+  "diffSha256": "17f1a13854e1fa21c36f92afc895e8b0cde0ac46b049ac967ff3542d5fd3d316",
+  "base": "f9e032f5384b649258f06728d17d118095a67461",
+  "checks": [
+    "Recomputed SHA256 of initial.diff and matched input.json.",
+    "Reconstructed added source from frozen diff and matched main.tsx, adapter.ts, Timeline.tsx and PreviewPlayer.tsx byte content after newline normalization.",
+    "Read PRODUCT.md, FEATURE_MATRIX.md and RELEASE.md; treated engineering preview scope and future model/3D gates as explicit limits.",
+    "Inspected browser-e2e/receipt.json: create, imports, split, camera metadata, save, preview, export, download, reload and reopen; no reported page errors.",
+    "Viewed browser-e2e/darzain-workspace.png; actual split workflow, camera disclaimer and inference disclaimer are visible.",
+    "Traced create/open/save/history reset and busy mutation paths; traced lock, solo, target, duplicate, paste, trim, split and delete handlers.",
+    "Compared preview media activation, seeking, audio and aspect handling with renderProject explicit audio and scale-to-fit paths.",
+    "Static review only; no new interactive stress run or tests executed. Reproduction steps below describe source-confirmed paths absent from the supplied E2E receipt."
+  ],
+  "mustFix": [
+    {
+      "id": "FE-01",
+      "priority": "P1",
+      "bar": "correctness/product",
+      "file": "src/main.tsx",
+      "line": 246,
+      "issue": "Opening or creating a project silently discards the current unsaved edits and their undo history.",
+      "reproduction": "Open project A, add a clip or change camera metadata without Save, click project B or Create project, then reopen A. The edit is gone; beforeunload never runs for an in-app switch.",
+      "evidence": "Both switch handlers call accept directly; accept replaces history with createHistoryState. Only browser unload checks history.past.length.",
+      "fix": "Route create/open through a common project-switch guard that saves the current dirty project before replacement or offers explicit save/discard/cancel. Preserve current state when saving or opening fails."
+    },
+    {
+      "id": "FE-02",
+      "priority": "P2",
+      "bar": "correctness/product",
+      "file": "src/donors/film-editor/components/Timeline.tsx",
+      "line": 764,
+      "issue": "Ctrl+D modifies a locked track, although the Duplicate context-menu item is disabled for that track.",
+      "reproduction": "Select a clip, lock its track, focus the timeline, press Ctrl+D. duplicateClip appends a copy to the locked track through onBatchUpdateClips.",
+      "evidence": "Keyboard handler line 809 invokes duplicateClip without a lock check; duplicateClip itself has no check. main.tsx updateClips accepts changes on locked tracks.",
+      "fix": "Enforce the lock check inside duplicateClip and preferably at the central clip mutation boundary so every invocation obeys the same rule."
+    },
+    {
+      "id": "FE-03",
+      "priority": "P2",
+      "bar": "correctness/product",
+      "file": "src/donors/film-editor/components/PreviewPlayer.tsx",
+      "line": 587,
+      "issue": "Preview plays embedded video sound, but export excludes that sound and the UI tells users to add explicit audio.",
+      "reproduction": "Import a video containing audio, add it to the picture track and Play. PreviewPlayer starts the unmuted video at volume 1. Export the same project without an explicit audio clip; the renderer produces no audio stream.",
+      "evidence": "Video creation sets muted=false at line 370; lines 587-598 play both video and audio. core/render.ts 114-134 adds audio only for assets whose kind is audio.",
+      "fix": "Mute video elements in this preview integration and play only explicit audio assets, matching the documented renderer contract."
+    },
+    {
+      "id": "FE-04",
+      "priority": "P2",
+      "bar": "correctness/product",
+      "file": "src/donors/film-editor/components/PreviewPlayer.tsx",
+      "line": 364,
+      "issue": "Multiple active clips referencing the same audio/video asset share one playback element, so their independent source offsets cannot be previewed or mixed.",
+      "reproduction": "Add one audio asset to two audio tracks with overlapping clips and different source offsets. While playing, both active clips retrieve the same HTMLAudioElement and overwrite its currentTime; only one audio source plays. Export creates a distinct input per clip and mixes both.",
+      "evidence": "mediaElementsRef is keyed by media item id, allocation creates one element per asset, and activeClips retrieves that shared element at line 566 before seeking it at line 594.",
+      "fix": "Manage audio/video playback instances per timeline clip, keeping images shared if desired. Pause and dispose instances when clips disappear or the component unmounts."
+    }
+  ],
+  "worthConsidering": [
+    {
+      "id": "FE-05",
+      "priority": "P2",
+      "bar": "correctness/product",
+      "file": "src/donors/film-editor/components/PreviewPlayer.tsx",
+      "line": 804,
+      "issue": "Portrait or square video is cropped vertically in preview while export fits the entire frame.",
+      "reproduction": "Import a 9:16 video into the default 1280x720 project. Preview scales it to width 1280 and height about 2276, clipping most of the frame; export force_original_aspect_ratio=decrease fits it to about 405x720.",
+      "fix": "Use the image branch's contain calculation for video and transition video rendering too. Video qualification is explicitly partial, but the current import control exposes this discrepancy."
+    },
+    {
+      "id": "FE-06",
+      "priority": "P2",
+      "bar": "correctness",
+      "file": "src/main.tsx",
+      "line": 108,
+      "issue": "Timeline seeks while playing are overwritten by the transport timer's original position; edits that change duration during playback also retain the original end time.",
+      "reproduction": "Play a multi-second timeline and click its ruler or use Go to start/end. onPlayheadUpdate changes playhead, but the next 33ms timer tick restores at+elapsed. Add or shorten a clip during playback; total remains the value captured when playback began.",
+      "fix": "Pause on timeline seeking, or maintain a transport origin ref updated by seek operations and recompute duration when the timeline changes."
+    }
+  ],
+  "skipIt": [
+    { "bar": "product", "issue": "Do not demand enabled inference, 3D scene rendering, durable jobs, portable recovery, installers or cross-platform qualification in this engineering-preview phase; the supplied contracts explicitly leave those future gates open." },
+    { "bar": "parsimony", "issue": "No separate abstraction rewrite warranted. The direct adapter and imported donor component integration serve the adoption requirement; prioritize small behavior guards and consistent media semantics." }
+  ],
+  "clean": [
+    "Schema parse guards local edits and save revisions use expectedRevision.",
+    "Save/import/export busy state blocks ordinary concurrent editor mutations.",
+    "Solo/mute filtering uses the same independent audio/video track grouping in preview and export.",
+    "Split/delete/import target paths check track compatibility or lock state; duplicate shortcut is the identified exception.",
+    "Camera controls explicitly disclose metadata-only behavior and no inference backend is claimed.",
+    "Supplied image/audio/title split-export-reopen receipt supports a basic verified workflow, with advanced parity explicitly pending."
+  ],
+  "manifest": "frontend: fresh-context inline correctness + parsimony + product; specialized providers unavailable; browser judged from supplied receipt and screenshot"
+}

@@ -1,0 +1,32 @@
+{
+  "runtime": "Microsoft Edge",
+  "fixture": "FFmpeg test pattern and sine audio; not AI generation",
+  "steps": [
+    "project create",
+    "image import",
+    "audio import",
+    "timeline add",
+    "scene camera edit",
+    "title",
+    "split at one second",
+    "locked duplicate rejection",
+    "save",
+    "preview",
+    "export",
+    "download",
+    "reload",
+    "reopen",
+    "autosave on project switch",
+    "video import via agent API",
+    "independent overlapping audio",
+    "embedded video audio muted"
+  ],
+  "focalLengthMm": 85,
+  "clipsAfterSplit": 4,
+  "overlappingAudioOffsets": [
+    0.337818,
+    1.314587
+  ],
+  "pageErrors": [],
+  "artifactBytes": 84614
+}

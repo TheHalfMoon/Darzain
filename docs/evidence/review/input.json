@@ -1,0 +1,7 @@
+{
+  "base": "f9e032f5384b649258f06728d17d118095a67461",
+  "diffSha256": "17f1a13854e1fa21c36f92afc895e8b0cde0ac46b049ac967ff3542d5fd3d316",
+  "bytes": 650036,
+  "scope": "all uncommitted P01 files against documentation bootstrap",
+  "judges": "fresh-context inline bars; specialized ECC/ponytail providers unavailable"
+}

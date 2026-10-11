@@ -1,0 +1,18 @@
+{
+  "judge": "security-delta",
+  "provider": "fresh-context inline ps-review security bar",
+  "inputHash": "b1f91ef9bceb7c32c9df8fc12f7db4f3823abf2c7bf56a344646ac356642663f",
+  "deltaSha256": "b1f91ef9bceb7c32c9df8fc12f7db4f3823abf2c7bf56a344646ac356642663f",
+  "priorDiffSha256": "17f1a13854e1fa21c36f92afc895e8b0cde0ac46b049ac967ff3542d5fd3d316",
+  "scope": "Delta only: authenticated media byte ranges, shutdown admission, cancellation publication, preview media lifecycle",
+  "checksPerformed": [
+    {"check": "Read complete frozen delta and relevant current server/adapter source", "result": "Range processing remains behind existing exact Host/Origin validation and API authentication; verified asset lookup and completed-job checks precede media response."},
+    {"check": "Range integer and header trace", "result": "Anchored digits-only single range grammar; safe integers required; outside/reversed/multiple ranges rejected; end clamped to actual buffer; response headers derive only from validated numbers and fixed MIME values."},
+    {"command": "rtk node --test tests/http.test.ts", "exitCode": 0, "testsPassed": 1, "result": "Actual HTTP 206 returned correct 16 bytes and Content-Range; outside and multipart requests returned 416; existing auth/origin/restart negatives still pass."},
+    {"command": "rtk node --test --test-name-pattern=\"queue closure|cancellation during artifact\" tests/core.test.ts", "exitCode": 0, "testsPassed": 2, "result": "Publication cancellation leaves no completed output; queue shutdown rejects delayed and subsequent submissions."},
+    {"check": "Preview source flow", "result": "New media instances receive same API asset URLs generated from validated project/asset UUIDs. No new raw DOM, eval, command or remote URL sink."}
+  ],
+  "findings": {"must-fix": [], "worth-considering": [], "skip-it": []},
+  "verdict": "pass: no reproducible in-scope security regression in delta",
+  "limitations": ["Existing whole-file buffering and native codec isolation remain documented preview release gates; delta introduces no new isolation claim."]
+}

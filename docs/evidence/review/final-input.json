@@ -1,0 +1,14 @@
+{
+  "cycle": 3,
+  "priorDeltaSha256": "b1f91ef9bceb7c32c9df8fc12f7db4f3823abf2c7bf56a344646ac356642663f",
+  "files": {
+    "server/main.ts": "5bf61133d098a78fc04aed6fb0e16d05fd1e2c16b622bdeb528e4017e6fadbfb",
+    "src/main.tsx": "ada70ea697b8f394cc12748873db30cb6a992ad01ee4b04a768c830aeb1a5235",
+    "tests/http.test.ts": "4ab7de065dfa1cb87851b3c8e574550db22178460b69089e8769732d469dd650"
+  },
+  "changes": [
+    "Suffix range support with executed -16 byte assertion",
+    "New clip additions check destination lock, existing clip mutations also enforce original track lock",
+    "Playback timer restarts when sequence duration changes"
+  ]
+}

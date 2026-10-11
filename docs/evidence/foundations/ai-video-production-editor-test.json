@@ -1,0 +1,11 @@
+{
+  "name": "ai-video-production-editor",
+  "task": "test",
+  "command": [
+    "npm.cmd",
+    "test"
+  ],
+  "exit": 0,
+  "signal": null,
+  "elapsedMs": 4229
+}
