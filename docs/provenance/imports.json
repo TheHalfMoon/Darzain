@@ -186,9 +186,10 @@
     "modifications": [
       "Adapt buildTimelineCommand algorithm only: canonical frame data, local process isolation, explicit audio mixing, safe title files, cancellation and verified atomic output.",
       "T1: prefer YAMAKAN_FFMPEG/YAMAKAN_FONT with DARZAIN_* compatibility fallback; product name in comments.",
-      "T1 review: render threads and session job limit read the server resource policy; public FFmpeg errors are classified and path-free, with the stderr tail kept as the server-side error cause. Job error messages are redacted of the workspace root."
+      "T1 review: render threads and session job limit read the server resource policy; public FFmpeg errors are classified and path-free, with the stderr tail kept as the server-side error cause. Job error messages are redacted of the workspace root.",
+      "T5: rendering runs through the owned worker (core/process) into a per-attempt staging folder with policy wall-clock and memory limits and an onCreated identity hook; returns the verified unpublished output; publication and job state moved to core/jobs.ts (the in-memory RenderQueue is removed); input protocols restricted to file."
     ],
-    "importedSha256": "03834095d28982af1dee14794042513ac4fafd4b57102e9720995866638bdc40"
+    "importedSha256": "6a6d5187ab6b6d82ea9f54928069f9a0594355cbd67c4050057c0fb13e81aedb"
   },
   {
     "source": "TheHalfMoon/Skelet",
