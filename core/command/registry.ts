@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { ProjectSchema, Id } from "../project.ts";
-import type { ProjectStore } from "../store.ts";
+import { SNAPSHOT_FORMAT } from "../store.ts";
+import type { ProjectStore, RequestReceipt } from "../store.ts";
+import { canonicalJson, sha256Hex } from "../donors/ninerr/canonical.ts";
 import type { RenderQueue } from "../render.ts";
 import { CommandError } from "./errors.ts";
 import { RESOURCE_POLICY } from "./policy.ts";
-import { canonicalJson, sha256Hex } from "../donors/ninerr/canonical.ts";
 
 export const RESOURCE_POLICY_HASH = sha256Hex(canonicalJson(RESOURCE_POLICY));
 
@@ -30,14 +31,16 @@ export type CommandContext = {
   store: ProjectStore;
   queue: RenderQueue;
   principal: Principal;
+  requestId?: string;
 };
+type RunContext = CommandContext & { receipt?: RequestReceipt };
 
 type Definition<S extends z.ZodType, R> = {
   scope: Scope;
   mutation: boolean;
   summary: string;
   input: S;
-  run: (ctx: CommandContext, input: z.output<S>) => Promise<R> | R;
+  run: (ctx: RunContext, input: z.output<S>) => Promise<R> | R;
 };
 const define = <S extends z.ZodType, R>(d: Definition<S, R>) => d;
 
@@ -54,7 +57,7 @@ export const commands = {
     mutation: true,
     summary: "Create an empty project.",
     input: z.object({ name: z.string().min(1).max(120) }).strict(),
-    run: ({ store }, a) => store.create(a.name),
+    run: ({ store, receipt }, a) => store.create(a.name, receipt),
   }),
   "yamakan.project.open": define({
     scope: "project:read",
@@ -73,9 +76,17 @@ export const commands = {
   "yamakan.project.history": define({
     scope: "project:read",
     mutation: false,
-    summary: "List retained revisions and verify the head.",
-    input: z.object({ projectId: Id }).strict(),
-    run: ({ store }, a) => store.history(a.projectId),
+    summary: "List the newest retained revisions and verify them.",
+    input: z
+      .object({
+        projectId: Id,
+        limit: z.number().int().min(1).max(500).optional(),
+        // Page older revisions: list only revisions below this one.
+        beforeRevision: z.number().int().min(1).max(10001).optional(),
+      })
+      .strict(),
+    run: ({ store }, a) =>
+      store.history(a.projectId, a.limit, a.beforeRevision),
   }),
   "yamakan.project.restore": define({
     scope: "project:recover",
@@ -88,8 +99,13 @@ export const commands = {
         expectedHeadFingerprint: revisionFingerprint,
       })
       .strict(),
-    run: ({ store }, a) =>
-      store.restore(a.projectId, a.revision, a.expectedHeadFingerprint),
+    run: ({ store, receipt }, a) =>
+      store.restore(
+        a.projectId,
+        a.revision,
+        a.expectedHeadFingerprint,
+        receipt,
+      ),
   }),
   "yamakan.project.save": define({
     scope: "project:write",
@@ -101,7 +117,8 @@ export const commands = {
         expectedRevision: z.number().int().nonnegative(),
       })
       .strict(),
-    run: ({ store }, a) => store.save(a.project, a.expectedRevision),
+    run: ({ store, receipt }, a) =>
+      store.save(a.project, a.expectedRevision, receipt),
   }),
   "yamakan.export.video": define({
     scope: "render:execute",
@@ -174,7 +191,24 @@ export async function execute(
   authorize(ctx.principal, operation);
   const command = commands[operation] as Definition<z.ZodType, unknown>;
   const input = command.input.parse(parameters ?? {});
-  return { operation, result: await command.run(ctx, input) };
+  // A mutation with a request ID is replayable: the same ID and input return
+  // the original result; the same ID with different input is rejected.
+  const receipt =
+    command.mutation && ctx.requestId
+      ? {
+          principalId: ctx.principal.id,
+          requestId: ctx.requestId,
+          digest: sha256Hex(
+            canonicalJson({
+              apiVersion: API_VERSION,
+              format: SNAPSHOT_FORMAT,
+              operation,
+              input,
+            }),
+          ),
+        }
+      : undefined;
+  return { operation, result: await command.run({ ...ctx, receipt }, input) };
 }
 
 export function catalog() {

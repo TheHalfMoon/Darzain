@@ -44,9 +44,14 @@ export class CreativeAPI {
       },
     };
   }
-  execute(name: unknown, args: unknown, principal: Principal) {
+  execute(
+    name: unknown,
+    args: unknown,
+    principal: Principal,
+    requestId?: string,
+  ) {
     return execute(
-      { store: this.store, queue: this.queue, principal },
+      { store: this.store, queue: this.queue, principal, requestId },
       name,
       args,
     );
@@ -55,7 +60,8 @@ export class CreativeAPI {
     name: unknown,
     args: unknown,
     principal: Principal = principals["local-client"],
+    requestId?: string,
   ) {
-    return (await this.execute(name, args, principal)).result;
+    return (await this.execute(name, args, principal, requestId)).result;
   }
 }

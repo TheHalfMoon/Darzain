@@ -132,11 +132,13 @@ test("command envelopes are strict and accept the legacy body", () => {
   assert.deepEqual(e, {
     operation: "yamakan.project.list",
     requestId: "req-1",
+    clientRequestId: true,
     parameters: {},
   });
   const legacy = parseEnvelope({ name: "darzain.project.list" });
   assert.equal(legacy.operation, "darzain.project.list");
   assert.match(legacy.requestId, /^[0-9a-f-]{36}$/);
+  assert.equal(legacy.clientRequestId, false);
   for (const bad of [
     { apiVersion: 2, operation: "yamakan.project.list" },
     { apiVersion: 1, operation: "yamakan.project.list", principalId: "root" },

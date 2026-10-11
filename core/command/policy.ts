@@ -10,6 +10,7 @@ export const RESOURCE_POLICY = Object.freeze({
   policy: "yamakan.resource-policy/v1",
   enforced: Object.freeze({
     requestBytes: 2 * MiB,
+    snapshotBytes: 2 * MiB,
     assetImportBytes: 50 * MiB,
     assetsPerProject: 200,
     timelineFrames: 18000,

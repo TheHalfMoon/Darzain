@@ -271,8 +271,26 @@ test("loopback API rejects unauthenticated and cross-site access; restart preser
       ).status,
       416,
     );
-    await stop();
-    await assert.rejects(access(path.join(root, "server.lock")));
+    // A second service on the same workspace is refused while the first lives.
+    const rival = fork(script, [], {
+      env: {
+        ...process.env,
+        YAMAKAN_WORKSPACE: root,
+        YAMAKAN_PORT: String(port + 1),
+      },
+      silent: true,
+      windowsHide: true,
+    });
+    let rivalErrors = "";
+    rival.stderr?.on("data", (chunk) => (rivalErrors += String(chunk)));
+    const [rivalCode] = await once(rival, "exit");
+    assert.notEqual(rivalCode, 0);
+    assert.match(rivalErrors, /already owns this workspace/);
+    // A hard kill leaves no lock that needs manual deletion before restart.
+    const killed = once(child!, "exit");
+    child!.kill("SIGKILL");
+    await killed;
+    await access(path.join(root, "service.lock"));
     await start();
     assert.equal(
       (await fetch(`${origin}/api/v1/tools`, { headers })).status,

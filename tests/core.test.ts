@@ -1,16 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  mkdtemp,
-  readFile,
-  writeFile,
-  symlink,
-  access,
-} from "node:fs/promises";
+import { mkdtemp, readFile, symlink, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { ProjectStore } from "../core/store.ts";
+import { DatabaseSync } from "node:sqlite";
 import { ProjectSchema } from "../core/project.ts";
 import { renderProject, RenderQueue } from "../core/render.ts";
 import { safePath } from "../core/paths.ts";
@@ -134,10 +129,12 @@ test("project import, scene, timeline, title, audio, render and reopen preserve 
   assert.equal(artifact, `exports/${jobId}/render.mp4`);
   const out = await readFile(await store.file(p.id, ...artifact.split("/")));
   assert.ok(out.length > 1000);
-  const reopened = await new ProjectStore(root).load(p.id);
+  const second = new ProjectStore(root);
+  await second.initialize();
+  const reopened = await second.load(p.id);
   assert.deepEqual(reopened, saved);
   assert.equal(reopened.scenes[0].camera.focalLengthMm, 85);
-  const api = new CreativeAPI(new ProjectStore(root));
+  const api = new CreativeAPI(second);
   assert.deepEqual(
     await api.call("darzain.project.open", { projectId: p.id }),
     saved,
@@ -213,10 +210,24 @@ test("malicious paths, disguised playlists, schema versions and missing referenc
 });
 test("corrupt asset or snapshot fails integrity validation without silent rewriting", async () => {
   const { store, project } = await fixture();
-  const snapshot = await store.file(project.id, "snapshots", "0.json");
-  await writeFile(snapshot, "{}");
+  // Tamper with the committed snapshot bytes through an independent connection.
+  const db = new DatabaseSync(path.join(store.root, "workspace.sqlite"));
+  db.prepare(
+    "UPDATE snapshots SET bytes = ?, byte_length = 2 WHERE hash = (SELECT snapshot_hash FROM projects WHERE project_id = ?)",
+  ).run(Buffer.from("{}"), project.id);
   await assert.rejects(store.load(project.id), /hash mismatch/);
-  assert.equal(await readFile(snapshot, "utf8"), "{}");
+  assert.equal((await store.list())[0].error, "Project cannot be verified.");
+  const kept = db
+    .prepare(
+      "SELECT bytes FROM snapshots WHERE hash = (SELECT snapshot_hash FROM projects WHERE project_id = ?)",
+    )
+    .get(project.id) as { bytes: Uint8Array };
+  assert.equal(
+    Buffer.from(kept.bytes).toString(),
+    "{}",
+    "evidence is not rewritten",
+  );
+  db.close();
 });
 test("unknown tools and injected call keys are rejected", async () => {
   const { store, project } = await fixture();
