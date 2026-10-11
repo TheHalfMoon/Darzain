@@ -59,7 +59,7 @@ export type StoreOptions = {
 // T2 builds stored in the 30 fps editing shape are upgraded on read by the
 // same pure, lossless conversion; they are never rewritten in place.
 export const SNAPSHOT_FORMAT = "yamakan.project/1";
-const EDIT_VIEW_FORMAT = "yamakan.edit-view/1";
+export const EDIT_VIEW_FORMAT = "yamakan.edit-view/1";
 const MAX_REVISION = 10000;
 const SCHEMA_VERSION = 1;
 const WORKSPACE_SCOPE = "";

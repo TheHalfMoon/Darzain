@@ -25,8 +25,14 @@ import {
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { LegacyProjectStore } from "./legacy-store.ts";
-import { ProjectStore } from "./store.ts";
-import { fromEditView, parseCanonical } from "./canonical.ts";
+import { EDIT_VIEW_FORMAT, ProjectStore } from "./store.ts";
+import {
+  FORMAT,
+  FORMAT_VERSION,
+  fromEditView,
+  inspectFormat,
+  parseCanonical,
+} from "./canonical.ts";
 import type { CanonicalProject } from "./canonical.ts";
 import type { Asset, Project } from "./project.ts";
 import { Id, ProjectSchema } from "./project.ts";
@@ -283,14 +289,18 @@ async function migrateDatabaseProject(
     bytes: Uint8Array | null;
   }[];
   const decoded = new Map<number, CanonicalProject>();
+  let newerFormat = false;
   for (const row of rows) {
     try {
       if (!row.bytes) throw new Error("missing");
       const text = Buffer.from(row.bytes).toString("utf8");
       if (sha256Hex(text) !== row.snapshot_hash) throw new Error("hash");
       const value: unknown = JSON.parse(text);
+      const info = inspectFormat(value);
+      if (info.format === FORMAT && (info.formatVersion ?? 0) > FORMAT_VERSION)
+        newerFormat = true;
       const project =
-        row.format === "yamakan.edit-view/1"
+        row.format === EDIT_VIEW_FORMAT
           ? fromEditView(ProjectSchema.parse(value))
           : parseCanonical(value);
       if (project.id !== projectId || project.revision !== row.revision)
@@ -299,6 +309,12 @@ async function migrateDatabaseProject(
     } catch {
       outcome.unverifiedRevisions.push(row.revision);
     }
+  }
+  // Never replace a newer build's work with an older revision, even on request.
+  if (newerFormat) {
+    outcome.reason =
+      "The project has revisions in a newer format; migrate it with a newer build.";
+    return;
   }
   const verified = [...decoded.keys()].sort((a, b) => a - b);
   if (!verified.length) {

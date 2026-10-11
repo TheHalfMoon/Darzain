@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, fork, spawnSync } from "node:child_process";
 import { once } from "node:events";
+import { createHash } from "node:crypto";
+import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import {
   mkdtemp,
@@ -371,4 +373,41 @@ test("destinations that alias into the source by junction or short name are refu
     before,
     "nothing was written into the source",
   );
+});
+
+test("database projects with a newer-format revision are never downgraded", async () => {
+  const { root, source } = await legacyWorkspace();
+  const opened = new ProjectStore(source);
+  await opened.initialize();
+  const project = await opened.create("Touched by a newer build");
+  opened.close();
+  const db = new DatabaseSync(path.join(source, "workspace.sqlite"));
+  const row = db
+    .prepare(
+      "SELECT s.bytes FROM snapshots s JOIN projects p ON p.snapshot_hash = s.hash WHERE p.project_id = ?",
+    )
+    .get(project.id) as { bytes: Uint8Array };
+  const newer = {
+    ...JSON.parse(Buffer.from(row.bytes).toString("utf8")),
+    revision: 1,
+    formatVersion: 2,
+  };
+  const bytes = Buffer.from(JSON.stringify(newer));
+  const hash = createHash("sha256").update(bytes).digest("hex");
+  db.prepare(
+    "INSERT INTO snapshots(hash, format, bytes, byte_length) VALUES (?, 'yamakan.project/1', ?, ?)",
+  ).run(hash, bytes, bytes.length);
+  db.prepare(
+    "INSERT INTO revisions(project_id, revision, snapshot_hash, parent_revision, operation) VALUES (?, 1, ?, 0, 'newer.build')",
+  ).run(project.id, hash);
+  db.prepare(
+    "UPDATE projects SET revision = 1, snapshot_hash = ? WHERE project_id = ?",
+  ).run(hash, project.id);
+  db.close();
+  const report = await migrateLegacyWorkspace(source, path.join(root, "dest"), {
+    acceptLatestVerified: true,
+  });
+  const outcome = report.projects.find((p) => p.projectId === project.id)!;
+  assert.equal(outcome.status, "skipped");
+  assert.match(outcome.reason!, /newer format/);
 });
