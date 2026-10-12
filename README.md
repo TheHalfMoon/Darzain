@@ -15,7 +15,9 @@ npm start
 
 `build:native` builds the Windows process owner and the workspace access helper (Rust toolchain with MSVC); media workers run only through the owner on Windows, and the service does not open a workspace it cannot make private to your account.
 
-Open the launch link the service prints when it starts (`http://127.0.0.1:4318/#launch=…`, also saved in the workspace's `launch` file); the bare address shows only a sign-in notice. Agents use `npm run cli -- yamakan.project.list {}` or the MCP stdio server (`npm run mcp`) against the running service; both authenticate with the workspace client token, separately from the browser session.
+Open the launch link saved in the workspace's `launch` file (`http://127.0.0.1:4318/#launch=…`; the service prints where it is); the bare address shows only a sign-in notice. Each browser tab keeps its own session, so a new tab needs the link again. Agents use `npm run cli -- yamakan.project.list {}` or the MCP stdio server (`npm run mcp`) against the running service; both authenticate with the workspace client token, separately from the browser session.
+
+Local boundary: the workspace, its recovery folder and every file in them are private to your account (on Windows, access for you, SYSTEM and Administrators only; an elevated administrator can always read them). A workspace on a drive without permissions (FAT/exFAT), a folder owned by another account, or a link or junction is refused. Keep the application folder itself (this checkout, `node_modules`, the built helpers) writable only by your account: anyone who can change the code that runs as you can read what you can.
 
 Source/weight/service rights and capability availability remain distinct. No paid inference, cloud account or model weights are used.
 

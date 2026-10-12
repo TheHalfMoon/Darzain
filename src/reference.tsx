@@ -5,6 +5,7 @@
 // the revision it shows, and says so plainly when there are unsaved edits.
 import React, { useEffect, useState } from "react";
 import type { MessageKey } from "./i18n.ts";
+import { mediaUrl } from "./session.ts";
 
 type Props = {
   projectId: string;
@@ -39,7 +40,9 @@ export function ReferencePreview(props: Props) {
   const [loaded, setLoaded] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [segment, setSegment] = useState<string | null>(null);
-  const base = `/api/v1/projects/${encodeURIComponent(projectId)}/preview?revision=${revision}`;
+  const base = mediaUrl(
+    `/api/v1/projects/${encodeURIComponent(projectId)}/preview?revision=${revision}`,
+  );
   // A failed frame (busy renderer, transient error) is asked for again a
   // few times; the attempt number only changes the address.
   const [attempt, setAttempt] = useState(0);

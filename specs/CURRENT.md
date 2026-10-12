@@ -28,11 +28,22 @@ T9 exceeds the plan's four-day bound, so it is split at its interface: **T9a** r
 
 ## T9b surface (in review)
 
-- **Session only through the launch link.** Opening the page no longer issues the browser session cookie (any local process or account could). The service writes `http://127.0.0.1:<port>/#launch=<secret>` to the owner-only `launch` file and prints it; the page exchanges the secret (in the fragment, never sent to a server) through `POST /api/v1/session` (exact Origin required) for the HttpOnly, SameSite=Strict cookie, then removes it from the address bar and history. Without it the editor shows a sign-in notice (English and Arabic).
-- **Owner-only workspace.** At start the service makes the workspace private before writing any secret, and refuses to open one it cannot: on Windows a protected DACL granting full access only to the current user, SYSTEM and Administrators, inherited by everything below (existing files included); on POSIX 0700 (secret files 0600, written fresh each start). The recovery folder and restored roots get the same. `yamakan-acl` (dependency-free Rust, built with procd) sets and describes DACLs; `core/process/access.ts` is added to the spawn allowlist for it.
-- **Evidence for "second Windows account denied" without creating accounts:** `yamakan-acl probe-other` opens a path under a restricted copy of the service's token with the user and Administrators deny-only and no privileges, which is what another standard account of the machine holds (Everyone, Users, Authenticated Users). It is denied on the workspace, token, launch file and database, and allowed on an ordinary file (control). A real second-account check remains a T10 founder step.
-- **Other loopback port:** a page served from another 127.0.0.1 port in the same browser, holding a valid session, can neither call the API nor load media (same-site but not same-origin), while the same requests succeed from the Yamakan page (control).
-- Authenticated CLI (token file) works against the hardened service; the keyboard-only journey runs in Arabic (RTL): Tab reaches the backup button and Enter runs it.
+- **Session only through the launch link, never a cookie.** Opening the page grants nothing. The service writes `http://127.0.0.1:<port>/#launch=<secret>` to the owner-only `launch` file (it prints the file's location, not the secret). The page exchanges the secret (in the fragment, never sent to a server) through `POST /api/v1/session` (exact Origin required) for a session and a media key, kept in the tab's `sessionStorage`. API requests send the session as `X-Yamakan-Session` (state changes also need the exact Origin; any request from another site or loopback port is refused by Fetch Metadata); media elements and the export download carry `?media=<key>`, accepted only for GET asset, preview and artifact reads. No cookie is used because browsers send cookies to every port of 127.0.0.1, so another local server would receive one. Without a session the editor shows a sign-in notice (English and Arabic); each tab needs the link.
+- **Owner-only workspace.** At start the service makes the workspace private before writing any secret, and refuses to open one it cannot. On Windows (`yamakan-acl`, dependency-free Rust built with procd):
+  - a link or junction, or a folder owned by another account, is refused;
+  - the root gets a protected DACL granting full access only to the current user, SYSTEM and Administrators;
+  - the whole tree below is reset to inherit only that (explicit and protected entries removed) and owned by the current user;
+  - every object is then checked, because the reset can report success without reaching every object.
+
+  On POSIX the folder is 0700 (links and other owners refused), with secret files 0600 written fresh. The recovery folder, restored roots and migrated workspaces are restricted the same way. `core/process/access.ts` joins the spawn allowlist to run the helper.
+
+- **Evidence for "second Windows account denied" without creating accounts:** `yamakan-acl probe-other` opens a path under a restricted copy of the service's token with the user and Administrators deny-only and no privileges. It keeps this logon's other groups, so it holds at least what another standard account holds and a denial is conservative.
+  - From a known permissive start, the workspace, the token, a file with an explicit Everyone grant and a file with a protected Everyone DACL are all readable before and denied after.
+  - An ordinary file stays readable (control), and a junction is refused.
+  - The running service's workspace, token, launch file and database are denied, with the root's DACL and owner asserted.
+  - It says nothing about an elevated administrator, who can always read. A real second-account check remains a T10 founder step.
+- **Other loopback port:** in the E2E a page on another 127.0.0.1 port, in the same browser and even holding the real session and media key, can neither call the API nor load media, while the same requests succeed from the Yamakan page (control); the other port's server never receives the session, the media key or any Yamakan cookie.
+- Authenticated CLI (token file) works against the hardened service. In the keyboard-only journey in Arabic (RTL), Tab reaches the backup button and Enter runs it.
 
 ## T9a surface (merged)
 

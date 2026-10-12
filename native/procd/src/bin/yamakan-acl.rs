@@ -1,25 +1,33 @@
 //! yamakan-acl — owner-only access for a Yamakan workspace on Windows.
 //!
 //!   yamakan-acl secure dir|file <path>
-//!       Sets a protected DACL granting full access only to the current user,
-//!       SYSTEM and Administrators (inherited by everything below a folder;
-//!       existing children are updated by the system). Prints
-//!       "OK changed" or "OK unchanged" (the DACL already matched).
+//!       Makes <path> private to the current user: the owner becomes the
+//!       current user and the DACL a protected list granting full access only
+//!       to the current user, SYSTEM and Administrators. For a folder, the
+//!       whole tree below is reset to inherit exactly that (explicit and
+//!       protected entries below are removed, owners set to the current
+//!       user), then every object below is checked. Refuses a path that is a
+//!       link or junction, and a path owned by another account (it could
+//!       rewrite the DACL whatever it says, and may hold handles opened
+//!       before). Prints "OK".
 //!   yamakan-acl describe <path>
-//!       Prints the DACL as JSON: {"protected":bool,"aces":[{"type","flags",
-//!       "mask","sid"}]}.
+//!       Prints {"owner","protected","aces":[{"type","flags","mask","sid"}]}.
 //!   yamakan-acl probe-other <path>
 //!       Opens <path> for reading under a restricted copy of this process's
 //!       token in which the current user and Administrators are deny-only and
-//!       privileges are removed: what another standard account of this
-//!       machine holds (Everyone, Users, Authenticated Users...). Prints
-//!       "ALLOWED" or "DENIED <error>". Diagnostic evidence for the boundary.
+//!       privileges are removed. It keeps every other group (Everyone, Users,
+//!       Authenticated Users, INTERACTIVE, this logon session), so it holds
+//!       at least what another standard account of this machine holds; a
+//!       denial is therefore conservative. Prints "ALLOWED" or
+//!       "DENIED <error>".
 //! Failures print "ERROR <code> <message>" and exit 1.
 //!
 //! Deliberately dependency-free: only the Windows API through hand-declared
 //! FFI, like yamakan-procd.
 
 use std::ffi::c_void;
+use std::os::windows::fs::MetadataExt;
+use std::path::Path;
 use std::ptr::null_mut;
 
 type Handle = *mut c_void;
@@ -27,13 +35,16 @@ type Bool = i32;
 type Psid = *mut c_void;
 
 const SE_FILE_OBJECT: i32 = 1;
+const OWNER_SECURITY_INFORMATION: u32 = 0x0000_0001;
 const DACL_SECURITY_INFORMATION: u32 = 0x0000_0004;
 const PROTECTED_DACL_SECURITY_INFORMATION: u32 = 0x8000_0000;
 const SE_DACL_PROTECTED: u16 = 0x1000;
 const ACL_REVISION: u32 = 2;
 const ACCESS_ALLOWED_ACE_TYPE: u8 = 0;
+const ACCESS_DENIED_ACE_TYPE: u8 = 1;
 const OBJECT_INHERIT_ACE: u32 = 0x1;
 const CONTAINER_INHERIT_ACE: u32 = 0x2;
+const INHERITED_ACE: u8 = 0x10;
 const FILE_ALL_ACCESS: u32 = 0x001F_01FF;
 const TOKEN_ASSIGN_PRIMARY: u32 = 0x0001;
 const TOKEN_DUPLICATE: u32 = 0x0002;
@@ -49,8 +60,13 @@ const GENERIC_READ: u32 = 0x8000_0000;
 const FILE_SHARE_ALL: u32 = 0x7;
 const OPEN_EXISTING: u32 = 3;
 const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+const PROGRESS_INVOKE_NEVER: i32 = 1;
 const INVALID_HANDLE_VALUE: Handle = -1isize as Handle;
 const SECURITY_MAX_SID_SIZE: usize = 68;
+const ERROR_ACCESS_DENIED: u32 = 5;
+const ERROR_NOT_SUPPORTED: u32 = 50;
+const ERROR_INVALID_OWNER: u32 = 1307;
 
 #[repr(C)]
 struct SidAndAttributes {
@@ -109,6 +125,19 @@ extern "system" {
         dacl: *mut c_void,
         sacl: *mut c_void,
     ) -> u32;
+    fn TreeResetNamedSecurityInfoW(
+        name: *mut u16,
+        kind: i32,
+        info: u32,
+        owner: Psid,
+        group: Psid,
+        dacl: *mut c_void,
+        sacl: *mut c_void,
+        keep_explicit: Bool,
+        progress: *mut c_void,
+        invoke: i32,
+        args: *mut c_void,
+    ) -> u32;
     fn GetNamedSecurityInfoW(
         name: *const u16,
         kind: i32,
@@ -160,6 +189,23 @@ impl Drop for Token {
     }
 }
 
+// A SID in an 8-byte aligned buffer.
+struct Sid(Vec<u64>);
+impl Sid {
+    fn copy_of(sid: Psid) -> Sid {
+        let length = unsafe { GetLengthSid(sid) } as usize;
+        let mut buffer = vec![0u64; length.div_ceil(8)];
+        unsafe { std::ptr::copy_nonoverlapping(sid as *const u8, buffer.as_mut_ptr() as *mut u8, length) };
+        Sid(buffer)
+    }
+    fn ptr(&mut self) -> Psid {
+        self.0.as_mut_ptr() as Psid
+    }
+    fn equals(&mut self, other: Psid) -> bool {
+        !other.is_null() && unsafe { EqualSid(self.ptr(), other) } != 0
+    }
+}
+
 fn process_token(access: u32) -> Token {
     let mut token: Handle = null_mut();
     if unsafe { OpenProcessToken(GetCurrentProcess(), access, &mut token) } == 0 {
@@ -168,32 +214,31 @@ fn process_token(access: u32) -> Token {
     Token(token)
 }
 
-// The current user's SID, copied into an owned buffer.
-fn user_sid() -> Vec<u8> {
+fn user_sid() -> Sid {
     let token = process_token(TOKEN_QUERY);
     let mut needed = 0u32;
     unsafe { GetTokenInformation(token.0, TOKEN_USER_CLASS, null_mut(), 0, &mut needed) };
-    let mut buffer = vec![0u8; needed as usize];
+    // TOKEN_USER starts with SID_AND_ATTRIBUTES; an 8-byte aligned buffer.
+    let mut buffer = vec![0u64; (needed as usize).div_ceil(8)];
     if unsafe { GetTokenInformation(token.0, TOKEN_USER_CLASS, buffer.as_mut_ptr() as *mut c_void, needed, &mut needed) } == 0 {
         fail("GetTokenInformation", unsafe { GetLastError() });
     }
-    // TOKEN_USER starts with SID_AND_ATTRIBUTES { PSID Sid; DWORD Attributes; }.
-    let sid = unsafe { (*(buffer.as_ptr() as *const SidAndAttributes)).sid };
-    let length = unsafe { GetLengthSid(sid) } as usize;
-    unsafe { std::slice::from_raw_parts(sid as *const u8, length) }.to_vec()
+    Sid::copy_of(unsafe { (*(buffer.as_ptr() as *const SidAndAttributes)).sid })
 }
 
-fn well_known_sid(kind: i32) -> Vec<u8> {
-    let mut buffer = vec![0u8; SECURITY_MAX_SID_SIZE];
+fn well_known_sid(kind: i32) -> Sid {
+    let mut buffer = vec![0u64; SECURITY_MAX_SID_SIZE.div_ceil(8)];
     let mut size = SECURITY_MAX_SID_SIZE as u32;
     if unsafe { CreateWellKnownSid(kind, null_mut(), buffer.as_mut_ptr() as Psid, &mut size) } == 0 {
         fail("CreateWellKnownSid", unsafe { GetLastError() });
     }
-    buffer.truncate(size as usize);
-    buffer
+    Sid(buffer)
 }
 
 fn sid_text(sid: Psid) -> String {
+    if sid.is_null() {
+        return String::from("?");
+    }
     let mut text: *mut u16 = null_mut();
     if unsafe { ConvertSidToStringSidW(sid, &mut text) } == 0 {
         return String::from("?");
@@ -209,6 +254,7 @@ fn sid_text(sid: Psid) -> String {
 
 struct Descriptor {
     memory: *mut c_void,
+    owner: Psid,
     dacl: *mut c_void,
 }
 impl Drop for Descriptor {
@@ -217,15 +263,17 @@ impl Drop for Descriptor {
     }
 }
 
-fn read_dacl(path: &[u16]) -> Descriptor {
+fn read_security(path: &str) -> Result<Descriptor, u32> {
+    let name = wide(path);
+    let mut owner: Psid = null_mut();
     let mut dacl: *mut c_void = null_mut();
     let mut memory: *mut c_void = null_mut();
     let code = unsafe {
         GetNamedSecurityInfoW(
-            path.as_ptr(),
+            name.as_ptr(),
             SE_FILE_OBJECT,
-            DACL_SECURITY_INFORMATION,
-            null_mut(),
+            OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+            &mut owner,
             null_mut(),
             &mut dacl,
             null_mut(),
@@ -233,9 +281,9 @@ fn read_dacl(path: &[u16]) -> Descriptor {
         )
     };
     if code != 0 {
-        fail("GetNamedSecurityInfo", code);
+        return Err(code);
     }
-    Descriptor { memory, dacl }
+    Ok(Descriptor { memory, owner, dacl })
 }
 
 fn protected(descriptor: &Descriptor) -> bool {
@@ -245,7 +293,8 @@ fn protected(descriptor: &Descriptor) -> bool {
     control & SE_DACL_PROTECTED != 0
 }
 
-// (type, flags, mask, sid pointer) of each ACE.
+// (type, flags, mask, sid) of each ACE. The SID is read only for allow and
+// deny entries, whose layout puts it at byte 8; other kinds report none.
 fn aces(descriptor: &Descriptor) -> Vec<(u8, u8, u32, Psid)> {
     if descriptor.dacl.is_null() {
         return Vec::new();
@@ -258,16 +307,78 @@ fn aces(descriptor: &Descriptor) -> Vec<(u8, u8, u32, Psid)> {
                 fail("GetAce", unsafe { GetLastError() });
             }
             let bytes = ace as *const u8;
-            unsafe {
-                (
-                    *bytes,
-                    *bytes.add(1),
-                    std::ptr::read_unaligned(bytes.add(4) as *const u32),
-                    bytes.add(8) as Psid,
-                )
-            }
+            let kind = unsafe { *bytes };
+            let sid = if kind == ACCESS_ALLOWED_ACE_TYPE || kind == ACCESS_DENIED_ACE_TYPE {
+                unsafe { bytes.add(8) as Psid }
+            } else {
+                null_mut()
+            };
+            unsafe { (kind, *bytes.add(1), std::ptr::read_unaligned(bytes.add(4) as *const u32), sid) }
         })
         .collect()
+}
+
+fn is_reparse(path: &Path) -> bool {
+    match std::fs::symlink_metadata(path) {
+        Ok(meta) => meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0,
+        Err(_) => fail("cannot read the path", ERROR_NOT_SUPPORTED),
+    }
+}
+
+// Whether an object below the root is owned by the user, unprotected, and
+// holds exactly the three grants, all inherited.
+fn conforms(path: &str, sids: &mut [Sid; 3]) -> bool {
+    let Ok(descriptor) = read_security(path) else { return false };
+    if !sids[0].equals(descriptor.owner) || protected(&descriptor) {
+        return false;
+    }
+    let entries = aces(&descriptor);
+    entries.len() == sids.len()
+        && entries.iter().all(|&(kind, flags, mask, _)| {
+            kind == ACCESS_ALLOWED_ACE_TYPE && flags & INHERITED_ACE != 0 && mask == FILE_ALL_ACCESS
+        })
+        && sids.iter_mut().all(|sid| entries.iter().any(|&(_, _, _, ace_sid)| sid.equals(ace_sid)))
+}
+
+// Every object below `dir` conforms; links and junctions below are refused.
+// Makes the current user the owner of `path` when it is not (setting an
+// owner needs WRITE_OWNER, which the owner-only DACL now grants).
+fn take_ownership(path: &str, user: &mut Sid) -> bool {
+    let Ok(current) = read_security(path) else { return false };
+    if user.equals(current.owner) {
+        return true;
+    }
+    drop(current);
+    let mut name = wide(path);
+    (unsafe {
+        SetNamedSecurityInfoW(name.as_mut_ptr(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, user.ptr(), null_mut(), null_mut(), null_mut())
+    }) == 0
+}
+
+fn verify_tree(dir: &Path, sids: &mut [Sid; 3], bad: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        bad.push(dir.display().to_string());
+        return;
+    };
+    for entry in entries {
+        let Ok(entry) = entry else { continue };
+        let path = entry.path();
+        let text = path.display().to_string();
+        let Ok(meta) = std::fs::symlink_metadata(&path) else {
+            bad.push(text);
+            continue;
+        };
+        if meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+            || !take_ownership(&text, &mut sids[0])
+            || !conforms(&text, sids)
+        {
+            bad.push(text);
+            continue;
+        }
+        if meta.is_dir() {
+            verify_tree(&path, sids, bad);
+        }
+    }
 }
 
 fn secure(kind: &str, path: &str) {
@@ -276,25 +387,17 @@ fn secure(kind: &str, path: &str) {
         "file" => 0,
         _ => fail("kind must be dir or file", 87),
     };
+    if is_reparse(Path::new(path)) {
+        fail("the path is a link or junction", ERROR_NOT_SUPPORTED);
+    }
     let mut sids = [user_sid(), well_known_sid(WIN_LOCAL_SYSTEM_SID), well_known_sid(WIN_BUILTIN_ADMINISTRATORS_SID)];
-    let mut name = wide(path);
-    // Unchanged when the DACL is already exactly these three protected grants.
-    let current = read_dacl(&name);
-    let entries = aces(&current);
-    let matches = protected(&current)
-        && entries.len() == sids.len()
-        && sids.iter_mut().all(|sid| {
-            entries.iter().any(|&(kind, ace_flags, mask, ace_sid)| {
-                kind == ACCESS_ALLOWED_ACE_TYPE
-                    && ace_flags as u32 == flags
-                    && mask == FILE_ALL_ACCESS
-                    && unsafe { EqualSid(ace_sid, sid.as_mut_ptr() as Psid) } != 0
-            })
-        });
-    drop(current);
-    if matches {
-        println!("OK unchanged");
-        return;
+    // Another account's folder is never adopted: its owner keeps the right
+    // to rewrite the DACL, and handles it opened before keep their access.
+    {
+        let current = read_security(path).unwrap_or_else(|code| fail("GetNamedSecurityInfo", code));
+        if !sids.iter_mut().any(|sid| sid.equals(current.owner)) {
+            fail(&format!("owned by another account ({})", sid_text(current.owner)), ERROR_INVALID_OWNER);
+        }
     }
     let mut acl = vec![0u64; 128]; // 1 KiB, aligned for the ACL header
     let size = (acl.len() * 8) as u32;
@@ -303,29 +406,61 @@ fn secure(kind: &str, path: &str) {
         fail("InitializeAcl", unsafe { GetLastError() });
     }
     for sid in sids.iter_mut() {
-        if unsafe { AddAccessAllowedAceEx(acl_ptr, ACL_REVISION, flags, FILE_ALL_ACCESS, sid.as_mut_ptr() as Psid) } == 0 {
+        if unsafe { AddAccessAllowedAceEx(acl_ptr, ACL_REVISION, flags, FILE_ALL_ACCESS, sid.ptr()) } == 0 {
             fail("AddAccessAllowedAceEx", unsafe { GetLastError() });
         }
     }
-    let code = unsafe {
-        SetNamedSecurityInfoW(
-            name.as_mut_ptr(),
-            SE_FILE_OBJECT,
-            DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-            null_mut(),
-            null_mut(),
-            acl_ptr,
-            null_mut(),
-        )
+    let mut name = wide(path);
+    // The DACL first (an owner may always rewrite it); owners follow once
+    // the new DACL grants this user full control.
+    let info = DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION;
+    let owner = null_mut();
+    let code = if kind == "dir" {
+        // The root gets the protected DACL; everything below is reset to
+        // inherit it only (explicit and protected entries removed).
+        unsafe {
+            TreeResetNamedSecurityInfoW(
+                name.as_mut_ptr(),
+                SE_FILE_OBJECT,
+                info,
+                owner,
+                null_mut(),
+                acl_ptr,
+                null_mut(),
+                0,
+                null_mut(),
+                PROGRESS_INVOKE_NEVER,
+                null_mut(),
+            )
+        }
+    } else {
+        unsafe { SetNamedSecurityInfoW(name.as_mut_ptr(), SE_FILE_OBJECT, info, owner, null_mut(), acl_ptr, null_mut()) }
     };
     if code != 0 {
-        fail("SetNamedSecurityInfo", code);
+        fail("SetSecurityInfo", code);
     }
-    println!("OK changed");
+    if !take_ownership(path, &mut sids[0]) {
+        fail("could not take ownership", ERROR_ACCESS_DENIED);
+    }
+    // The reset can report success without reaching every object: check.
+    let root = read_security(path).unwrap_or_else(|code| fail("GetNamedSecurityInfo", code));
+    let root_ok = sids[0].equals(root.owner) && protected(&root) && aces(&root).len() == 3;
+    drop(root);
+    if !root_ok {
+        fail("the folder did not take the owner-only access", ERROR_ACCESS_DENIED);
+    }
+    if kind == "dir" {
+        let mut bad = Vec::new();
+        verify_tree(Path::new(path), &mut sids, &mut bad);
+        if !bad.is_empty() {
+            fail(&format!("{} objects below did not take it, first: {}", bad.len(), bad[0]), ERROR_ACCESS_DENIED);
+        }
+    }
+    println!("OK");
 }
 
 fn describe(path: &str) {
-    let descriptor = read_dacl(&wide(path));
+    let descriptor = read_security(path).unwrap_or_else(|code| fail("GetNamedSecurityInfo", code));
     let list: Vec<String> = aces(&descriptor)
         .into_iter()
         .map(|(kind, flags, mask, sid)| {
@@ -333,7 +468,8 @@ fn describe(path: &str) {
         })
         .collect();
     println!(
-        "{{\"protected\":{},\"null\":{},\"aces\":[{}]}}",
+        "{{\"owner\":\"{}\",\"protected\":{},\"null\":{},\"aces\":[{}]}}",
+        sid_text(descriptor.owner),
         protected(&descriptor),
         descriptor.dacl.is_null(),
         list.join(",")
@@ -345,8 +481,8 @@ fn probe_other(path: &str) {
     let mut admins = well_known_sid(WIN_BUILTIN_ADMINISTRATORS_SID);
     let token = process_token(TOKEN_DUPLICATE | TOKEN_QUERY | TOKEN_ASSIGN_PRIMARY);
     let mut disable = [
-        SidAndAttributes { sid: user.as_mut_ptr() as Psid, attributes: 0 },
-        SidAndAttributes { sid: admins.as_mut_ptr() as Psid, attributes: 0 },
+        SidAndAttributes { sid: user.ptr(), attributes: 0 },
+        SidAndAttributes { sid: admins.ptr(), attributes: 0 },
     ];
     let mut restricted: Handle = null_mut();
     if unsafe {

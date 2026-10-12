@@ -227,11 +227,18 @@ try {
   // (which holds a valid session cookie), can neither call the API nor
   // load media: it is same-site but not same-origin.
   const image = saved.assets.find((a) => a.kind === "image");
-  const probe = async ({ target, projectId, assetId }) => {
+  // The page's session (this tab's own storage; never a cookie).
+  const credentials = JSON.parse(
+    await page.evaluate(() => sessionStorage.getItem("yamakan.session")),
+  );
+  assert.deepEqual(await context.cookies(), [], "no cookie is ever set");
+  const probe = async ({ target, projectId, assetId, session, media }) => {
     const api = await fetch(`${target}/api/v1/call`, {
       method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Yamakan-Session": session,
+      },
       body: JSON.stringify({
         name: "yamakan.project.list",
         arguments: {},
@@ -240,31 +247,54 @@ try {
       (r) => `status ${r.status}`,
       () => "blocked",
     );
-    const media = await new Promise((done) => {
+    const image = await new Promise((done) => {
       const img = document.createElement("img");
       img.onload = () => done("loaded");
       img.onerror = () => done("refused");
-      img.src = `${target}/api/v1/projects/${projectId}/assets/${assetId}`;
+      img.src = `${target}/api/v1/projects/${projectId}/assets/${assetId}?media=${media}`;
     });
-    return { api, media };
+    return { api, media: image };
   };
-  const probeArgs = { target: url, projectId, assetId: image.id };
+  const probeArgs = {
+    target: url,
+    projectId,
+    assetId: image.id,
+    session: credentials.session,
+    media: credentials.media,
+  };
   // Control: from the Yamakan page itself the same requests succeed.
   assert.deepEqual(await page.evaluate(probe, probeArgs), {
     api: "status 200",
     media: "loaded",
   });
-  const neighbour = createServer((_, res) => {
+  // Every request the neighbour's server receives is recorded: none may
+  // carry Yamakan's session, media key or any cookie of Yamakan's.
+  const received = [];
+  const neighbour = createServer((req, res) => {
+    received.push(JSON.stringify({ url: req.url, headers: req.headers }));
     res.writeHead(200, { "Content-Type": "text/html" });
     res.end("<!doctype html><title>neighbour</title>");
   });
-  await new Promise((done) => neighbour.listen(port + 1, "127.0.0.1", done));
+  await new Promise((done) => neighbour.listen(0, "127.0.0.1", done));
+  const neighbourUrl = `http://127.0.0.1:${neighbour.address().port}`;
   try {
     const other = await context.newPage();
-    await other.goto(`http://127.0.0.1:${port + 1}/`);
+    await other.goto(`${neighbourUrl}/`);
+    // Even holding the real secrets, a page on another port is refused:
+    // the session header needs a preflight Yamakan never grants, and media
+    // reads from another port are same-site, not same-origin.
     const attempt = await other.evaluate(probe, probeArgs);
     assert.deepEqual(attempt, { api: "blocked", media: "refused" });
+    // The neighbour's own requests (a fetch and a navigation).
+    await other.evaluate((u) => fetch(`${u}/steal`), neighbourUrl);
+    await other.goto(`${neighbourUrl}/again`);
     await other.close();
+    assert.ok(received.length >= 3, "the neighbour saw its own requests");
+    for (const request of received) {
+      assert.ok(!request.includes(credentials.session), request);
+      assert.ok(!request.includes(credentials.media), request);
+      assert.doesNotMatch(request, /yamakan/i, request);
+    }
   } finally {
     neighbour.close();
   }
@@ -530,8 +560,8 @@ try {
     .waitFor();
   assert.equal((await getProject()).scenes[0].camera.shotScale, "close");
   await page.screenshot({ path: join(output, "arabic-interface.png") });
-  // Keyboard only, right to left: Tab reaches the Arabic backup button in
-  // reading order and Enter runs it.
+  // Keyboard only, right to left: Tab reaches the Arabic backup button and
+  // Enter runs it.
   let reached = false;
   for (let i = 0; i < 200 && !reached; i++) {
     await page.keyboard.press("Tab");

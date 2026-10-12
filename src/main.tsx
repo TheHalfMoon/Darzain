@@ -33,6 +33,7 @@ import {
   updateClips as applyClipUpdates,
 } from "./edit-ops.ts";
 import { YamakanClient, YamakanError } from "../sdk/client.ts";
+import { mediaUrl, sessionHeaders, startSession } from "./session.ts";
 import type {
   Operation,
   OperationInput,
@@ -42,7 +43,7 @@ import "./donors/film-editor/editor.css";
 import "./style.css";
 // The UI is a same-origin client of the shared command registry; its session
 // cookie identifies the browser-ui principal.
-const client = new YamakanClient();
+const client = new YamakanClient({ headers: sessionHeaders });
 // A status line: a message key (re-translated when the language changes)
 // or text from elsewhere (service errors), shown as given.
 type Status =
@@ -443,6 +444,7 @@ function App() {
                     const r = await fetch(`/api/v1/projects/${p.id}/assets`, {
                       method: "POST",
                       headers: {
+                        ...sessionHeaders(),
                         "X-Asset-Name": encodeURIComponent(file.name),
                       },
                       body: file,
@@ -497,7 +499,9 @@ function App() {
                   >
                     {a.kind === "image" && (
                       <img
-                        src={`/api/v1/projects/${p.id}/assets/${a.id}`}
+                        src={mediaUrl(
+                          `/api/v1/projects/${p.id}/assets/${a.id}`,
+                        )}
                         alt=""
                       />
                     )}
@@ -918,7 +922,7 @@ function App() {
                       {job.state === "COMPLETED" && (
                         <a
                           className="download"
-                          href={`/api/v1/jobs/${job.id}/artifact`}
+                          href={mediaUrl(`/api/v1/jobs/${job.id}/artifact`)}
                         >
                           {t("job.download")}
                         </a>
@@ -1010,22 +1014,6 @@ function App() {
 // The page starts in the chosen language and direction before React draws.
 document.documentElement.lang = initialLang();
 document.documentElement.dir = direction(initialLang());
-// The launch link carries a secret in its fragment (never sent to a server).
-// It is exchanged once for the session cookie and removed from the address
-// bar and history before the editor starts.
-async function startSession() {
-  const launch = /(?:^#|&)launch=([a-f0-9]{64})(?:&|$)/.exec(
-    location.hash,
-  )?.[1];
-  if (!launch) return;
-  history.replaceState(null, "", location.pathname + location.search);
-  await fetch("/api/v1/session", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ launch }),
-    credentials: "same-origin",
-  }).catch(() => {});
-}
 void startSession().finally(() =>
   createRoot(document.getElementById("root")!).render(<App />),
 );

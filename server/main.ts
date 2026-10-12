@@ -66,18 +66,24 @@ try {
 const lock = await acquireServiceLock(root);
 const store = new ProjectStore(root);
 await store.initialize();
-// Separate credentials: the browser session secret exists only in memory and in
-// an HttpOnly cookie; explicit local clients (CLI, MCP, SDK) read the bearer file.
-// The browser obtains its session only through the launch link, which is
-// written to an owner-only file (and printed here): opening the page alone
-// grants nothing, so another local process or account cannot get a session.
+// Separate credentials. Explicit local clients (CLI, MCP, SDK) read the
+// bearer token file. The browser page obtains its session only through the
+// launch link (an owner-only file): opening the page alone grants nothing.
+// No cookie is used: browsers send cookies to every port of 127.0.0.1, so
+// another local server would receive it. The page keeps the session in its
+// own per-origin storage and sends it as a header; media elements, which
+// cannot send headers, use a separate key that only reads media.
 const sessionToken = randomBytes(32).toString("hex");
+const mediaKey = randomBytes(32).toString("hex");
 const clientToken = randomBytes(32).toString("hex");
 const launchSecret = randomBytes(32).toString("hex");
 // Written fresh each start (a stale file keeps its old mode on POSIX).
 async function writeSecret(name: string, value: string) {
   const file = await safePath(root, name);
-  await unlink(file).catch(() => {});
+  await unlink(file).catch((e: NodeJS.ErrnoException) => {
+    if (e.code !== "ENOENT")
+      throw new Error(`The ${name} file could not be replaced: ${e.message}`);
+  });
   await writeFile(file, value, { mode: 0o600, flag: "wx" });
 }
 await writeSecret("token", clientToken);
@@ -86,10 +92,17 @@ await writeSecret("token", clientToken);
 const recoveryHome = path.resolve(env("RECOVERY") || defaultRecoveryHome(root));
 try {
   await assertSeparate(root, recoveryHome);
-  if (existsSync(recoveryHome)) await restrictToOwner(recoveryHome, "dir");
 } catch (e) {
   console.error(
     `The recovery folder must be outside the workspace: ${(e as Error).message}`,
+  );
+  process.exit(1);
+}
+try {
+  if (existsSync(recoveryHome)) await restrictToOwner(recoveryHome, "dir");
+} catch (e) {
+  console.error(
+    `The recovery folder could not be made private to this account: ${(e as Error).message}`,
   );
   process.exit(1);
 }
@@ -112,8 +125,13 @@ function sameToken(value: string, expected: string) {
     b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
 }
+// Media reads (asset bytes, previews, export downloads) are the only routes
+// the media key opens.
+const MEDIA_ROUTE =
+  /^\/api\/v1\/(projects\/[^/]+\/(assets\/[^/]+|preview)|jobs\/[^/]+\/artifact)$/;
 function authenticate(
   req: import("node:http").IncomingMessage,
+  url: URL,
 ): Principal | null {
   const authorization = req.headers.authorization;
   if (authorization !== undefined) {
@@ -122,17 +140,28 @@ function authenticate(
       ? principals["local-client"]
       : null;
   }
-  const cookie = /(?:^|; )yamakan=([a-f0-9]{64})(?:;|$)/.exec(
-    req.headers.cookie || "",
-  )?.[1];
-  if (!cookie || !sameToken(cookie, sessionToken)) return null;
-  // Cookie requests must come from the Yamakan page itself: state changes carry
-  // our exact Origin; reads reject other sites, including other loopback ports.
+  // Browser requests must come from the Yamakan page itself: state changes
+  // carry our exact Origin; reads reject other sites and loopback ports.
   const site = req.headers["sec-fetch-site"];
-  if (req.method !== "GET" && req.headers.origin !== origin) return null;
   if (site !== undefined && site !== "same-origin" && site !== "none")
     return null;
-  return principals["browser-ui"];
+  const session = req.headers["x-yamakan-session"];
+  if (typeof session === "string") {
+    if (!/^[a-f0-9]{64}$/.test(session) || !sameToken(session, sessionToken))
+      return null;
+    if (req.method !== "GET" && req.headers.origin !== origin) return null;
+    return principals["browser-ui"];
+  }
+  const media = url.searchParams.get("media");
+  if (
+    media !== null &&
+    req.method === "GET" &&
+    MEDIA_ROUTE.test(url.pathname) &&
+    /^[a-f0-9]{64}$/.test(media) &&
+    sameToken(media, mediaKey)
+  )
+    return principals["browser-ui"];
+  return null;
 }
 async function body(req: import("node:http").IncomingMessage, max: number) {
   const chunks: Buffer[] = [];
@@ -254,14 +283,10 @@ const server = createServer(async (req, res) => {
         return fail(
           new CommandError("UNAUTHENTICATED", "The launch link is not valid."),
         );
-      res.writeHead(204, {
-        "Set-Cookie": `yamakan=${sessionToken}; HttpOnly; SameSite=Strict; Path=/`,
-      });
-      res.end();
-      return;
+      return json(200, { session: sessionToken, media: mediaKey });
     }
     if (url.pathname.startsWith("/api/")) {
-      const principal = authenticate(req);
+      const principal = authenticate(req, url);
       if (!principal)
         return fail(
           new CommandError("UNAUTHENTICATED", "Authentication required."),
@@ -458,7 +483,7 @@ server.requestTimeout = 0;
 server.setTimeout(120_000);
 server.listen(port, "127.0.0.1", () =>
   console.log(
-    `Yamakan is running at ${origin}; workspace ${root}\nOpen Yamakan with this link (also saved in the workspace's launch file): ${launchUrl}`,
+    `Yamakan is running at ${origin}; workspace ${root}\nOpen Yamakan with the link in ${path.join(root, "launch")}`,
   ),
 );
 const close = async (code = 0) => {
