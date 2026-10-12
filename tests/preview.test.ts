@@ -434,3 +434,110 @@ test("the preview cache evicts least recently used entries; recency never holds 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("clips show picture on their first frame when the source start falls inside a source frame or a still starts off the 1/25 s grid", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "yamakan-preview-"));
+  const store = new ProjectStore(root);
+  try {
+    await store.initialize();
+    const created = await store.create("First frames");
+    const mp4 = path.join(root, "src25.mp4");
+    ffmpeg([
+      "-f",
+      "lavfi",
+      "-i",
+      `testsrc2=size=${W}x${H}:rate=25:duration=4`,
+      "-pix_fmt",
+      "yuv420p",
+      mp4,
+    ]);
+    const png = path.join(root, "still.png");
+    ffmpeg([
+      "-f",
+      "lavfi",
+      "-i",
+      `testsrc2=size=${W}x${H}`,
+      "-frames:v",
+      "1",
+      png,
+    ]);
+    const video = (
+      await store.importAsset(created.id, "src25.mp4", await readFile(mp4))
+    ).asset;
+    const { project, asset: still } = await store.importAsset(
+      created.id,
+      "still.png",
+      await readFile(png),
+    );
+    const track = project.tracks[0].id;
+    const saved = await store.save(
+      {
+        ...project,
+        width: W,
+        height: H,
+        clips: [
+          // Source starts 5 and 71 (in 30 fps units) fall inside 25 fps frames.
+          {
+            id: crypto.randomUUID(),
+            trackId: track,
+            assetId: video.id,
+            startFrame: 0,
+            durationFrames: 30,
+            sourceFrame: 5,
+            title: null,
+          },
+          {
+            id: crypto.randomUUID(),
+            trackId: track,
+            assetId: video.id,
+            startFrame: 30,
+            durationFrames: 30,
+            sourceFrame: 71,
+            title: null,
+          },
+          // A still starting on frame 63 (2.1 s, off the 1/25 s grid).
+          {
+            id: crypto.randomUUID(),
+            trackId: track,
+            assetId: still.id,
+            startFrame: 63,
+            durationFrames: 12,
+            sourceFrame: 0,
+            title: null,
+          },
+        ],
+      },
+      project.revision,
+    );
+    const exported = await renderRevision(
+      store,
+      saved.id,
+      saved.revision,
+      ["exports", "first"],
+      new AbortController().signal,
+      () => {},
+    );
+    const mean = (pixels: Buffer) =>
+      pixels.reduce((sum, v) => sum + v, 0) / pixels.length;
+    // Control: the gap before the still (frames 60–62) is black.
+    assert.ok(mean(gray(exported.output, 61)) < 5, "gap is black");
+    for (const frame of [0, 30, 63, 74]) {
+      const fromExport = gray(exported.output, frame);
+      assert.ok(mean(fromExport) > 40, `export frame ${frame} shows picture`);
+      const shown = await preview(
+        store,
+        saved.id,
+        saved.revision,
+        "frame",
+        frame,
+      );
+      assert.ok(
+        psnr(gray(shown.file), fromExport) > 35,
+        `preview frame ${frame}`,
+      );
+    }
+  } finally {
+    store.close();
+    await rm(root, { recursive: true, force: true, maxRetries: 5 });
+  }
+});

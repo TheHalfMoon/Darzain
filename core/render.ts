@@ -131,7 +131,7 @@ export function ptsOffset(ticks: number) {
 
 // Version of how this module draws a plan. Bump it whenever the drawing
 // changes, so cached previews of unchanged plans are not reused.
-export const RENDERER_VERSION = 2;
+export const RENDERER_VERSION = 3;
 
 // One frame of the 30 fps profile, in flicks.
 const FRAME = FLICKS_PER_SECOND / 30;
@@ -309,25 +309,37 @@ export async function renderPlan(
       const end = seconds(to);
       const clip = `c${n}`,
         next = `v${n++}`;
+      // Clips are placed in a time base of one tick per flick, so the
+      // offset is exact whatever the source's own time base (a looped still
+      // counts in 1/25 s; a rounded offset there could skip a frame).
+      const flicks = `settb=1/${FLICKS_PER_SECOND}`;
       let timed: string;
       if (layer.kind === "image") {
         // A still: one frame looped for the clip's part of the window, cut
         // one frame long and ended by the overlay's enable window.
         const cut = seconds(to - from + FRAME);
         const index = await input(layer, ["-loop", "1", "-t", cut]);
-        timed = `[${index}:v]trim=duration=${cut},setpts=PTS-STARTPTS+${ptsOffset(from)}`;
+        timed = `[${index}:v]trim=duration=${cut},${flicks},setpts=PTS-STARTPTS+(${from})`;
       } else {
         // Every source frame keeps its own timeline time, clip start plus
         // its distance from the clip's source start, in export and in any
         // window alike, so the frame-rate filter picks the same source frame
-        // for each output frame at any source rate. A window reads from up
-        // to two frames earlier (never before the clip) so the frame shown at
-        // its start is available; the overlay's enable window hides them.
-        const lead = Math.min(from - layer.startTicks, 2 * FRAME);
-        const seek = layer.sourceStartTicks + (from - layer.startTicks) - lead;
+        // for each output frame at any source rate. Reading starts up to two
+        // frames early (never before the source's first frame), so the frame
+        // covering the clip's or window's first instant is always read, even
+        // when that instant falls inside a source frame; frames before the
+        // clip or window get earlier (even negative) times and the overlay's
+        // enable window hides them.
+        const offset = layer.sourceStartTicks + (from - layer.startTicks);
+        const lead = Math.min(offset, 2 * FRAME);
         const span = seconds(to - from + lead + FRAME);
-        const index = await input(layer, ["-ss", seconds(seek), "-t", span]);
-        timed = `[${index}:v]trim=duration=${span},setpts=PTS+${ptsOffset(from - lead)}`;
+        const index = await input(layer, [
+          "-ss",
+          seconds(offset - lead),
+          "-t",
+          span,
+        ]);
+        timed = `[${index}:v]trim=duration=${span},${flicks},setpts=PTS+(${from - lead})`;
       }
       filters.push(
         `${timed},fps=${rate},scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,setsar=1[${clip}]`,

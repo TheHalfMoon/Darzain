@@ -36,7 +36,16 @@ export function ReferencePreview(props: Props) {
   const [failed, setFailed] = useState<string | null>(null);
   const [segment, setSegment] = useState<string | null>(null);
   const base = `/api/v1/projects/${encodeURIComponent(projectId)}/preview?revision=${revision}`;
-  const src = `${base}&kind=frame&start=${settled}`;
+  // A failed frame (busy renderer, transient error) is asked for again a
+  // few times; the attempt number only changes the address.
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => setAttempt(0), [base, settled]);
+  const src = `${base}&kind=frame&start=${settled}${attempt ? `&attempt=${attempt}` : ""}`;
+  useEffect(() => {
+    if (failed !== src || attempt >= 3) return;
+    const timer = setTimeout(() => setAttempt((n) => n + 1), 1500);
+    return () => clearTimeout(timer);
+  }, [failed, src, attempt]);
   useEffect(() => setSegment(null), [projectId, revision]);
   if (totalFrames < 1)
     return (

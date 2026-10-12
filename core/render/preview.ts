@@ -148,7 +148,12 @@ export async function preview(
     frames: count,
     cached,
   });
-  let pending = inFlight.get(file);
+  // A render everyone left is never joined: a new request starts afresh.
+  const live = () => {
+    const entry = inFlight.get(file);
+    return entry && !entry.controller.signal.aborted ? entry : undefined;
+  };
+  let pending = live();
   if (!pending) {
     const hit = await stat(file).catch(() => null);
     if (hit?.isFile()) {
@@ -156,7 +161,7 @@ export async function preview(
       await utimes(file, now, now).catch(() => {});
       return result(true);
     }
-    pending = inFlight.get(file);
+    pending = live();
   }
   if (!pending) {
     if (waiting >= RESOURCE_POLICY.enforced.previewQueueDepth)
