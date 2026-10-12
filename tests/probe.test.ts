@@ -1,12 +1,18 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { probe } from "../core/media.ts";
 import { mediaTools } from "../core/process/workers.ts";
 import { CommandError } from "../core/command/errors.ts";
+
+// Every test folder is removed when the file's tests finish.
+const bases: string[] = [];
+after(() =>
+  Promise.all(bases.map((b) => rm(b, { recursive: true, force: true }))),
+);
 
 const ffmpeg = (args: string[]) =>
   execFileSync(
@@ -19,6 +25,7 @@ const ffmpeg = (args: string[]) =>
 
 test("owned probes identify constant and variable frame rate and record time bases", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "yamakan-probe-"));
+  bases.push(dir);
   const cfr = path.join(dir, "cfr.mp4");
   const vfr = path.join(dir, "vfr.mp4");
   ffmpeg([
@@ -55,6 +62,7 @@ test("owned probes identify constant and variable frame rate and record time bas
 
 test("unreadable media fails as MEDIA_INVALID without echoing paths or stderr", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "yamakan-probe-bad-"));
+  bases.push(dir);
   const bad = path.join(dir, "broken.mp4");
   await writeFile(
     bad,

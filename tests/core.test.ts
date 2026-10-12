@@ -1,6 +1,6 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, symlink, access } from "node:fs/promises";
+import { mkdtemp, readFile, symlink, access, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -13,9 +13,19 @@ import { safePath } from "../core/paths.ts";
 import { CreativeAPI } from "../server/api.ts";
 import { canonicalJson } from "../core/donors/ninerr/canonical.ts";
 const ffmpeg = process.env.DARZAIN_FFMPEG || "ffmpeg";
+// Every test folder is removed when the file's tests finish, after the
+// stores and queues opened in it close (Windows cannot delete them open).
+const bases: string[] = [];
+const handles: { close(): unknown }[] = [];
+after(async () => {
+  for (const handle of handles.reverse()) await handle.close();
+  await Promise.all(bases.map((b) => rm(b, { recursive: true, force: true })));
+});
 async function fixture() {
   const root = await mkdtemp(path.join(tmpdir(), "darzain-test-"));
+  bases.push(root);
   const store = new ProjectStore(root);
+  handles.push(store);
   await store.initialize();
   const project = await store.create("Cinematic product");
   return { root, store, project };
@@ -134,11 +144,13 @@ test("project import, scene, timeline, title, audio, render and reopen preserve 
   const out = await readFile(output);
   assert.ok(out.length > 1000);
   const second = new ProjectStore(root);
+  handles.push(second);
   await second.initialize();
   const reopened = await second.load(p.id);
   assert.deepEqual(reopened, saved);
   assert.equal(reopened.scenes[0].camera.focalLengthMm, 85);
   const api = new CreativeAPI(second);
+  handles.push(api.queue);
   assert.deepEqual(
     await api.call("darzain.project.open", { projectId: p.id }),
     saved,
@@ -205,6 +217,7 @@ test("malicious paths, disguised playlists, schema versions and missing referenc
   );
   assert.throws(() => canonicalJson({ n: Infinity }));
   const outside = await mkdtemp(path.join(tmpdir(), "darzain-outside-"));
+  bases.push(outside);
   await symlink(
     outside,
     path.join(root, "linked"),
@@ -216,6 +229,7 @@ test("corrupt asset or snapshot fails integrity validation without silent rewrit
   const { store, project } = await fixture();
   // Tamper with the committed snapshot bytes through an independent connection.
   const db = new DatabaseSync(path.join(store.root, "workspace.sqlite"));
+  handles.push({ close: () => db.isOpen && db.close() });
   db.prepare(
     "UPDATE snapshots SET bytes = ?, byte_length = 2 WHERE hash = (SELECT snapshot_hash FROM projects WHERE project_id = ?)",
   ).run(Buffer.from("{}"), project.id);
@@ -236,6 +250,7 @@ test("corrupt asset or snapshot fails integrity validation without silent rewrit
 test("unknown tools and injected call keys are rejected", async () => {
   const { store, project } = await fixture();
   const api = new CreativeAPI(store);
+  handles.push(api.queue);
   await assert.rejects(
     api.call("run_command", { cmd: "whoami" }),
     /Unknown operation/,
@@ -250,6 +265,7 @@ test("unknown tools and injected call keys are rejected", async () => {
 test("render queue submissions are idempotent and queued cancellation is terminal", async () => {
   const { store, project } = await fixture();
   const queue = new JobSupervisor(store);
+  handles.push(queue);
   const one = await queue.submit(project.id, "same");
   const two = await queue.submit(project.id, "same");
   assert.equal(one.id, two.id);

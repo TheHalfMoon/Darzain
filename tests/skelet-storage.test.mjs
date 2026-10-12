@@ -12,14 +12,20 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, relative, basename, isAbsolute } from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 import {
   LocalContentAddressedStorage,
   StorageError,
 } from "../core/donors/skelet/storage.ts";
 
+// Tests remove their own folders; these catch what a failed test leaves.
+const bases = [];
+after(() =>
+  Promise.all(bases.map((b) => rm(b, { recursive: true, force: true }))),
+);
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "skelet-storage-"));
+  bases.push(root);
   const storage = new LocalContentAddressedStorage({
     rootDir: root,
     maxBytes: 4 * 1024 * 1024,
@@ -204,6 +210,7 @@ test("garbage collection touches only older UUID-named temporary files", async (
 test("storage root and hash directories reject symlink escape where supported", async (t) => {
   const { root, storage, close } = await fixture();
   const outside = await mkdtemp(join(tmpdir(), "skelet-outside-"));
+  bases.push(outside);
   try {
     await mkdir(root, { recursive: true });
     try {

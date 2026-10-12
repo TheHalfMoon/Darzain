@@ -1,15 +1,23 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { fork, spawn } from "node:child_process";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { once } from "node:events";
 import { createInterface } from "node:readline";
 
+// Every test folder is removed when the file's tests finish; each test
+// waits for its server to exit first.
+const bases: string[] = [];
+after(() =>
+  Promise.all(bases.map((b) => rm(b, { recursive: true, force: true }))),
+);
+
 test("MCP stdio exposes registry tools and runs the shared command path", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-mcp-"));
+  bases.push(root);
   const port = 24319;
   const env = {
     ...process.env,

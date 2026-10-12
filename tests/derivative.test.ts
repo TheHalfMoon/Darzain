@@ -1,7 +1,7 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readdir, readFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { ProjectStore } from "../core/store.ts";
@@ -16,13 +16,24 @@ const ffmpeg = (args: string[]) =>
     { windowsHide: true },
   );
 
+// Every test folder is removed when the file's tests finish, after the
+// stores and queues opened in it close (Windows cannot delete them open).
+const bases: string[] = [];
+const handles: { close(): unknown }[] = [];
+after(async () => {
+  for (const handle of handles.reverse()) await handle.close();
+  await Promise.all(bases.map((b) => rm(b, { recursive: true, force: true })));
+});
+
 // A two-second variable-frame-rate clip with audio, optionally odd-sized or
 // carrying a display rotation (as phone video does).
 async function vfrWorkspace(
   options: { size?: string; rotate?: number; pixFmt?: string } = {},
 ) {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-vfr-"));
+  bases.push(root);
   const store = new ProjectStore(root);
+  handles.push(store);
   await store.initialize();
   const project = await store.create("Variable frame rate");
   const vfr = path.join(root, "vfr.mp4");

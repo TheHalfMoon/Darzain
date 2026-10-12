@@ -1,8 +1,8 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { fork, spawnSync } from "node:child_process";
 import { once } from "node:events";
-import { access, mkdtemp, readdir } from "node:fs/promises";
+import { access, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,9 +12,19 @@ import type { SupervisorOptions } from "../core/jobs.ts";
 import { CommandError } from "../core/command/errors.ts";
 import { workers } from "../core/process/workers.ts";
 
+// Every test folder is removed when the file's tests finish, after the
+// stores and queues opened in it close (Windows cannot delete them open).
+const bases: string[] = [];
+const handles: { close(): unknown }[] = [];
+after(async () => {
+  for (const handle of handles.reverse()) await handle.close();
+  await Promise.all(bases.map((b) => rm(b, { recursive: true, force: true })));
+});
 async function workspace(frames = 30, width = 320) {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-jobs-"));
+  bases.push(root);
   const store = new ProjectStore(root);
+  handles.push(store);
   await store.initialize();
   const created = await store.create("Jobs");
   const project = await store.save(
@@ -342,6 +352,7 @@ test(
     );
     const [{ jobId }] = (await once(child, "message")) as [{ jobId: string }];
     const observer = new ProjectStore(root);
+    handles.push(observer);
     await observer.initialize();
     let pid = 0;
     for (let t = 0; t < 30000 && !pid; t += 20) {

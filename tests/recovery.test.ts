@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import {
   mkdtemp,
@@ -7,6 +7,7 @@ import {
   unlink,
   readdir,
   rename,
+  rm,
 } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
@@ -15,8 +16,14 @@ import { execFileSync } from "node:child_process";
 import { LegacyProjectStore as ProjectStore } from "../core/legacy-store.ts";
 import { ProjectSchema } from "../core/project.ts";
 
+// Every test folder is removed when the file's tests finish.
+const bases: string[] = [];
+after(() =>
+  Promise.all(bases.map((b) => rm(b, { recursive: true, force: true }))),
+);
 async function fixture() {
   const root = await mkdtemp(path.join(tmpdir(), "darzain-recovery-"));
+  bases.push(root);
   const store = new ProjectStore(root);
   await store.initialize();
   return { root, store, project: await store.create("Original") };

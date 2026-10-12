@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
@@ -25,6 +25,15 @@ import { mediaTools } from "../core/process/workers.ts";
 import { CommandError } from "../core/command/errors.ts";
 import { RESOURCE_POLICY } from "../core/command/policy.ts";
 
+// Tests remove their own folders; these catch what a failed setup leaves,
+// after its store closes (Windows cannot delete an open database).
+const bases: string[] = [];
+const handles: { close(): unknown }[] = [];
+after(async () => {
+  for (const handle of handles.reverse()) await handle.close();
+  await Promise.all(bases.map((b) => rm(b, { recursive: true, force: true })));
+});
+
 const W = 320;
 const H = 180;
 
@@ -41,7 +50,9 @@ const ffmpeg = (args: string[]) =>
 // throughout and a title covers frames 45–74 on its own track.
 async function workspace(rate = "30") {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-preview-"));
+  bases.push(root);
   const store = new ProjectStore(root);
+  handles.push(store);
   await store.initialize();
   const created = await store.create("Preview");
   const mp4 = path.join(root, "src.mp4");
@@ -392,6 +403,7 @@ test("previews refuse invalid windows and segments beyond the limit", async () =
 
 test("the preview cache evicts least recently used entries; recency never holds it above twice its bound", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "yamakan-preview-cache-"));
+  bases.push(dir);
   try {
     await mkdir(dir, { recursive: true });
     const names = ["a", "b", "c", "d"].map((c) =>
@@ -437,7 +449,9 @@ test("the preview cache evicts least recently used entries; recency never holds 
 
 test("clips show picture on their first frame when the source start falls inside a source frame or a still starts off the 1/25 s grid", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-preview-"));
+  bases.push(root);
   const store = new ProjectStore(root);
+  handles.push(store);
   try {
     await store.initialize();
     const created = await store.create("First frames");
