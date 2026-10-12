@@ -227,6 +227,27 @@ try {
     "Locked duplication must not add a clip",
   );
   await page.getByTitle("Unlock track (Alt+L)").first().click();
+  // Reference preview: the saved revision's frame, rendered by the export's
+  // plan compiler, and marked stale while the unlock is unsaved.
+  await page.getByText(/Stale: save to include your latest edits/).waitFor();
+  await page.waitForFunction(
+    () => {
+      const img = document.querySelector(".reference img");
+      return (
+        img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0
+      );
+    },
+    null,
+    { timeout: 60000 },
+  );
+  const referenceSrc = await page.locator(".reference img").getAttribute("src");
+  const referenceResponse = await page.request.get(
+    new URL(referenceSrc, url).href,
+  );
+  assert.equal(referenceResponse.ok(), true);
+  assert.equal(referenceResponse.headers()["content-type"], "image/png");
+  const referencePlanHash = referenceResponse.headers()["x-plan-hash"];
+  assert.match(referencePlanHash, /^[a-f0-9]{64}$/);
   await page.getByRole("button", { name: "Play", exact: true }).click();
   await page.waitForTimeout(500);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
@@ -440,6 +461,7 @@ try {
       "locked duplicate rejection",
       "save",
       "preview",
+      "reference preview frame (plan-compiled) with stale notice",
       "export",
       "download",
       "reload",
@@ -456,6 +478,7 @@ try {
     focalLengthMm: 85,
     clipsAfterSplit: 4,
     overlappingAudioOffsets: audioTimes,
+    referencePlanHash,
     pageErrors: errors,
     artifactBytes: bytes.length,
   };

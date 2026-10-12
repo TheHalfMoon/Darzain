@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fork, execFileSync } from "node:child_process";
-import { mkdtemp, readFile, access } from "node:fs/promises";
+import { mkdtemp, readFile, access, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -422,5 +422,103 @@ test("a VFR upload returns 202 with a conversion job; the converted asset joins 
       child.send("shutdown");
       await done;
     }
+  }
+});
+
+test("the preview route serves plan-compiled frames and segments to authenticated clients only", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "yamakan-http-preview-"));
+  const port = 24321;
+  const origin = `http://127.0.0.1:${port}`;
+  const script = fileURLToPath(new URL("../server/main.ts", import.meta.url));
+  const child = fork(script, [], {
+    env: {
+      ...process.env,
+      YAMAKAN_WORKSPACE: root,
+      YAMAKAN_PORT: String(port),
+    },
+    silent: true,
+    windowsHide: true,
+  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("Server startup timeout")),
+        10000,
+      );
+      child.stdout?.on("data", (chunk) => {
+        if (String(chunk).includes("Yamakan is running")) {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+    });
+    const token = await readFile(path.join(root, "token"), "utf8");
+    const auth = { Authorization: `Bearer ${token}` };
+    const call = async (name: string, args: unknown) =>
+      (
+        await (
+          await fetch(`${origin}/api/v1/call`, {
+            method: "POST",
+            headers: { ...auth, "Content-Type": "application/json" },
+            body: JSON.stringify({ name, arguments: args }),
+          })
+        ).json()
+      ).result;
+    const created = await call("yamakan.project.create", { name: "Preview" });
+    const saved = await call("yamakan.project.save", {
+      project: {
+        ...created,
+        width: 320,
+        height: 180,
+        clips: [
+          {
+            id: crypto.randomUUID(),
+            trackId: created.tracks[0].id,
+            assetId: null,
+            startFrame: 0,
+            durationFrames: 60,
+            sourceFrame: 0,
+            title: "Preview",
+          },
+        ],
+      },
+      expectedRevision: created.revision,
+    });
+    const at = (query: string) =>
+      `${origin}/api/v1/projects/${saved.id}/preview?revision=${saved.revision}&${query}`;
+    assert.equal((await fetch(at("start=10"))).status, 401);
+    const frame = await fetch(at("start=10"), { headers: auth });
+    assert.equal(frame.status, 200);
+    assert.equal(frame.headers.get("content-type"), "image/png");
+    assert.match(frame.headers.get("x-plan-hash") ?? "", /^[a-f0-9]{64}$/);
+    assert.equal(frame.headers.get("x-preview-cache"), "miss");
+    const bytes = Buffer.from(await frame.arrayBuffer());
+    assert.equal(bytes.subarray(1, 4).toString("latin1"), "PNG");
+    assert.equal(
+      (await fetch(at("start=10"), { headers: auth })).headers.get(
+        "x-preview-cache",
+      ),
+      "hit",
+    );
+    const segment = await fetch(at("kind=segment&start=0&frames=30"), {
+      headers: auth,
+    });
+    assert.equal(segment.status, 200);
+    assert.equal(segment.headers.get("content-type"), "video/mp4");
+    for (const bad of [
+      "start=-1",
+      "start=x",
+      "start=60",
+      "kind=gif&start=1",
+      "kind=segment&start=0&frames=151",
+    ])
+      assert.equal((await fetch(at(bad), { headers: auth })).status, 400, bad);
+  } finally {
+    if (child.exitCode === null) {
+      const done = once(child, "exit");
+      child.send("shutdown");
+      await done;
+    }
+    await rm(root, { recursive: true, force: true }).catch(() => {});
   }
 });

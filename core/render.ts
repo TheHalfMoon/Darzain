@@ -119,6 +119,16 @@ async function assertTitlesFit(
       );
 }
 
+// A timestamp offset of `ticks` in a stream's own time base, from exact
+// flicks and rounded to the nearest tick: setpts truncates its result, so a
+// truncated decimal could land a frame one tick (a whole frame at 30 fps)
+// early.
+export function ptsOffset(ticks: number) {
+  if (!Number.isSafeInteger(ticks) || ticks < 0)
+    throw new CommandError("VALIDATION", "Render time is out of range.");
+  return `floor(${ticks}/${FLICKS_PER_SECOND}/TB+0.5)`;
+}
+
 export type RenderReceipt = {
   planHash: string;
   width: number;
@@ -149,6 +159,15 @@ const aborted = (signal: AbortSignal) =>
 // FFmpeg worker under one wall-clock limit and returns the verified,
 // unpublished output and its receipt. Publication and the terminal job
 // state belong to the job supervisor.
+// What to render from a plan: a time window of it (the whole plan for an
+// export, one frame or a short segment for reference preview) as MP4 or as
+// a single PNG frame.
+export type RenderWindow = {
+  startTicks: number;
+  durationTicks: number;
+  output: "mp4" | "png";
+};
+
 export async function renderPlan(
   store: ProjectStore,
   plan: RenderPlan,
@@ -157,12 +176,33 @@ export async function renderPlan(
   signal: AbortSignal,
   onProgress: (value: number) => void,
   onCreated?: (pid: number) => void | Promise<void>,
+  window: RenderWindow = {
+    startTicks: 0,
+    durationTicks: plan.durationTicks,
+    output: "mp4",
+  },
 ): Promise<{ output: string; receipt: RenderReceipt }> {
   const { profile } = plan;
   const rate = `${profile.fps.num}/${profile.fps.den}`;
-  const total = seconds(plan.durationTicks);
+  const wStart = window.startTicks;
+  const wEnd = wStart + window.durationTicks;
+  if (
+    !Number.isSafeInteger(wStart) ||
+    !Number.isSafeInteger(window.durationTicks) ||
+    wStart < 0 ||
+    window.durationTicks < 1 ||
+    wEnd > plan.durationTicks
+  )
+    throw new CommandError(
+      "VALIDATION",
+      "The render window is outside the timeline.",
+    );
+  const total = seconds(window.durationTicks);
   const dir = await store.file(plan.projectId, ...staging);
-  const output = path.join(dir, "render.partial.mp4");
+  const output = path.join(
+    dir,
+    window.output === "png" ? "frame.partial.png" : "render.partial.mp4",
+  );
   // One limit covers the capability probe, the fit check and the render.
   const controller = new AbortController();
   const abort = () => controller.abort();
@@ -240,98 +280,133 @@ export async function renderPlan(
       );
       return inputs++;
     };
+    // Timestamps stay absolute (timeline time) through the graph, so the
+    // plan's title script times titles in any window; the output is reset
+    // to start at zero at the end.
     const filters = [
-      `color=c=black:s=${profile.width}x${profile.height}:r=${rate}:d=${total},format=yuv420p[base]`,
+      `color=c=black:s=${profile.width}x${profile.height}:r=${rate}:d=${total},setpts=PTS+${ptsOffset(wStart)},format=yuv420p[base]`,
     ];
     let visual = "base";
     let n = 0;
     for (const layer of plan.layers) {
-      const start = seconds(layer.startTicks);
-      const end = seconds(layer.startTicks + layer.durationTicks);
-      const len = seconds(layer.durationTicks);
+      // The part of the clip inside the window.
+      const from = Math.max(layer.startTicks, wStart);
+      const to = Math.min(layer.startTicks + layer.durationTicks, wEnd);
+      if (to <= from) continue;
+      const start = seconds(from);
+      const end = seconds(to);
+      // Each clip is cut one frame long: a cut of exactly its length can
+      // leave its last frame (or a one-frame window's only frame) short of the
+      // frame-rate filter. The overlay's enable window still ends it on time.
+      const cut = seconds(to - from + FLICKS_PER_SECOND / 30);
       const index = await input(
         layer,
         layer.kind === "image"
-          ? ["-loop", "1", "-t", len]
-          : ["-ss", seconds(layer.sourceStartTicks), "-t", len],
+          ? ["-loop", "1", "-t", cut]
+          : [
+              "-ss",
+              seconds(layer.sourceStartTicks + (from - layer.startTicks)),
+              "-t",
+              cut,
+            ],
       );
       const clip = `c${n}`,
         next = `v${n++}`;
       filters.push(
-        `[${index}:v]trim=duration=${len},setpts=PTS-STARTPTS+${start}/TB,fps=${rate},scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,setsar=1[${clip}]`,
+        `[${index}:v]trim=duration=${cut},setpts=PTS-STARTPTS+${ptsOffset(from)},fps=${rate},scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,setsar=1[${clip}]`,
         `[${visual}][${clip}]overlay=x=(W-w)/2:y=(H-h)/2:enable='gte(t,${start})*lt(t,${end})':eof_action=pass[${next}]`,
       );
       visual = next;
     }
     const audio: string[] = [];
-    for (const a of plan.audio) {
-      const len = seconds(a.durationTicks);
-      const index = await input(a, [
-        "-ss",
-        seconds(a.sourceStartTicks),
-        "-t",
-        len,
-      ]);
-      const label = `a${n++}`;
-      // Gain and linear fades are plan numbers, applied in the clip's own
-      // time; the clip is then made 48 kHz stereo and placed by an exact
-      // sample delay.
-      const shaping = [
-        a.gainDb ? `volume=${a.gainDb}dB` : null,
-        a.fadeInTicks ? `afade=t=in:st=0:d=${seconds(a.fadeInTicks)}` : null,
-        a.fadeOutTicks
-          ? `afade=t=out:st=${seconds(a.durationTicks - a.fadeOutTicks)}:d=${seconds(a.fadeOutTicks)}`
-          : null,
-      ].filter(Boolean);
-      const delay =
-        (BigInt(a.startTicks) * BigInt(profile.sampleRate)) /
-        BigInt(FLICKS_PER_SECOND);
-      filters.push(
-        `[${index}:a]atrim=duration=${len},asetpts=PTS-STARTPTS,${shaping.map((f) => `${f},`).join("")}aresample=${profile.sampleRate},aformat=channel_layouts=stereo,adelay=${delay}S:all=1[${label}]`,
-      );
-      audio.push(label);
-    }
+    if (window.output === "mp4")
+      for (const a of plan.audio) {
+        const from = Math.max(a.startTicks, wStart);
+        const to = Math.min(a.startTicks + a.durationTicks, wEnd);
+        if (to <= from) continue;
+        // The whole clip is read and shaped in its own time (gain and linear
+        // fades are plan numbers), then cut to the window, made 48 kHz
+        // stereo and placed by an exact sample delay.
+        const index = await input(a, [
+          "-ss",
+          seconds(a.sourceStartTicks),
+          "-t",
+          seconds(a.durationTicks),
+        ]);
+        const label = `a${n++}`;
+        const shaping = [
+          a.gainDb ? `volume=${a.gainDb}dB` : null,
+          a.fadeInTicks ? `afade=t=in:st=0:d=${seconds(a.fadeInTicks)}` : null,
+          a.fadeOutTicks
+            ? `afade=t=out:st=${seconds(a.durationTicks - a.fadeOutTicks)}:d=${seconds(a.fadeOutTicks)}`
+            : null,
+        ].filter(Boolean);
+        const delay =
+          (BigInt(from - wStart) * BigInt(profile.sampleRate)) /
+          BigInt(FLICKS_PER_SECOND);
+        filters.push(
+          `[${index}:a]atrim=duration=${seconds(a.durationTicks)},asetpts=PTS-STARTPTS,${shaping.map((f) => `${f},`).join("")}atrim=start=${seconds(from - a.startTicks)}:duration=${seconds(to - from)},asetpts=PTS-STARTPTS,aresample=${profile.sampleRate},aformat=channel_layouts=stereo,adelay=${delay}S:all=1[${label}]`,
+        );
+        audio.push(label);
+      }
     if (plan.titles) {
       filters.push(`[${visual}]ass=titles.ass:fontsdir=fonts[titled]`);
       visual = "titled";
     }
+    filters.push(`[${visual}]setpts=PTS-STARTPTS[picture]`);
     if (audio.length)
       filters.push(
         `${audio.map((a) => `[${a}]`).join("")}amix=inputs=${audio.length}:normalize=0,atrim=duration=${total},alimiter=limit=0.95[audio]`,
       );
-    args.push("-filter_complex", filters.join(";"), "-map", `[${visual}]`);
-    if (audio.length)
+    args.push("-filter_complex", filters.join(";"), "-map", "[picture]");
+    if (window.output === "png")
       args.push(
-        "-map",
-        "[audio]",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
-        "-ar",
-        String(profile.sampleRate),
+        "-frames:v",
+        "1",
+        "-c:v",
+        "png",
+        "-f",
+        "image2",
+        "-update",
+        "1",
+        "-progress",
+        "pipe:1",
+        "frame.partial.png",
       );
-    args.push(
-      "-c:v",
-      "libx264",
-      "-threads",
-      "2",
-      "-preset",
-      "veryfast",
-      "-crf",
-      "20",
-      "-pix_fmt",
-      profile.pixelFormat,
-      "-r",
-      rate,
-      "-t",
-      total,
-      "-movflags",
-      "+faststart",
-      "-progress",
-      "pipe:1",
-      "render.partial.mp4",
-    );
+    else {
+      if (audio.length)
+        args.push(
+          "-map",
+          "[audio]",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "192k",
+          "-ar",
+          String(profile.sampleRate),
+        );
+      args.push(
+        "-c:v",
+        "libx264",
+        "-threads",
+        "2",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "20",
+        "-pix_fmt",
+        profile.pixelFormat,
+        "-r",
+        rate,
+        "-t",
+        total,
+        "-movflags",
+        "+faststart",
+        "-progress",
+        "pipe:1",
+        "render.partial.mp4",
+      );
+    }
     const duration = Number(total);
     let progress = "";
     if (controller.signal.aborted) throw stopped();
@@ -369,8 +444,9 @@ export async function renderPlan(
       !probed.hasVideo ||
       probed.width !== profile.width ||
       probed.height !== profile.height ||
-      Math.abs(probed.durationFrames - expectedFrames) > 2 ||
-      (audio.length > 0 && !probed.hasAudio)
+      (window.output === "mp4" &&
+        (Math.abs(probed.durationFrames - expectedFrames) > 2 ||
+          (audio.length > 0 && !probed.hasAudio)))
     )
       throw new Error("Rendered output failed verification.");
     onProgress(1);
@@ -380,7 +456,7 @@ export async function renderPlan(
         planHash: plan.planHash,
         width: probed.width,
         height: probed.height,
-        durationFrames: probed.durationFrames,
+        durationFrames: window.output === "png" ? 1 : probed.durationFrames,
         hasAudio: probed.hasAudio,
         libassApi,
       },

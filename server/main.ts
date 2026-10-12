@@ -21,6 +21,7 @@ import { RESOURCE_POLICY } from "../core/command/policy.ts";
 import { acquireServiceLock } from "../core/service-lock.ts";
 import { isLegacyWorkspace } from "../core/migrate.ts";
 import { closeWorkers } from "../core/process/workers.ts";
+import { preview } from "../core/render/preview.ts";
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -249,6 +250,45 @@ const server = createServer(async (req, res) => {
           asset: staged.asset,
           probe: staged.probe,
         });
+      }
+      // Reference preview: a frame (PNG) or short segment (MP4) of a stored
+      // revision, rendered by the export's plan compiler.
+      const previewMatch = /^\/api\/v1\/projects\/([^/]+)\/preview$/.exec(
+        url.pathname,
+      );
+      if (req.method === "GET" && previewMatch) {
+        authorize(principal, "yamakan.project.open");
+        const number = (name: string, fallback?: number) => {
+          const raw = url.searchParams.get(name);
+          if (raw === null && fallback !== undefined) return fallback;
+          if (raw === null || !/^\d{1,9}$/.test(raw))
+            throw new CommandError(
+              "VALIDATION",
+              `${name} must be a whole number.`,
+            );
+          return Number(raw);
+        };
+        const kind = url.searchParams.get("kind") ?? "frame";
+        if (kind !== "frame" && kind !== "segment")
+          throw new CommandError(
+            "VALIDATION",
+            "kind must be frame or segment.",
+          );
+        const shown = await preview(
+          store,
+          previewMatch[1],
+          number("revision"),
+          kind,
+          number("start"),
+          kind === "segment" ? number("frames", 60) : 1,
+        );
+        res.setHeader("X-Plan-Hash", shown.planHash);
+        res.setHeader("X-Revision", String(shown.revision));
+        res.setHeader("X-Preview-Cache", shown.cached ? "hit" : "miss");
+        // A preview of a revision never changes.
+        res.setHeader("Cache-Control", "private, max-age=3600, immutable");
+        await media(shown.file, shown.contentType);
+        return;
       }
       const asset = /^\/api\/v1\/projects\/([^/]+)\/assets\/([^/]+)$/.exec(
         url.pathname,
