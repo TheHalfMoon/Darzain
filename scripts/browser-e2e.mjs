@@ -164,13 +164,13 @@ try {
   await page.getByLabel("Import local media").setInputFiles(png);
   await page
     .getByRole("status")
-    .filter({ hasText: "Imported reference.png" })
+    .filter({ hasText: /Imported \W?reference\.png/ })
     .waitFor();
   await page.getByRole("button", { name: "reference.png image" }).click();
   await page.getByLabel("Import local media").setInputFiles(wav);
   await page
     .getByRole("status")
-    .filter({ hasText: "Imported music.wav" })
+    .filter({ hasText: /Imported \W?music\.wav/ })
     .waitFor();
   await page.getByRole("button", { name: "music.wav audio" }).click();
   await page.getByRole("button", { name: "Add scene", exact: true }).click();
@@ -373,7 +373,7 @@ try {
     .click();
   await page
     .getByRole("status")
-    .filter({ hasText: "Opened Browser verified production" })
+    .filter({ hasText: /Opened \W?Browser verified production/ })
     .waitFor();
   const restored = await getProject();
   assert.equal(restored.revision, beforeRestore.revision + 1);
@@ -443,6 +443,39 @@ try {
     .filter({ hasText: `revision ${restored.revision + 1}.` })
     .waitFor();
   assert.equal((await getProject()).revision, restored.revision + 1);
+  // Arabic interface: right-to-left page, Arabic labels, left-to-right
+  // timeline; translated choices still store canonical values; remembered
+  // across a reload; then back to English. The switch is named by its
+  // visible text (the other language).
+  await page.getByRole("button", { name: "العربية", exact: true }).click();
+  await page.waitForFunction(
+    () =>
+      document.documentElement.dir === "rtl" &&
+      document.documentElement.lang === "ar",
+  );
+  assert.equal(
+    await page.locator("section.timeline").getAttribute("dir"),
+    "ltr",
+  );
+  await page.getByLabel("حجم اللقطة").first().selectOption({ label: "قريبة" });
+  await page.getByRole("button", { name: "حفظ", exact: true }).click();
+  await page
+    .getByRole("status")
+    .filter({ hasText: "حُفظت المراجعة" })
+    .waitFor();
+  assert.equal((await getProject()).scenes[0].camera.shotScale, "close");
+  await page.screenshot({ path: join(output, "arabic-interface.png") });
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dir === "rtl");
+  await page.getByRole("button", { name: "English", exact: true }).click();
+  await page.waitForFunction(
+    () =>
+      document.documentElement.dir === "ltr" &&
+      document.documentElement.lang === "en",
+  );
+  await page
+    .getByRole("button", { name: "Create project", exact: true })
+    .waitFor();
   assert.deepEqual(errors, []);
   const receipt = {
     runtime:
@@ -462,6 +495,7 @@ try {
       "save",
       "preview",
       "reference preview frame (plan-compiled) with stale notice",
+      "Arabic interface (RTL page, LTR timeline, remembered across reload)",
       "export",
       "download",
       "reload",

@@ -4,6 +4,7 @@
 // approximate; this one is what the export will contain. It always names
 // the revision it shows, and says so plainly when there are unsaved edits.
 import React, { useEffect, useState } from "react";
+import type { MessageKey } from "./i18n.ts";
 
 type Props = {
   projectId: string;
@@ -15,12 +16,15 @@ type Props = {
   playing: boolean;
   // Saves the edits, so the reference shows the current timeline.
   onSave: () => void;
+  // The interface language's messages.
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string;
 };
 
 const SEGMENT_FRAMES = 60;
 
 export function ReferencePreview(props: Props) {
-  const { projectId, revision, totalFrames, unsaved, playing, onSave } = props;
+  const { projectId, revision, totalFrames, unsaved, playing, onSave, t } =
+    props;
   const frame = Math.max(0, Math.min(totalFrames - 1, props.frame));
   // Follow the playhead only once it rests, so scrubbing does not queue
   // renders; nothing is requested during playback.
@@ -49,21 +53,25 @@ export function ReferencePreview(props: Props) {
   useEffect(() => setSegment(null), [projectId, revision]);
   if (totalFrames < 1)
     return (
-      <div className="reference" role="region" aria-label="Reference preview">
-        <p>Add a clip or title to see the reference preview.</p>
+      <div
+        className="reference"
+        role="region"
+        aria-label={t("reference.region")}
+      >
+        <p>{t("reference.empty")}</p>
       </div>
     );
   return (
-    <div className="reference" role="region" aria-label="Reference preview">
+    <div className="reference" role="region" aria-label={t("reference.region")}>
       <div className="reference-head">
-        <strong>Reference preview</strong>
+        <strong>{t("reference.title")}</strong>
         <span>
-          Saved revision {revision}, frame {settled}
-          {unsaved ? " · Stale: save to include your latest edits" : ""}
+          {t("reference.state", { revision, frame: settled })}
+          {unsaved ? ` · ${t("reference.stale")}` : ""}
         </span>
         {unsaved ? (
           <button type="button" onClick={onSave}>
-            Save and refresh
+            {t("reference.save")}
           </button>
         ) : null}
         <button
@@ -74,7 +82,7 @@ export function ReferencePreview(props: Props) {
             )
           }
         >
-          Play reference (2 s)
+          {t("reference.play")}
         </button>
       </div>
       {segment ? (
@@ -83,13 +91,13 @@ export function ReferencePreview(props: Props) {
           src={segment}
           controls
           autoPlay
-          aria-label="Reference segment"
+          aria-label={t("reference.segment")}
           onEnded={() => setSegment(null)}
         />
       ) : (
         <img
           src={src}
-          alt={`Reference frame ${settled} of saved revision ${revision}`}
+          alt={t("reference.alt", { frame: settled, revision })}
           data-state={
             failed === src ? "error" : loaded === src ? "ready" : "loading"
           }
@@ -98,12 +106,10 @@ export function ReferencePreview(props: Props) {
         />
       )}
       {loaded !== src && failed !== src && !segment ? (
-        <small>Rendering…</small>
+        <small>{t("reference.rendering")}</small>
       ) : null}
       {failed === src && !segment ? (
-        <small className="error">
-          The reference preview could not be rendered for this revision.
-        </small>
+        <small className="error">{t("reference.failed")}</small>
       ) : null}
     </div>
   );
