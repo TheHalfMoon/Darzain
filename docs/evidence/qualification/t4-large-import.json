@@ -1,0 +1,19 @@
+{
+  "qualification": "T4 large import",
+  "commit": "66b3c0e8e004e7217affb29b7f35c9bc4b3902c8",
+  "date": "2026-10-11T20:31:59.081Z",
+  "host": {
+    "platform": "win32",
+    "release": "10.0.26300",
+    "cpus": 12,
+    "memoryGiB": 16
+  },
+  "node": "v24.19.0",
+  "fixture": "FFmpeg testsrc2 1920x1080, 18 s rawvideo uyvy422 MOV (synthetic test pattern)",
+  "bytes": 2239490938,
+  "seconds": 65.3,
+  "samples": 292,
+  "peakServiceWorkingSetMiB": 154,
+  "ceilingMiB": 300,
+  "pass": true
+}
