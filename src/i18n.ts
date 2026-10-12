@@ -279,7 +279,7 @@ export function translate(
 // Embeddings, overrides and isolates inside a value are removed, so a
 // name cannot close its own isolate early (display only; stored names are
 // unchanged).
-const BIDI_CONTROLS = /[‪-‮⁦-⁩]/g;
+const BIDI_CONTROLS = /[\u202a-\u202e\u2066-\u2069]/g;
 
 // A duration in seconds with two decimals, in the language's digits
 // (fixed width, so a running readout does not jitter).

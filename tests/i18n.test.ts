@@ -85,3 +85,16 @@ test("durations keep two decimals and percentages use the language's sign", () =
   // ICU adds an Arabic letter mark after the sign for correct direction.
   assert.ok(formatPercent("ar", 0.5).startsWith("٥٠٪"));
 });
+
+test("interface source writes direction controls as escapes, never as raw characters", async () => {
+  const { readdir, readFile } = await import("node:fs/promises");
+  const dir = new URL("../src/", import.meta.url);
+  const raw = /[\u200e\u200f\u202a-\u202e\u2066-\u2069]/;
+  for (const name of await readdir(dir))
+    if (/\.(ts|tsx)$/.test(name))
+      assert.doesNotMatch(
+        await readFile(new URL(name, dir), "utf8"),
+        raw,
+        name,
+      );
+});
