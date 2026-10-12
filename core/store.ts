@@ -788,6 +788,8 @@ export class ProjectStore {
   // Marks a publication in flight from before its bytes are written until
   // the returned release is called (after its row commits or it is
   // abandoned). Unregistered objects are never removed while one is open.
+  // importObject holds one only around the copy; a caller that registers
+  // the object later (a derivative job) holds its own until it commits.
   async beginPublication(projectId: string) {
     for (
       let pending = this.#discarding.get(projectId);
@@ -1249,6 +1251,7 @@ export class ProjectStore {
         hasAudio: metadata.hasAudio,
         timebase: metadata.timebase,
         frameRate: metadata.frameRate,
+        averageFrameRate: metadata.averageFrameRate,
         variableFrameRate: metadata.variableFrameRate,
       });
       this.transaction((db) => registerAsset(db, id, asset, probeRecord));
@@ -1257,6 +1260,7 @@ export class ProjectStore {
         probe: JSON.parse(probeRecord) as Record<string, unknown> & {
           variableFrameRate: boolean;
           frameRate: { num: number; den: number } | null;
+          averageFrameRate: { num: number; den: number } | null;
         },
       };
     } finally {

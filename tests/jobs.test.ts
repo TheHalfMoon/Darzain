@@ -475,8 +475,8 @@ test("a job interrupted too many times is set aside instead of retried forever",
   store.close();
 });
 
-test("a supervisor from an older generation stops claiming; start() twice keeps its generation", async () => {
-  const { store, project } = await workspace();
+test("a supervisor from an older generation stops claiming and refuses new work; start() twice keeps its generation", async () => {
+  const { store, project } = await workspace(3000);
   const older = new JobSupervisor(store);
   await older.start();
   const generation = () =>
@@ -488,21 +488,31 @@ test("a supervisor from an older generation stops claiming; start() twice keeps 
   const before = generation();
   await older.start();
   assert.equal(generation(), before, "a second start is a no-op");
+  // The older run is rendering a long job with another queued behind it.
+  const long = await older.submit(project.id, "long");
+  const queued = await older.submit(project.id, "queued-behind");
+  for (
+    let t = 0;
+    t < 30000 && attempts(store, long.id)[0]?.state !== "running";
+    t += 20
+  )
+    await new Promise((r) => setTimeout(r, 20));
+  // A newer run takes over: it fences the running attempt and owns the queue.
   const newer = new JobSupervisor(store);
   await newer.start();
-  const job = await older.submit(project.id, "claimed-by-newer");
-  await new Promise((r) => setTimeout(r, 300));
-  assert.equal(older.status(job.id).detail, "queued", "the older run left it");
-  assert.equal(attempts(store, job.id).length, 0);
-  // The current run picks it up with its own generation.
-  const other = await newer.submit(project.id, "wakes-newer");
-  assert.equal((await settled(newer, job.id)).state, "COMPLETED");
-  assert.equal((await settled(newer, other.id)).state, "COMPLETED");
+  await assert.rejects(
+    older.submit(project.id, "too-late"),
+    (e: unknown) => e instanceof CommandError && e.code === "UNAVAILABLE",
+  );
+  assert.equal((await settled(newer, long.id)).state, "COMPLETED");
+  assert.equal((await settled(newer, queued.id)).state, "COMPLETED");
+  await older.close();
+  // Nothing the older run claimed after the takeover: every attempt of the
+  // queued job belongs to the newer generation.
   assert.deepEqual(
-    attempts(store, job.id).map((a) => a.generation),
+    attempts(store, queued.id).map((a) => a.generation),
     [generation()],
   );
-  await older.close();
   await newer.close();
   store.close();
 });

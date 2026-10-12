@@ -6,7 +6,15 @@
 // from an earlier generation: their Job Object workers died with that service,
 // so they are marked failed and their jobs re-queued (local work only, never
 // a paid resubmission). Partial outputs are never registered.
-import { mkdir, open, rename, rm, statfs, unlink } from "node:fs/promises";
+import {
+  mkdir,
+  open,
+  rename,
+  rm,
+  rmdir,
+  statfs,
+  unlink,
+} from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -33,8 +41,10 @@ export type JobState =
   | "reconciliationRequired";
 const TERMINAL = ["succeeded", "cancelled", "failed", "reconciliationRequired"];
 const terminalSql = TERMINAL.map((s) => `'${s}'`).join(", ");
-// Interrupted attempts are retried locally at most this many times in all.
-const MAX_ATTEMPTS = 3;
+// Attempts interrupted by a crash (not a graceful stop) are retried locally
+// at most this many times; the job is then set aside for reconciliation.
+const MAX_INTERRUPTIONS = 3;
+const INTERRUPTED = "Interrupted by a service restart.";
 
 type Row = {
   job_id: string;
@@ -124,8 +134,8 @@ export class JobSupervisor {
       }[];
       for (const a of stale) {
         db.prepare(
-          "UPDATE attempts SET state = 'failed', error = 'Interrupted by a service restart.' WHERE job_id = ? AND attempt_no = ?",
-        ).run(a.job_id, a.attempt_no);
+          "UPDATE attempts SET state = 'failed', error = ? WHERE job_id = ? AND attempt_no = ?",
+        ).run(INTERRUPTED, a.job_id, a.attempt_no);
         db.prepare(
           "UPDATE jobs SET state = ?, progress = 0 WHERE job_id = ?",
         ).run(a.cancel_requested ? "cancelled" : "queued", a.job_id);
@@ -169,12 +179,14 @@ export class JobSupervisor {
 
   async submit(projectId: string, key: string) {
     if (this.#closing) throw new Error("Render queue is closing.");
+    this.#current();
     if (!this.#generation) await this.start();
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(key))
       throw new Error("Invalid idempotency key.");
     const project = await this.store.load(projectId);
     if (this.#closing) throw new Error("Render queue is closing.");
     const row = this.store.transaction((db) => {
+      this.#currentIn(db);
       const existing = db
         .prepare(
           "SELECT * FROM jobs WHERE project_id = ? AND kind = 'export' AND frozen_revision = ? AND idempotency_key = ?",
@@ -313,7 +325,14 @@ export class JobSupervisor {
               )
               .get(row.job_id) as { n: number }
           ).n + 1;
-        if (attempt > MAX_ATTEMPTS) {
+        const interruptions = (
+          db
+            .prepare(
+              "SELECT count(*) AS n FROM attempts WHERE job_id = ? AND error = ?",
+            )
+            .get(row.job_id, INTERRUPTED) as { n: number }
+        ).n;
+        if (interruptions >= MAX_INTERRUPTIONS) {
           db.prepare(
             "UPDATE jobs SET state = 'reconciliationRequired', error = 'The job was interrupted too many times.' WHERE job_id = ?",
           ).run(row.job_id);
@@ -508,6 +527,10 @@ export class JobSupervisor {
       this.#controllers.delete(jobId);
       this.#progress.delete(jobId);
       await this.#cleanup(row.project_id, jobId, attempt);
+      // Removed only when empty: an export's artifact keeps its folder.
+      await rmdir(
+        await this.store.file(row.project_id, "exports", jobId),
+      ).catch(() => {});
       await this.#release(jobId);
     }
   }
@@ -519,7 +542,7 @@ export class JobSupervisor {
       const row = this.store.read((db) => this.#row(db, jobId));
       if (
         row?.kind !== "cfr-derivative" ||
-        !["failed", "cancelled", "reconciliationRequired"].includes(row.state)
+        !["failed", "cancelled"].includes(row.state)
       )
         return;
       const payload = DerivativePayload.safeParse(safeJson(row.payload));
@@ -599,12 +622,18 @@ export class JobSupervisor {
     const seconds = Math.max(1, asset.durationFrames / 30);
     let progress = "";
     if (signal.aborted) throw new Error("Cancelled.");
-    // The conversion and its published copy, with the import reserve kept.
+    // The conversion and its published copy share the space above the
+    // import reserve; FFmpeg stops writing at that size (-fs).
     const space = await statfs(dir);
-    if (
-      Number(space.bavail) * Number(space.bsize) <
-      2 * asset.bytes + RESOURCE_POLICY.enforced.diskReserveBytes
-    )
+    const outputCap = Math.min(
+      RESOURCE_POLICY.enforced.assetImportBytes,
+      Math.floor(
+        (Number(space.bavail) * Number(space.bsize) -
+          RESOURCE_POLICY.enforced.diskReserveBytes) /
+          2,
+      ),
+    );
+    if (outputCap < 16 * 1024 * 1024)
       throw new CommandError(
         "LIMIT_EXCEEDED",
         "Insufficient free disk space for the conversion.",
@@ -662,6 +691,8 @@ export class JobSupervisor {
           "192k",
           "-movflags",
           "+faststart",
+          "-fs",
+          String(outputCap),
           "-progress",
           "pipe:1",
           "derivative.mp4",
@@ -707,6 +738,27 @@ export class JobSupervisor {
     )
       throw new Error("Converted output failed verification.");
     this.#markValidating(jobId, attempt);
+    // Held from before the copy is written until its rows commit (or it is
+    // discarded), so no concurrent discard can remove the same bytes.
+    const publication = await this.store.beginPublication(row.project_id);
+    try {
+      await this.#publishDerivative(row, attempt, asset, file, probed, () =>
+        publication(),
+      );
+    } finally {
+      publication();
+    }
+  }
+
+  async #publishDerivative(
+    row: Row,
+    attempt: number,
+    asset: Asset,
+    file: string,
+    probed: Awaited<ReturnType<typeof probe>>,
+    endPublication: () => void,
+  ) {
+    const jobId = row.job_id;
     // The handle opens eagerly and closes before the attempt folder is
     // removed, so no deferred open can race that cleanup.
     const handle = await open(file, "r");
@@ -740,6 +792,7 @@ export class JobSupervisor {
     } catch (e) {
       // Losing the commit leaves the published copy unregistered; remove it
       // unless another publication or row now shares those bytes.
+      endPublication();
       await this.store.discardUnregisteredObject(row.project_id, derived.hash);
       throw e;
     }
@@ -778,20 +831,28 @@ export class JobSupervisor {
     projectId: string,
     staged: {
       asset: Asset;
-      probe: { frameRate: { num: number; den: number } | null };
+      probe: {
+        frameRate: { num: number; den: number } | null;
+        averageFrameRate?: { num: number; den: number } | null;
+      };
     },
   ) {
     if (this.#closing) throw new Error("Render queue is closing.");
     if (!this.#generation) await this.start();
+    this.#current();
     const project = await this.store.load(projectId);
     const payload = DerivativePayload.parse({
       format: "cfr/1",
       asset: staged.asset,
-      frameRate: standardRate(staged.probe.frameRate),
+      frameRate: standardRate(
+        staged.probe.frameRate,
+        staged.probe.averageFrameRate ?? null,
+      ),
     });
     // Each upload stages its own version, so each gets its own conversion.
     const key = `cfr-${staged.asset.id}`;
     const row = this.store.transaction((db) => {
+      this.#currentIn(db);
       const existing = db
         .prepare(
           "SELECT * FROM jobs WHERE project_id = ? AND kind = 'cfr-derivative' AND idempotency_key = ?",
@@ -812,6 +873,19 @@ export class JobSupervisor {
       ).n;
       if (active >= RESOURCE_POLICY.enforced.activeJobs)
         throw new CommandError("LIMIT_EXCEEDED", "Too many active jobs.");
+      // Conversions are long; a few per project leave room for exports.
+      const converting = (
+        db
+          .prepare(
+            `SELECT count(*) AS n FROM jobs WHERE project_id = ? AND kind = 'cfr-derivative' AND state NOT IN (${terminalSql})`,
+          )
+          .get(projectId) as { n: number }
+      ).n;
+      if (converting >= RESOURCE_POLICY.enforced.activeConversionsPerProject)
+        throw new CommandError(
+          "LIMIT_EXCEEDED",
+          "Too many conversions are in progress for this project.",
+        );
       const jobId = randomUUID();
       db.prepare(
         "INSERT INTO jobs(job_id, kind, project_id, frozen_revision, idempotency_key, payload, state) VALUES (?, 'cfr-derivative', ?, ?, ?, ?, 'queued')",
@@ -828,6 +902,24 @@ export class JobSupervisor {
     return this.#view(row);
   }
 
+  // Inside a submission transaction: a newer service run has taken the
+  // queue, so this supervisor would queue work it never runs.
+  #currentIn(db: DatabaseSync) {
+    const { generation } = db
+      .prepare("SELECT generation FROM supervisor WHERE id = 1")
+      .get() as { generation: number };
+    if (this.#generation && generation !== this.#generation)
+      this.#superseded = true;
+    this.#current();
+  }
+  #current() {
+    if (this.#superseded)
+      throw new CommandError(
+        "UNAVAILABLE",
+        "A newer service run owns the job queue.",
+      );
+  }
+
   // Stops claiming work, terminates running workers and waits for the loop.
   async close() {
     this.#closing = true;
@@ -838,8 +930,11 @@ export class JobSupervisor {
 
 const even = (n: number) => n - (n % 2);
 
-// Constant-rate targets: the nearest common rate to the source's nominal
-// rate, so a nominal 90000/1 time base never becomes the output rate.
+// Constant-rate targets: the nearest common rate to the source's rate. The
+// nominal rate is used when plausible (it keeps every frame of a source that
+// pauses); a nominal above 60 is often a time base or a peak (120 for 60 fps
+// phone video), so the measured average is used instead, capped at 60, and
+// anything unusable becomes 30. A 90000/1 tag never becomes the output rate.
 const RATES = [
   [24000, 1001],
   [24, 1],
@@ -850,11 +945,19 @@ const RATES = [
   [50, 1],
   [60000, 1001],
   [60, 1],
-  [120, 1],
 ] as const;
-function standardRate(rate: { num: number; den: number } | null) {
-  const value = rate && rate.den > 0 ? rate.num / rate.den : 30;
-  const target = value > 0 && value <= 120 ? value : 30;
+type Rate = { num: number; den: number } | null;
+const rateValue = (rate: Rate) =>
+  rate && rate.den > 0 && rate.num > 0 ? rate.num / rate.den : 0;
+function standardRate(nominal: Rate, average: Rate = null) {
+  const declared = rateValue(nominal);
+  const measured = rateValue(average);
+  const target =
+    declared > 0 && declared <= 60
+      ? declared
+      : measured > 0 && measured <= 120
+        ? Math.min(measured, 60)
+        : 30;
   const [num, den] = RATES.reduce((best, r) =>
     Math.abs(r[0] / r[1] - target) < Math.abs(best[0] / best[1] - target)
       ? r

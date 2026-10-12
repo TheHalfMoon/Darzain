@@ -267,7 +267,7 @@ test("the output rate is a standard rate, never the file's own tag", async () =>
     [{ num: 1_000_000, den: 1 }, "30/1"],
     [{ num: 30000, den: 1001 }, "30000/1001"],
     [{ num: 59, den: 1 }, "60000/1001"],
-    [{ num: 61, den: 1 }, "60/1"],
+    [{ num: 61, den: 1 }, "30/1"],
     [{ num: 24, den: 1 }, "24/1"],
     [null, "30/1"],
   ];
@@ -290,6 +290,72 @@ test("the output rate is a standard rate, never the file's own tag", async () =>
     );
     supervisor.cancel(job.id);
   }
+  await supervisor.close();
+  store.close();
+});
+
+test("graceful shutdowns during a conversion never cost the upload", async () => {
+  const { store, project, staged } = await vfrWorkspace();
+  let job = "";
+  // Three service runs each stop gracefully just after claiming the job.
+  for (let run = 0; run < 3; run++) {
+    const supervisor: JobSupervisor = new JobSupervisor(store, {
+      fault: (point) => {
+        if (point === "after-claim") void supervisor.close();
+      },
+    });
+    await supervisor.start();
+    if (!job) job = (await supervisor.submitDerivative(project.id, staged)).id;
+    await supervisor.close();
+    assert.equal(supervisor.status(job).state, "QUEUED", `run ${run}`);
+  }
+  assert.ok(store.assetVersion(staged.asset.id), "the upload is kept");
+  const last = new JobSupervisor(store);
+  await last.start();
+  const done = await settled(last, job);
+  assert.equal(done.state, "COMPLETED", done.error ?? "");
+  assert.equal((await store.load(project.id)).assets.length, 1);
+  await last.close();
+  store.close();
+});
+
+test("active conversions per project are capped", async () => {
+  const { store, project, staged } = await vfrWorkspace();
+  // Four conversions already running (as a previous run left them).
+  store.transaction((db) => {
+    for (let i = 0; i < 4; i++)
+      db.prepare(
+        "INSERT INTO jobs(job_id, kind, project_id, frozen_revision, idempotency_key, payload, state) VALUES (?, 'cfr-derivative', ?, 0, ?, '{}', 'running')",
+      ).run(crypto.randomUUID(), project.id, `busy-${i}`);
+  });
+  const supervisor = new JobSupervisor(store);
+  await assert.rejects(
+    supervisor.submitDerivative(project.id, staged),
+    (e: unknown) => (e as { code?: string }).code === "LIMIT_EXCEEDED",
+  );
+  await supervisor.close();
+  store.close();
+});
+
+test("the target rate follows the measured average, not a nominal peak", async () => {
+  const { store, project, staged } = await vfrWorkspace();
+  const supervisor = new JobSupervisor(store);
+  const job = await supervisor.submitDerivative(project.id, {
+    asset: { ...staged.asset, id: crypto.randomUUID() },
+    probe: {
+      frameRate: { num: 120, den: 1 },
+      averageFrameRate: { num: 5994, den: 100 },
+    },
+  });
+  const payload = JSON.parse(
+    (
+      store.read((db) =>
+        db.prepare("SELECT payload FROM jobs WHERE job_id = ?").get(job.id),
+      ) as { payload: string }
+    ).payload,
+  );
+  assert.deepEqual(payload.frameRate, { num: 60000, den: 1001 });
+  supervisor.cancel(job.id);
   await supervisor.close();
   store.close();
 });

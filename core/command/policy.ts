@@ -24,6 +24,8 @@ export const RESOURCE_POLICY = Object.freeze({
     activeRenderWorkers: 1,
     // Active (non-terminal) jobs admitted at once; history never counts.
     activeJobs: 128,
+    // Active constant-rate conversions per project, so exports are not starved.
+    activeConversionsPerProject: 4,
     renderWallSeconds: 180,
     // A constant-rate conversion of a source up to ten minutes long.
     conversionWallSeconds: 900,

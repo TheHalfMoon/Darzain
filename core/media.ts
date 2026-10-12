@@ -134,6 +134,7 @@ export async function probe(file: string) {
     format: String(info.format?.format_name || ""),
     timebase: ratio((visual ?? audio)?.time_base),
     frameRate: nominal,
+    averageFrameRate: average,
     variableFrameRate: Boolean(
       visual &&
       !isStill &&
