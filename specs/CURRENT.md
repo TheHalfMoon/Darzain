@@ -20,7 +20,7 @@ Updated: 2026-10-12. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 ## T6 surface (in review)
 
 - Canonical `yamakan.project` v2: audio gain and linear fades, scenes with shots. Edit view gains optional gain/fade/shot fields (lossless projection).
-- `core/timeline/operations.ts`: typed operations (scene/shot, track, clip add/trim/split/move/remove, title, audio) reduced by `applyBatch` (1–64 operations, validated once). OpenCut snapping and overlap helpers adapted behind checked time types (`core/donors/opencut`, pinned and noticed).
+- `core/timeline/operations.ts`: typed operations (scene/shot, track, clip add/trim/split/move/remove, title, audio) reduced by `applyBatch` (1–64 operations, validated once). OpenCut overlap (placement checks) and snapping (`clip.move` with an optional `snapTicks`, start or end to the nearest clip edge) adapted behind checked tick types and qualified by fixtures (`core/donors/opencut`, pinned and noticed).
 - Schema v4: `edit_history`, `edit_cursor`. `yamakan.project.applyBatch`, `undo`, `redo` are revision-bound mutations; a stale undo conflicts; non-batch commits clear history.
 - Render applies audio gain (`volume`) and fades (`afade`).
 

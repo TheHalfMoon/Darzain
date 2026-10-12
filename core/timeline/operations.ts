@@ -11,6 +11,11 @@ import { CanonicalProjectSchema } from "../canonical.ts";
 import type { CanonicalProject } from "../canonical.ts";
 import { CommandError } from "../command/errors.ts";
 import { canPlaceTimeSpansOnTrack } from "../donors/opencut/overlap.ts";
+import { resolveTimelineSnap } from "../donors/opencut/snapping.ts";
+import type { SnapPoint } from "../donors/opencut/snapping.ts";
+
+// The widest snap an operation may ask for: one second.
+const MAX_SNAP_TICKS = 705_600_000;
 
 const Name = z.string().min(1).max(120);
 const Camera = z
@@ -77,6 +82,9 @@ export const OperationSchema = z.discriminatedUnion("type", [
       clipId: Id,
       trackId: Id.optional(),
       startTicks: Ticks,
+      // Snap the clip's start or end to the nearest other clip edge within
+      // this distance (as an editor drag does); the result is still checked.
+      snapTicks: Ticks.max(MAX_SNAP_TICKS).optional(),
     })
     .strict(),
   z.object({ type: z.literal("clip.remove"), clipId: Id }).strict(),
@@ -265,9 +273,12 @@ function apply(p: CanonicalProject, op: Operation): void {
       unlocked(p, target);
       if (track(p, target).kind !== track(p, c.trackId).kind)
         throw invalid("Clips move only between tracks of the same kind.");
-      placeable(p, target, op.startTicks, c.durationTicks, c.id);
+      const start = op.snapTicks
+        ? snapStart(p, c, op.startTicks, op.snapTicks)
+        : op.startTicks;
+      placeable(p, target, start, c.durationTicks, c.id);
       c.trackId = target;
-      c.startTicks = op.startTicks;
+      c.startTicks = start;
       return;
     }
     case "clip.remove": {
@@ -341,6 +352,37 @@ function apply(p: CanonicalProject, op: Operation): void {
       return;
     }
   }
+}
+
+// The start a moved clip snaps to: whichever of its start or end lies closer
+// to another clip's edge (on any track), within the threshold.
+function snapStart(
+  p: CanonicalProject,
+  moving: CanonicalProject["clips"][number],
+  startTicks: number,
+  snapTicks: number,
+) {
+  const points: SnapPoint[] = p.clips
+    .filter((x) => x.id !== moving.id)
+    .flatMap((x) => [
+      { time: x.startTicks, type: "element-start" as const, elementId: x.id },
+      { time: end(x), type: "element-end" as const, elementId: x.id },
+    ]);
+  const byStart = resolveTimelineSnap({
+    targetTime: startTicks,
+    snapPoints: points,
+    maxSnapDistance: snapTicks,
+  });
+  const byEnd = resolveTimelineSnap({
+    targetTime: startTicks + moving.durationTicks,
+    snapPoints: points,
+    maxSnapDistance: snapTicks,
+  });
+  if (byEnd.snapDistance < byStart.snapDistance) {
+    const snapped = byEnd.snappedTime - moving.durationTicks;
+    if (snapped >= 0) return snapped;
+  }
+  return byStart.snappedTime;
 }
 
 // Applies a whole batch to a copy and validates the result once.

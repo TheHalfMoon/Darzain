@@ -518,3 +518,78 @@ test("splitting a clip inside a shot keeps the shot's order; removing it leaves 
   assert.deepEqual(p.scenes[0].shots[0].clipIds, [ids.title2, ids.extra]);
   store.close();
 });
+
+test("a snapped move lands on the nearest clip edge, by start or by end, and is still checked", async () => {
+  const { store, project, call } = await workspace();
+  const [picture] = project.tracks.map((t) => t.id);
+  const title = (clipId: string, startTicks: number, frames: number) => ({
+    type: "clip.add" as const,
+    clipId,
+    trackId: picture,
+    assetId: null,
+    title: "Snap",
+    startTicks,
+    durationTicks: frames * F,
+    sourceStartTicks: 0,
+  });
+  const apply = async (operations: Operation[]) => {
+    const head = await store.exportProject(project.id);
+    await call("yamakan.project.applyBatch", {
+      projectId: project.id,
+      expectedRevision: head.revision,
+      operations,
+    });
+    return store.exportProject(project.id);
+  };
+  // a: [0, 30) and b: [100, 130) in frames; the moving clip is 20 frames.
+  await apply([
+    title(ids.title, 0, 30),
+    title(ids.title2, 100 * F, 30),
+    title(ids.extra, 50 * F, 20),
+  ]);
+  const at = (p: Awaited<ReturnType<typeof apply>>) =>
+    p.clips.find((c) => c.id === ids.extra)!.startTicks / F;
+  // Start 33 is 3 frames from a's end: it snaps to 30.
+  let p = await apply([
+    {
+      type: "clip.move",
+      clipId: ids.extra,
+      startTicks: 33 * F,
+      snapTicks: 5 * F,
+    },
+  ]);
+  assert.equal(at(p), 30);
+  // Start 78 puts the end at 98, 2 frames from b's start: the end snaps.
+  p = await apply([
+    {
+      type: "clip.move",
+      clipId: ids.extra,
+      startTicks: 78 * F,
+      snapTicks: 5 * F,
+    },
+  ]);
+  assert.equal(at(p), 80);
+  // Nothing within reach: the move is exact.
+  p = await apply([
+    {
+      type: "clip.move",
+      clipId: ids.extra,
+      startTicks: 60 * F,
+      snapTicks: 5 * F,
+    },
+  ]);
+  assert.equal(at(p), 60);
+  // A snap that would overlap is refused like any other placement.
+  await assert.rejects(
+    apply([
+      {
+        type: "clip.move",
+        clipId: ids.extra,
+        startTicks: 12 * F,
+        snapTicks: 15 * F,
+      },
+    ]),
+    /overlap/,
+  );
+  store.close();
+});
