@@ -32,7 +32,7 @@ import {
   splitClip,
   updateClips as applyClipUpdates,
 } from "./edit-ops.ts";
-import { YamakanClient } from "../sdk/client.ts";
+import { YamakanClient, YamakanError } from "../sdk/client.ts";
 import type {
   Operation,
   OperationInput,
@@ -97,7 +97,14 @@ function App() {
   const refresh = async () =>
     setProjects(await call("yamakan.project.list", {}));
   useEffect(() => {
-    refresh().catch((e) => setMessage(e.message));
+    refresh().catch((e) =>
+      setMessage(
+        // No session: the page was opened without its launch link.
+        e instanceof YamakanError && e.code === "UNAUTHENTICATED"
+          ? msg("session.locked")
+          : e.message,
+      ),
+    );
   }, []);
   const run = async (fn: () => Promise<void>) => {
     if (busy) return;
@@ -1003,4 +1010,22 @@ function App() {
 // The page starts in the chosen language and direction before React draws.
 document.documentElement.lang = initialLang();
 document.documentElement.dir = direction(initialLang());
-createRoot(document.getElementById("root")!).render(<App />);
+// The launch link carries a secret in its fragment (never sent to a server).
+// It is exchanged once for the session cookie and removed from the address
+// bar and history before the editor starts.
+async function startSession() {
+  const launch = /(?:^#|&)launch=([a-f0-9]{64})(?:&|$)/.exec(
+    location.hash,
+  )?.[1];
+  if (!launch) return;
+  history.replaceState(null, "", location.pathname + location.search);
+  await fetch("/api/v1/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ launch }),
+    credentials: "same-origin",
+  }).catch(() => {});
+}
+void startSession().finally(() =>
+  createRoot(document.getElementById("root")!).render(<App />),
+);

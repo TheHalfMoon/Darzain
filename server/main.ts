@@ -1,8 +1,8 @@
 import { createServer } from "node:http";
-import { createReadStream } from "node:fs";
+import { createReadStream, existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, unlink, writeFile } from "node:fs/promises";
 import { randomBytes, timingSafeEqual, randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +23,7 @@ import { isLegacyWorkspace } from "../core/migrate.ts";
 import { closeWorkers } from "../core/process/workers.ts";
 import { closePreviews, preview } from "../core/render/preview.ts";
 import { assertSeparate, defaultRecoveryHome } from "../core/recovery.ts";
+import { restrictToOwner } from "../core/process/access.ts";
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -48,6 +49,18 @@ if (!env("WORKSPACE") && (await isLegacyWorkspace(legacyDefault)))
     `A pre-Yamakan workspace was found and left untouched. Migrate it with: ${legacyHint(legacyDefault)}`,
   );
 await initializeRoot(root);
+// Owner-only before anything secret is written: on Windows a protected DACL
+// (this user, SYSTEM, Administrators) that everything below inherits; other
+// accounts of the machine are denied. A workspace that cannot be protected
+// is not opened.
+try {
+  await restrictToOwner(root, "dir");
+} catch (e) {
+  console.error(
+    `The workspace could not be made private to this account: ${(e as Error).message}`,
+  );
+  process.exit(1);
+}
 // The OS-owned lock is taken before the database is read and is released by
 // the operating system if this process dies.
 const lock = await acquireServiceLock(root);
@@ -55,13 +68,25 @@ const store = new ProjectStore(root);
 await store.initialize();
 // Separate credentials: the browser session secret exists only in memory and in
 // an HttpOnly cookie; explicit local clients (CLI, MCP, SDK) read the bearer file.
+// The browser obtains its session only through the launch link, which is
+// written to an owner-only file (and printed here): opening the page alone
+// grants nothing, so another local process or account cannot get a session.
 const sessionToken = randomBytes(32).toString("hex");
 const clientToken = randomBytes(32).toString("hex");
-await writeFile(await safePath(root, "token"), clientToken, { mode: 0o600 });
-// Backups and restored workspaces live outside the workspace folder.
+const launchSecret = randomBytes(32).toString("hex");
+// Written fresh each start (a stale file keeps its old mode on POSIX).
+async function writeSecret(name: string, value: string) {
+  const file = await safePath(root, name);
+  await unlink(file).catch(() => {});
+  await writeFile(file, value, { mode: 0o600, flag: "wx" });
+}
+await writeSecret("token", clientToken);
+// Backups and restored workspaces live outside the workspace folder, and
+// are private to this account too.
 const recoveryHome = path.resolve(env("RECOVERY") || defaultRecoveryHome(root));
 try {
   await assertSeparate(root, recoveryHome);
+  if (existsSync(recoveryHome)) await restrictToOwner(recoveryHome, "dir");
 } catch (e) {
   console.error(
     `The recovery folder must be outside the workspace: ${(e as Error).message}`,
@@ -79,6 +104,9 @@ void store
   );
 const port = Number(env("PORT") || 4318);
 const origin = `http://127.0.0.1:${port}`;
+// The secret travels in the fragment, which browsers never send to a server.
+const launchUrl = `${origin}/#launch=${launchSecret}`;
+await writeSecret("launch", `${launchUrl}\n`);
 function sameToken(value: string, expected: string) {
   const a = Buffer.from(value),
     b = Buffer.from(expected);
@@ -203,6 +231,35 @@ const server = createServer(async (req, res) => {
         new CommandError("FORBIDDEN_ORIGIN", "Origin is not allowed."),
       );
     const url = new URL(req.url || "/", origin);
+    // The page exchanges the launch secret for its session cookie. Only the
+    // Yamakan page itself may do so (exact Origin), and only with the secret.
+    if (req.method === "POST" && url.pathname === "/api/v1/session") {
+      if (req.headers.origin !== origin)
+        return fail(
+          new CommandError("FORBIDDEN_ORIGIN", "Origin is not allowed."),
+        );
+      if (!req.headers["content-type"]?.startsWith("application/json"))
+        throw new CommandError("VALIDATION", "JSON content type required.");
+      let launch: unknown;
+      try {
+        launch = JSON.parse((await body(req, 1024)).toString()).launch;
+      } catch {
+        throw new CommandError("VALIDATION", "Invalid session request.");
+      }
+      if (
+        typeof launch !== "string" ||
+        !/^[a-f0-9]{64}$/.test(launch) ||
+        !sameToken(launch, launchSecret)
+      )
+        return fail(
+          new CommandError("UNAUTHENTICATED", "The launch link is not valid."),
+        );
+      res.writeHead(204, {
+        "Set-Cookie": `yamakan=${sessionToken}; HttpOnly; SameSite=Strict; Path=/`,
+      });
+      res.end();
+      return;
+    }
     if (url.pathname.startsWith("/api/")) {
       const principal = authenticate(req);
       if (!principal)
@@ -370,11 +427,7 @@ const server = createServer(async (req, res) => {
     }
     if (req.method !== "GET")
       return fail(new CommandError("VALIDATION", "Method not allowed."));
-    // Local navigation grants a session cookie; cross-site requests were rejected above.
-    res.setHeader(
-      "Set-Cookie",
-      `yamakan=${sessionToken}; HttpOnly; SameSite=Strict; Path=/`,
-    );
+    // The page itself is public application code; it grants no session.
     res.setHeader(
       "Content-Security-Policy",
       "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'",
@@ -404,7 +457,9 @@ const server = createServer(async (req, res) => {
 server.requestTimeout = 0;
 server.setTimeout(120_000);
 server.listen(port, "127.0.0.1", () =>
-  console.log(`Yamakan is running at ${origin}; workspace ${root}`),
+  console.log(
+    `Yamakan is running at ${origin}; workspace ${root}\nOpen Yamakan with this link (also saved in the workspace's launch file): ${launchUrl}`,
+  ),
 );
 const close = async (code = 0) => {
   if (closing) return;

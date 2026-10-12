@@ -1,12 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fork, execFileSync } from "node:child_process";
-import { mkdtemp, readFile, access, rm } from "node:fs/promises";
+import { mkdtemp, readFile, access, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { once } from "node:events";
 import { mediaTools } from "../core/process/workers.ts";
+import { readableByOtherAccounts } from "../core/process/access.ts";
 
 test("loopback API rejects unauthenticated and cross-site access; restart preserves edits", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-http-"));
@@ -88,13 +89,72 @@ test("loopback API rejects unauthenticated and cross-site access; restart preser
     assert.equal(unknown.status, 400);
     assert.equal((await unknown.json()).error.code, "VALIDATION");
 
-    // Browser session and local-client credentials are separate authentication paths.
+    // Browser session and local-client credentials are separate authentication
+    // paths. Opening the page grants nothing: the session comes only from the
+    // launch secret, exchanged by the Yamakan page itself.
     const page = await fetch(`${origin}/`);
-    const cookie = /yamakan=([a-f0-9]{64})/.exec(
-      page.headers.get("set-cookie") || "",
+    assert.equal(page.status, 200);
+    assert.equal(
+      page.headers.get("set-cookie"),
+      null,
+      "no cookie for a page load",
+    );
+    const launchUrl = (
+      await readFile(path.join(root, "launch"), "utf8")
+    ).trim();
+    const launch = /#launch=([a-f0-9]{64})$/.exec(launchUrl)?.[1];
+    assert.ok(launch, "the launch file holds the launch link");
+    assert.ok(launchUrl.startsWith(`${origin}/#launch=`));
+    const session = (secret: string, extra: Record<string, string> = {}) =>
+      fetch(`${origin}/api/v1/session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: origin,
+          ...extra,
+        },
+        body: JSON.stringify({ launch: secret }),
+      });
+    assert.equal((await session("0".repeat(64))).status, 401);
+    assert.equal(
+      (await session(token.trim())).status,
+      401,
+      "the client token is not a launch secret",
+    );
+    // Another loopback port (or any other origin) cannot exchange it.
+    assert.equal(
+      (await session(launch!, { Origin: "http://127.0.0.1:1" })).status,
+      403,
+    );
+    const noOrigin = await fetch(`${origin}/api/v1/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ launch }),
+    });
+    assert.equal(noOrigin.status, 403);
+    assert.equal(noOrigin.headers.get("set-cookie"), null);
+    const granted = await session(launch!);
+    assert.equal(granted.status, 204);
+    const cookie = /yamakan=([a-f0-9]{64}); HttpOnly; SameSite=Strict/.exec(
+      granted.headers.get("set-cookie") || "",
     )?.[1];
-    assert.ok(cookie, "navigation issues a browser session cookie");
+    assert.ok(cookie, "the launch secret grants an HttpOnly session cookie");
     assert.notEqual(cookie, token, "browser and client credentials differ");
+    assert.notEqual(cookie, launch, "the session is not the launch secret");
+    // The client token, the launch link and the database are private to
+    // this account: another account of the machine is denied (Windows), or
+    // the modes exclude everyone else (POSIX).
+    const secrets = ["token", "launch", "workspace.sqlite"].map((name) =>
+      path.join(root, name),
+    );
+    if (process.platform === "win32")
+      for (const file of [root, ...secrets])
+        assert.equal(await readableByOtherAccounts(file), false, file);
+    else {
+      assert.equal((await stat(root)).mode & 0o777, 0o700);
+      for (const file of secrets.slice(0, 2))
+        assert.equal((await stat(file)).mode & 0o777, 0o600, file);
+    }
     const envelope = JSON.stringify({
       apiVersion: 1,
       operation: "yamakan.project.list",
@@ -164,6 +224,22 @@ test("loopback API rejects unauthenticated and cross-site access; restart preser
     const catalog = await (
       await fetch(`${origin}/api/v1/tools`, { headers })
     ).json();
+    // The local CLI authenticates with the owner-only token file.
+    const listed = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          fileURLToPath(new URL("../cli/main.ts", import.meta.url)),
+          "yamakan.project.list",
+          "{}",
+        ],
+        {
+          env: { ...process.env, YAMAKAN_URL: origin, YAMAKAN_WORKSPACE: root },
+          windowsHide: true,
+        },
+      ).toString(),
+    );
+    assert.ok(Array.isArray(listed));
     assert.equal(catalog.service, "yamakan");
     assert.match(catalog.resourcePolicy.hash, /^[a-f0-9]{64}$/);
     assert.ok(

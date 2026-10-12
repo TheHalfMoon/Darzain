@@ -14,6 +14,8 @@ const en = {
   "nav.tools": "Agent tools",
   "badge.local": "Local media · CPU rendering",
   "status.initial": "Create or open a project to begin.",
+  "session.locked":
+    "Open Yamakan with the link it printed when it started (also saved in the workspace's launch file). Opening the address alone does not sign you in.",
   "status.working": "Working…",
   "status.opened": "Opened {name}, revision {revision}.",
   "status.saved": "Saved revision {revision}.",
@@ -149,6 +151,8 @@ const ar: Record<MessageKey, string> = {
   "nav.tools": "أدوات الوكلاء",
   "badge.local": "وسائط محلية · تصيير بالمعالج",
   "status.initial": "أنشئ مشروعًا أو افتح مشروعًا للبدء.",
+  "session.locked":
+    "افتح يماكن بالرابط الذي طبعه عند تشغيله (وهو محفوظ أيضًا في ملف launch في مساحة العمل). فتح العنوان وحده لا يسجّل دخولك.",
   "status.working": "جارٍ العمل…",
   "status.opened": "فُتح {name}، المراجعة {revision}.",
   "status.saved": "حُفظت المراجعة {revision}.",
