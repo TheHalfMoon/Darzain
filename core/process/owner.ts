@@ -26,6 +26,10 @@ export type RunOptions = {
   cwd: string;
   // Upper bound for the whole job's committed memory, in bytes (0 = none).
   memoryBytes?: number;
+  // The only folders the worker may write to (Windows: it runs at low
+  // integrity, and these are labelled low while it runs). Absolute paths of
+  // existing folders; at most 8. Anything else it can only read.
+  writable?: string[];
   signal?: AbortSignal;
   // Called with the worker's PID while it is still suspended (Windows).
   onCreated?: (pid: number) => void | Promise<void>;
@@ -253,6 +257,8 @@ export class ProcessOwner {
             hex(executable),
             hex(path.resolve(options.cwd)),
             String(options.memoryBytes ?? 0),
+            String(options.writable?.length ?? 0),
+            ...(options.writable ?? []).map((d) => hex(path.resolve(d))),
             String(options.args.length),
             ...options.args.map(hex),
           ].join("\t"),

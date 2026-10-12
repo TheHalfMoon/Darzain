@@ -702,6 +702,8 @@ export class JobSupervisor {
           "derivative.mp4",
         ],
         cwd: dir,
+        // The conversion's own folder is the only place it may write.
+        writable: [dir],
         memoryBytes: RESOURCE_POLICY.enforced.renderMemoryBytes,
         signal: controller.signal,
         stderrLimit: 8000,

@@ -317,12 +317,12 @@ test(
     const hex = (s: string) => Buffer.from(s).toString("hex");
     try {
       await waitFor((l) => l === "READY");
-      procd.stdin!.write("SPAWN\tbad1\ta\u00e9\t00\t0\t0\n");
+      procd.stdin!.write("SPAWN\tbad1\ta\u00e9\t00\t0\t0\t0\n");
       await waitFor((l) => l.startsWith("ERROR\tbad1"));
-      procd.stdin!.write("SPAWN\tbad2\tzz\t00\t0\t0\n");
+      procd.stdin!.write("SPAWN\tbad2\tzz\t00\t0\t0\t0\n");
       await waitFor((l) => l.startsWith("ERROR\tbad2"));
       procd.stdin!.write(
-        `SPAWN\tok1\t${hex(process.execPath)}\t${hex(tmpdir())}\t0\t0\n`,
+        `SPAWN\tok1\t${hex(process.execPath)}\t${hex(tmpdir())}\t0\t0\t0\n`,
       );
       await waitFor((l) => l.startsWith("CREATED\tok1"));
       procd.stdin!.write("KILL\tok1\n");

@@ -8,12 +8,17 @@
 //!   * procd dies (any cause)     -> the OS closes the job handles -> workers die;
 //!   * the service dies           -> procd's stdin closes -> procd terminates
 //!                                   every job and exits;
-//!   * a worker is never resumed before the service has recorded its identity.
+//!   * a worker is never resumed before the service has recorded its identity;
+//!   * a worker runs with a restricted, low-integrity copy of procd's token
+//!     (no privileges, Administrators deny-only), so it cannot reach services
+//!     such as WMI that would start a process outside its job, and it can
+//!     write only to the folders its request names (labelled low integrity
+//!     while it runs, restored when it exits).
 //! Worker output travels through anonymous pipes that only procd can read and
 //! is relayed to the service; no named object is ever opened.
 //!
 //! Protocol (tab-separated; strings and data are hex-encoded):
-//!   SPAWN id exe cwd jobMemoryBytes argc arg...
+//!   SPAWN id exe cwd jobMemoryBytes writableCount dir... argc arg...
 //!       -> CREATED id pid       (suspended, inside its job)
 //!   RESUME id                   -> RESUMED id
 //!   KILL id                     -> (EXITED follows)
@@ -52,12 +57,40 @@ const MAX_COMMAND_LINE: usize = 32_766;
 const MAX_REQUEST_LINE: usize = 256 * 1024;
 const MAX_LIVE_WORKERS: usize = 64;
 const RELAY_CHUNK: usize = 16 * 1024;
+const MAX_WRITABLE: usize = 8;
+const TOKEN_ASSIGN_PRIMARY: u32 = 0x0001;
+const TOKEN_DUPLICATE: u32 = 0x0002;
+const TOKEN_QUERY: u32 = 0x0008;
+const TOKEN_ADJUST_DEFAULT: u32 = 0x0080;
+const DISABLE_MAX_PRIVILEGE: u32 = 0x1;
+const TOKEN_INTEGRITY_LEVEL_CLASS: i32 = 25;
+const SE_GROUP_INTEGRITY: u32 = 0x0000_0020;
+const WIN_BUILTIN_ADMINISTRATORS_SID: i32 = 26;
+const WIN_LOW_LABEL_SID: i32 = 66;
+const SECURITY_MAX_SID_SIZE: usize = 68;
+const SE_FILE_OBJECT: i32 = 1;
+const LABEL_SECURITY_INFORMATION: u32 = 0x0000_0010;
+const ACL_REVISION: u32 = 2;
+const OBJECT_INHERIT_ACE: u32 = 0x1;
+const CONTAINER_INHERIT_ACE: u32 = 0x2;
+const SYSTEM_MANDATORY_LABEL_NO_WRITE_UP: u32 = 0x1;
+const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+const DACL_SECURITY_INFORMATION: u32 = 0x0000_0004;
+const FILE_ALL_ACCESS: u32 = 0x001F_01FF;
+const TOKEN_USER_CLASS: i32 = 1;
+const ERROR_ACCESS_DENIED: u32 = 5;
 
 #[repr(C)]
 struct SecurityAttributes {
     n_length: u32,
     security_descriptor: *mut c_void,
     inherit_handle: Bool,
+}
+
+#[repr(C)]
+struct SidAndAttributes {
+    sid: *mut c_void,
+    attributes: u32,
 }
 
 #[repr(C)]
@@ -131,6 +164,7 @@ struct ExtendedLimitInformation {
 #[cfg(target_pointer_width = "64")]
 const _: () = {
     assert!(std::mem::size_of::<SecurityAttributes>() == 24);
+    assert!(std::mem::size_of::<SidAndAttributes>() == 16);
     assert!(std::mem::size_of::<StartupInfoW>() == 104);
     assert!(std::mem::size_of::<StartupInfoExW>() == 112);
     assert!(std::mem::size_of::<ProcessInformation>() == 24);
@@ -154,18 +188,6 @@ extern "system" {
         return_size: *mut usize,
     ) -> Bool;
     fn DeleteProcThreadAttributeList(list: *mut c_void);
-    fn CreateProcessW(
-        application: *const u16,
-        command_line: *mut u16,
-        process_attributes: *mut c_void,
-        thread_attributes: *mut c_void,
-        inherit_handles: Bool,
-        flags: u32,
-        environment: *mut c_void,
-        current_directory: *const u16,
-        startup_info: *mut StartupInfoExW,
-        process_information: *mut ProcessInformation,
-    ) -> Bool;
     fn CreateFileW(
         name: *const u16,
         access: u32,
@@ -184,6 +206,65 @@ extern "system" {
     fn CloseHandle(handle: Handle) -> Bool;
     fn GetLastError() -> u32;
     fn CancelSynchronousIo(thread: Handle) -> Bool;
+    fn GetCurrentProcess() -> Handle;
+    fn LocalFree(memory: *mut c_void) -> *mut c_void;
+}
+
+#[link(name = "advapi32")]
+extern "system" {
+    fn OpenProcessToken(process: Handle, access: u32, token: *mut Handle) -> Bool;
+    fn CreateRestrictedToken(
+        token: Handle,
+        flags: u32,
+        disable_count: u32,
+        disable: *mut SidAndAttributes,
+        delete_count: u32,
+        delete: *mut c_void,
+        restrict_count: u32,
+        restrict: *mut SidAndAttributes,
+        restricted: *mut Handle,
+    ) -> Bool;
+    fn SetTokenInformation(token: Handle, class: i32, info: *mut c_void, length: u32) -> Bool;
+    fn CreateWellKnownSid(kind: i32, domain: *mut c_void, sid: *mut c_void, size: *mut u32) -> Bool;
+    fn GetLengthSid(sid: *mut c_void) -> u32;
+    fn InitializeAcl(acl: *mut c_void, length: u32, revision: u32) -> Bool;
+    fn AddMandatoryAce(acl: *mut c_void, revision: u32, flags: u32, policy: u32, sid: *mut c_void) -> Bool;
+    fn AddAccessAllowedAceEx(acl: *mut c_void, revision: u32, flags: u32, mask: u32, sid: *mut c_void) -> Bool;
+    fn GetAce(acl: *mut c_void, index: u32, ace: *mut *mut c_void) -> Bool;
+    fn AddAce(acl: *mut c_void, revision: u32, start: u32, list: *mut c_void, length: u32) -> Bool;
+    fn GetTokenInformation(token: Handle, class: i32, info: *mut c_void, length: u32, returned: *mut u32) -> Bool;
+    fn GetNamedSecurityInfoW(
+        name: *const u16,
+        kind: i32,
+        info: u32,
+        owner: *mut *mut c_void,
+        group: *mut *mut c_void,
+        dacl: *mut *mut c_void,
+        sacl: *mut *mut c_void,
+        descriptor: *mut *mut c_void,
+    ) -> u32;
+    fn SetNamedSecurityInfoW(
+        name: *mut u16,
+        kind: i32,
+        info: u32,
+        owner: *mut c_void,
+        group: *mut c_void,
+        dacl: *mut c_void,
+        sacl: *mut c_void,
+    ) -> u32;
+    fn CreateProcessAsUserW(
+        token: Handle,
+        application: *const u16,
+        command_line: *mut u16,
+        process_attributes: *mut c_void,
+        thread_attributes: *mut c_void,
+        inherit_handles: Bool,
+        flags: u32,
+        environment: *mut c_void,
+        current_directory: *const u16,
+        startup_info: *mut StartupInfoExW,
+        process_information: *mut ProcessInformation,
+    ) -> Bool;
 }
 
 /// A raw handle owned by exactly one value; closed when it drops.
@@ -205,6 +286,7 @@ impl Drop for Owned {
 struct Worker {
     job: Owned,
     thread: Owned,
+    writable: Vec<String>,
 }
 
 type Out = Arc<Mutex<std::io::Stdout>>;
@@ -311,6 +393,186 @@ fn environment() -> Vec<u16> {
     block
 }
 
+fn well_known_sid(kind: i32) -> Result<Vec<u64>, String> {
+    let mut buffer = vec![0u64; SECURITY_MAX_SID_SIZE.div_ceil(8)];
+    let mut size = SECURITY_MAX_SID_SIZE as u32;
+    if unsafe { CreateWellKnownSid(kind, null_mut(), buffer.as_mut_ptr() as *mut c_void, &mut size) } == 0 {
+        return Err(last_error("CreateWellKnownSid"));
+    }
+    Ok(buffer)
+}
+
+// A restricted, low-integrity primary token derived from procd's own: every
+// privilege removed (bar change-notify), Administrators deny-only, and the
+// integrity level lowered to Low. Lowering one's own token needs no
+// privilege, and CreateProcessAsUser accepts a restricted copy of the
+// caller's token without SeAssignPrimaryToken.
+fn sandbox_token() -> Result<Owned, String> {
+    let mut own: Handle = null_mut();
+    let access = TOKEN_DUPLICATE | TOKEN_QUERY | TOKEN_ASSIGN_PRIMARY | TOKEN_ADJUST_DEFAULT;
+    if unsafe { OpenProcessToken(GetCurrentProcess(), access, &mut own) } == 0 {
+        return Err(last_error("OpenProcessToken"));
+    }
+    let own = Owned(own);
+    let mut admins = well_known_sid(WIN_BUILTIN_ADMINISTRATORS_SID)?;
+    let mut disable = [SidAndAttributes { sid: admins.as_mut_ptr() as *mut c_void, attributes: 0 }];
+    let mut restricted: Handle = null_mut();
+    if unsafe {
+        CreateRestrictedToken(own.0, DISABLE_MAX_PRIVILEGE, 1, disable.as_mut_ptr(), 0, null_mut(), 0, null_mut(), &mut restricted)
+    } == 0
+    {
+        return Err(last_error("CreateRestrictedToken"));
+    }
+    let restricted = Owned(restricted);
+    let mut low = well_known_sid(WIN_LOW_LABEL_SID)?;
+    let mut label = SidAndAttributes { sid: low.as_mut_ptr() as *mut c_void, attributes: SE_GROUP_INTEGRITY };
+    let size = std::mem::size_of::<SidAndAttributes>() as u32 + unsafe { GetLengthSid(low.as_mut_ptr() as *mut c_void) };
+    if unsafe { SetTokenInformation(restricted.0, TOKEN_INTEGRITY_LEVEL_CLASS, &mut label as *mut _ as *mut c_void, size) } == 0 {
+        return Err(last_error("SetTokenInformation(integrity)"));
+    }
+    Ok(restricted)
+}
+
+// Grants the current user full control of a folder it owns, keeping every
+// entry already there. Setting a label needs WRITE_OWNER, which an owner
+// with only Modify (an unrestricted folder) lacks; an owner may always
+// rewrite the DACL. A workspace the service opened already grants this.
+fn grant_owner_full(dir: &str) -> Result<(), String> {
+    unsafe {
+        let mut own: Handle = null_mut();
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut own) == 0 {
+            return Err(last_error("OpenProcessToken"));
+        }
+        let own = Owned(own);
+        let mut needed = 0u32;
+        GetTokenInformation(own.0, TOKEN_USER_CLASS, null_mut(), 0, &mut needed);
+        let mut user = vec![0u64; (needed as usize).div_ceil(8)];
+        if GetTokenInformation(own.0, TOKEN_USER_CLASS, user.as_mut_ptr() as *mut c_void, needed, &mut needed) == 0 {
+            return Err(last_error("GetTokenInformation"));
+        }
+        let user_sid = (*(user.as_ptr() as *const SidAndAttributes)).sid;
+        let name = wide(dir);
+        let mut old: *mut c_void = null_mut();
+        let mut descriptor: *mut c_void = null_mut();
+        let code = GetNamedSecurityInfoW(
+            name.as_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION,
+            null_mut(),
+            null_mut(),
+            &mut old,
+            null_mut(),
+            &mut descriptor,
+        );
+        if code != 0 {
+            return Err(format!("read access of {dir}: Windows error {code}"));
+        }
+        let result = (|| {
+            let old_size = if old.is_null() { 8 } else { *((old as *const u8).add(2) as *const u16) as usize };
+            let count = if old.is_null() { 0 } else { *((old as *const u8).add(4) as *const u16) as u32 };
+            let mut acl = vec![0u64; (old_size + 128).div_ceil(8)];
+            let acl_ptr = acl.as_mut_ptr() as *mut c_void;
+            if InitializeAcl(acl_ptr, (acl.len() * 8) as u32, ACL_REVISION) == 0 {
+                return Err(last_error("InitializeAcl"));
+            }
+            // The user's grant first, then every existing entry in order.
+            if AddAccessAllowedAceEx(
+                acl_ptr,
+                ACL_REVISION,
+                OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE,
+                FILE_ALL_ACCESS,
+                user_sid,
+            ) == 0
+            {
+                return Err(last_error("AddAccessAllowedAceEx"));
+            }
+            for i in 0..count {
+                let mut ace: *mut c_void = null_mut();
+                if GetAce(old, i, &mut ace) == 0 {
+                    return Err(last_error("GetAce"));
+                }
+                let size = *((ace as *const u8).add(2) as *const u16) as u32;
+                if AddAce(acl_ptr, ACL_REVISION, u32::MAX, ace, size) == 0 {
+                    return Err(last_error("AddAce"));
+                }
+            }
+            let mut name = wide(dir);
+            let code = SetNamedSecurityInfoW(
+                name.as_mut_ptr(),
+                SE_FILE_OBJECT,
+                DACL_SECURITY_INFORMATION,
+                null_mut(),
+                null_mut(),
+                acl_ptr,
+                null_mut(),
+            );
+            if code != 0 {
+                return Err(format!("grant {dir}: Windows error {code}"));
+            }
+            Ok(())
+        })();
+        LocalFree(descriptor);
+        result
+    }
+}
+
+// Sets a folder's mandatory label: Low (a low-integrity worker may write
+// there, inherited by what it creates) or none (back to the default,
+// Medium). Lowering a label on one's own folder needs no privilege.
+fn set_label(dir: &str, low: bool) -> Result<(), String> {
+    match apply_label(dir, low) {
+        Err(code) if code == ERROR_ACCESS_DENIED => {
+            grant_owner_full(dir)?;
+            apply_label(dir, low).map_err(|code| format!("label {dir}: Windows error {code}"))
+        }
+        other => other.map_err(|code| format!("label {dir}: Windows error {code}")),
+    }
+}
+
+fn apply_label(dir: &str, low: bool) -> Result<(), u32> {
+    let mut acl = vec![0u64; 32];
+    let acl_ptr = acl.as_mut_ptr() as *mut c_void;
+    if unsafe { InitializeAcl(acl_ptr, (acl.len() * 8) as u32, ACL_REVISION) } == 0 {
+        return Err(unsafe { GetLastError() });
+    }
+    if low {
+        let mut sid = well_known_sid(WIN_LOW_LABEL_SID).map_err(|_| unsafe { GetLastError() })?;
+        if unsafe {
+            AddMandatoryAce(
+                acl_ptr,
+                ACL_REVISION,
+                OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE,
+                SYSTEM_MANDATORY_LABEL_NO_WRITE_UP,
+                sid.as_mut_ptr() as *mut c_void,
+            )
+        } == 0
+        {
+            return Err(unsafe { GetLastError() });
+        }
+    }
+    let mut name = wide(dir);
+    let code = unsafe {
+        SetNamedSecurityInfoW(name.as_mut_ptr(), SE_FILE_OBJECT, LABEL_SECURITY_INFORMATION, null_mut(), null_mut(), null_mut(), acl_ptr)
+    };
+    if code != 0 {
+        return Err(code);
+    }
+    Ok(())
+}
+
+// A writable folder must be an existing, absolute, real directory (not a
+// link or junction, which would label its target instead).
+fn writable_dir(dir: &str) -> Result<(), String> {
+    use std::os::windows::fs::MetadataExt;
+    if !std::path::Path::new(dir).is_absolute() {
+        return Err("writable folders must be absolute".into());
+    }
+    match std::fs::symlink_metadata(dir) {
+        Ok(meta) if meta.is_dir() && meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT == 0 => Ok(()),
+        _ => Err("a writable folder is missing or is a link".into()),
+    }
+}
+
 struct Spawned {
     worker: Worker,
     process: Owned,
@@ -320,21 +582,30 @@ struct Spawned {
 }
 
 fn spawn(fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
-    if fields.len() < 4 {
-        return Err("SPAWN needs exe, cwd, memory and argc".into());
+    if fields.len() < 5 {
+        return Err("SPAWN needs exe, cwd, memory, writable folders and argc".into());
     }
     let exe = hex_decode(fields[0])?;
     let cwd = hex_decode(fields[1])?;
     let memory: usize = fields[2].parse().map_err(|_| "bad memory limit")?;
-    let argc: usize = fields[3].parse().map_err(|_| "bad argc")?;
-    if argc > 4096 || fields.len() != 4 + argc {
+    let count: usize = fields[3].parse().map_err(|_| "bad writable count")?;
+    if count > MAX_WRITABLE || fields.len() < 5 + count {
+        return Err("writable folder count mismatch".into());
+    }
+    let writable = fields[4..4 + count].iter().map(|f| hex_decode(f)).collect::<Result<Vec<_>, _>>()?;
+    let fields = &fields[4 + count..];
+    let argc: usize = fields[0].parse().map_err(|_| "bad argc")?;
+    if argc > 4096 || fields.len() != 1 + argc {
         return Err("argument count mismatch".into());
+    }
+    for dir in &writable {
+        writable_dir(dir)?;
     }
     if !allow.iter().any(|a| a.eq_ignore_ascii_case(&exe)) {
         return Err("executable is not on the allowlist".into());
     }
     let mut line = quote(&exe);
-    for field in &fields[4..] {
+    for field in &fields[1..] {
         line.push(' ');
         line.push_str(&quote(&hex_decode(field)?));
     }
@@ -342,6 +613,45 @@ fn spawn(fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
         return Err("command line too long".into());
     }
 
+    let token = sandbox_token()?;
+    for (i, dir) in writable.iter().enumerate() {
+        if let Err(e) = set_label(dir, true) {
+            for done in &writable[..i] {
+                let _ = set_label(done, false);
+            }
+            return Err(e);
+        }
+    }
+    let restore = |writable: &[String]| {
+        for dir in writable {
+            let _ = set_label(dir, false);
+        }
+    };
+    let result = launch(&exe, &cwd, &line, memory, &token);
+    match result {
+        Ok((job, process)) => {
+            if std::env::var("YAMAKAN_PROCD_FAULT").as_deref() == Ok("after-create") {
+                // Test seam: the launcher dies with a suspended worker in its job.
+                std::process::abort();
+            }
+            Ok(Spawned {
+                worker: Worker { job, thread: Owned(process.0.thread), writable },
+                process: Owned(process.0.process),
+                pid: process.0.process_id,
+                stdout: process.1,
+                stderr: process.2,
+            })
+        }
+        Err(e) => {
+            restore(&writable);
+            Err(e)
+        }
+    }
+}
+
+type Launched = (ProcessInformation, Owned, Owned);
+
+fn launch(exe: &str, cwd: &str, line: &str, memory: usize, token: &Owned) -> Result<(Owned, Launched), String> {
     unsafe {
         let job = Owned(CreateJobObjectW(null_mut(), std::ptr::null()));
         if job.0.is_null() {
@@ -415,11 +725,12 @@ fn spawn(fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
             info.startup_info.std_error = stderr_write.0;
             info.attribute_list = list;
             let mut process: ProcessInformation = std::mem::zeroed();
-            let exe_w = wide(&exe);
-            let cwd_w = wide(&cwd);
-            let mut command = wide(&line);
+            let exe_w = wide(exe);
+            let cwd_w = wide(cwd);
+            let mut command = wide(line);
             let mut env = environment();
-            if CreateProcessW(
+            if CreateProcessAsUserW(
+                token.0,
                 exe_w.as_ptr(),
                 command.as_mut_ptr(),
                 null_mut(),
@@ -438,20 +749,10 @@ fn spawn(fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
         })();
         DeleteProcThreadAttributeList(list);
         let process = result?;
-        if std::env::var("YAMAKAN_PROCD_FAULT").as_deref() == Ok("after-create") {
-            // Test seam: the launcher dies with a suspended worker in its job.
-            std::process::abort();
-        }
         // procd's copies of the write ends close here, so readers see EOF
         // once the worker (the only other holder) exits.
         drop((stdin, stdout_write, stderr_write));
-        Ok(Spawned {
-            worker: Worker { job, thread: Owned(process.thread) },
-            process: Owned(process.process),
-            pid: process.process_id,
-            stdout: stdout_read,
-            stderr: stderr_read,
-        })
+        Ok((job, (process, stdout_read, stderr_read)))
     }
 }
 
@@ -539,8 +840,16 @@ fn main() {
                                 }
                                 let _ = reader.join();
                             }
-                            // Dropping the worker closes its job.
-                            workers.lock().unwrap().remove(&id);
+                            // Dropping the worker closes its job; its folders
+                            // return to the default label.
+                            let worker = workers.lock().unwrap().remove(&id);
+                            if let Some(worker) = worker {
+                                let folders = worker.writable.clone();
+                                drop(worker);
+                                for dir in &folders {
+                                    let _ = set_label(dir, false);
+                                }
+                            }
                             send(&out, &format!("EXITED\t{id}\t{code}"));
                         });
                     }

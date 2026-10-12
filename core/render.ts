@@ -443,6 +443,8 @@ export async function renderPlan(
       executable: mediaTools().ffmpeg,
       args,
       cwd: dir,
+      // The render's own folder is the only place it may write.
+      writable: [dir],
       memoryBytes: RESOURCE_POLICY.enforced.renderMemoryBytes,
       signal: controller.signal,
       onCreated,

@@ -4,7 +4,7 @@ Updated: 2026-10-12. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 
 **Phase:** P01 authority (T1–T3), implementation authorized by the [founder decision record](../docs/FOUNDER_DECISION_RECORD.md) against plan `edbaba6c4f5f2f42e968b4ab2273c8e11620d9af`. [IMPLEMENTATION_PLAN](../docs/IMPLEMENTATION_PLAN.md) is the sole task authority; [operational contracts](../docs/OPERATIONAL_CONTRACTS.md) define protocols. Release verdict: **NO-GO** until every T10 gate passes.
 
-**Verified main:** `eb0881b5` (T9a PR #16 merged at reviewed head `9fa5078d`; tree identical). T8b #15 `e9944262`, T8a #14 `530b1c51`, T7 #13 `54d2f9ba`, T6 #12 `f6843990`, T5 #11 `24dd0a2a`, T4b #10 `1ce242b1`, T4a #9 `2b0db1bd`, T3 #8 `539688b3`, T2 #7 `27e3c7da`, T1 #6 `c1664985`; planning PRs #3–#5 merged earlier.
+**Verified main:** `48f205a4` (T9b PR #17 merged at reviewed head `c331d86a`; tree identical). T9a #16 `eb0881b5`, T8b #15 `e9944262`, T8a #14 `530b1c51`, T7 #13 `54d2f9ba`, T6 #12 `f6843990`, T5 #11 `24dd0a2a`, T4b #10 `1ce242b1`, T4a #9 `2b0db1bd`, T3 #8 `539688b3`, T2 #7 `27e3c7da`, T1 #6 `c1664985`; planning PRs #3–#5 merged earlier.
 
 | Task                                       | Status                                 | Evidence                                                                                                                                                                                                                                                                    |
 | ------------------------------------------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -19,14 +19,23 @@ Updated: 2026-10-12. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 | T8a reference preview                      | **Merged** (#14, `530b1c51`)           | Combined + security reviews (2 cycles + deltas; 6 must-fix resolved: frame-exact previews at any source rate, black clip first frames, vacuous tests, queue flooding, cache bound); CI `qualify` on exact head; latency receipt at `c958b97`                                |
 | T8b localized UI                           | **Merged** (#15, `e9944262`)           | Combined + security reviews (cycle + deltas; 2 must-fix resolved: bidi isolation of inserted text, language switch named by its visible text); CI `qualify` on exact head; Arabic interface screenshot (native review **pending**)                                          |
 | T9a recovery: backups, restore, GC         | **Merged** (#16, `eb0881b5`)           | Combined + security reviews (3 cycles + deltas; 4 must-fix resolved: damaged WAL diagnosed and refused, torn last transaction not mistaken for damage, bounded restores, junction recovery folder); CI `qualify` on exact head                                              |
-| T9b local boundary                         | In review on `feat/t9b-local-boundary` | Windows tests (owner-only DACL; another account's view denied, ordinary file readable as control) + fresh-build Edge E2E (launch link, other loopback port refused with a same-origin control, keyboard-only Arabic journey)                                                |
-| T9c worker sandbox, T10                    | Not started                            | —                                                                                                                                                                                                                                                                           |
+| T9b local boundary                         | **Merged** (#17, `48f205a4`)           | Combined + security reviews (3 cycles + deltas; 7 must-fix resolved incl. a session cookie sent to every loopback port, adopting another account's folder, explicit grants surviving below the root, long paths, and an online-backup race); CI `qualify` on exact head     |
+| T9c worker sandbox                         | In review on `feat/t9c-worker-sandbox` | Windows tests: a sandboxed worker's WMI `Win32_Process.Create` is denied while an ordinary process's succeeds (control); writes confined to named folders, labels restored; full render suite under the sandbox                                                             |
+| T10                                        | Not started                            | —                                                                                                                                                                                                                                                                           |
 
 ## T9 split
 
 T9 exceeds the plan's four-day bound, so it is split at its interface: **T9a** recovery (online backup with pinned media, restore into a new root through the interface and CLI, read-only diagnosis, garbage collection of crash leftovers) and **T9b** local boundary (token ACL so a second Windows account is denied, loopback hardening so another local port cannot obtain credentials or read media, worker sandbox token for the WMI release blocker, authenticated CLI/MCP and the keyboard/RTL journey).
 
-## T9b surface (in review)
+## T9c surface (in review)
+
+- **Worker sandbox (closes the T4a WMI release blocker).** procd now launches every worker with `CreateProcessAsUserW` and a restricted copy of its own token. The copy has every privilege removed (bar change-notify), Administrators deny-only and Low integrity. No privilege is needed: a restricted copy of the caller's token is allowed, and lowering integrity is always allowed. The worker still runs suspended inside its kill-on-close, single-process Job Object as before.
+- **Evidence:** from an ordinary process of this account, WMI `Win32_Process.Create` starts a process outside any job (control). From a sandboxed worker the same call is denied ("Access to a CIM resource was not available to the client", PermissionDenied), and nothing starts.
+- **Writes are confined.** A worker can only read, except in the folders its request names (`writable` in RunOptions; at most 8, absolute, existing, not a link or junction): the render's own folder and the conversion's own folder. procd labels them Low integrity just before launch and restores the default label when the worker exits. To label a folder the account owns but lacks WRITE_OWNER on (an unrestricted folder, as in tests), procd first grants the owner full control of that folder, which an owner may always do. A workspace the service opened already grants it (T9b). Writes elsewhere fail with EPERM (tested).
+- **Protocol:** `SPAWN id exe cwd jobMemoryBytes writableCount dir... argc arg...`.
+- **Residual:** while a worker runs, other low-integrity programs of the same account could also write in its output folder. The service validates each output (probe and receipt) before publishing. An AppContainer would remove this, at the cost of brokering every input.
+
+## T9b surface (merged)
 
 - **Session only through the launch link, never a cookie.** Opening the page grants nothing. The service writes `http://127.0.0.1:<port>/#launch=<secret>` to the owner-only `launch` file (it prints the file's location, not the secret). The page exchanges the secret (in the fragment, never sent to a server) through `POST /api/v1/session` (exact Origin required) for a session and a media key, kept in the tab's `sessionStorage`. API requests send the session as `X-Yamakan-Session` (state changes also need the exact Origin; any request from another site or loopback port is refused by Fetch Metadata); media elements and the export download carry `?media=<key>`, accepted only for GET asset, preview and artifact reads. No cookie is used because browsers send cookies to every port of 127.0.0.1, so another local server would receive one. Without a session the editor shows a sign-in notice (English and Arabic); each tab needs the link.
 - **Owner-only workspace.** At start the service makes the workspace private before writing any secret, and refuses to open one it cannot. On Windows (`yamakan-acl`, dependency-free Rust built with procd):
@@ -102,7 +111,7 @@ T9 exceeds the plan's four-day bound, so it is split at its interface: **T9a** r
 
 ## Release blockers recorded
 
-- **WMI escape from worker jobs:** a compromised worker can start a process outside its Job Object via WMI. Requires a restricted/low-integrity/AppContainer worker token (T9b).
+- ~~**WMI escape from worker jobs**~~ — resolved in T9c: workers run at Low integrity with a restricted token, and WMI process creation is denied to them (tested against a control that succeeds).
 
 ## T4a surface (merged)
 
@@ -155,7 +164,7 @@ T9 exceeds the plan's four-day bound, so it is split at its interface: **T9a** r
 - **Disk (2026-10-12):** C: has ~1.9 GiB free; D: has ~18 GiB free. Clone and npm cache live on D:. T4's ≥2 GiB import and T10 media tests need a disk-capacity preflight and may need space freed by the founder.
 - Jev key and an OCR LLM backend are founder-provided resources; without them those reviews stay recorded as unavailable.
 
-**Next executable task:** T9c worker sandbox (restricted, low-integrity worker token for the WMI release blocker, with writable output folders labelled for it) after T9b merges; then T10.
+**Next executable task:** T10 Windows qualification and release proposal (pinned runtime/FFmpeg/fonts/notices, clean-host journey, CI/fault matrix, independent release review) after T9c merges.
 
 **Recorded for T9 from T6 reviews:** undo/redo write full snapshots and consume the 10,000-revision budget (compaction or head re-pointing); edit history is pruned only by MAX_REVISION; track overlap is enforced by reducers, not by canonical validation (needs a migration decision for existing projects); a request retried across the snapshot format change (`/1`→`/2`) gets IDEMPOTENCY_MISMATCH. Undo binds to the principal, and the CLI and all MCP agents share `local-client` (per-agent identities come with grants).
 
