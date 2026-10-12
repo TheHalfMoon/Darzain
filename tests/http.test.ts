@@ -500,6 +500,11 @@ test("the preview route serves plan-compiled frames and segments to authenticate
       ),
       "hit",
     );
+    // Past the saved timeline: its last frame, said in a header.
+    const past = await fetch(at("start=600"), { headers: auth });
+    assert.equal(past.status, 200);
+    assert.equal(past.headers.get("x-preview-start"), "59");
+    await past.arrayBuffer();
     const segment = await fetch(at("kind=segment&start=0&frames=30"), {
       headers: auth,
     });
@@ -508,7 +513,6 @@ test("the preview route serves plan-compiled frames and segments to authenticate
     for (const bad of [
       "start=-1",
       "start=x",
-      "start=60",
       "kind=gif&start=1",
       "kind=segment&start=0&frames=151",
     ])

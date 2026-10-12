@@ -129,6 +129,13 @@ export function ptsOffset(ticks: number) {
   return `floor(${ticks}/${FLICKS_PER_SECOND}/TB+0.5)`;
 }
 
+// Version of how this module draws a plan. Bump it whenever the drawing
+// changes, so cached previews of unchanged plans are not reused.
+export const RENDERER_VERSION = 2;
+
+// One frame of the 30 fps profile, in flicks.
+const FRAME = FLICKS_PER_SECOND / 30;
+
 export type RenderReceipt = {
   planHash: string;
   width: number;
@@ -166,6 +173,8 @@ export type RenderWindow = {
   startTicks: number;
   durationTicks: number;
   output: "mp4" | "png";
+  // Wall-clock limit; exports use renderWallSeconds.
+  wallSeconds?: number;
 };
 
 export async function renderPlan(
@@ -208,10 +217,13 @@ export async function renderPlan(
   const abort = () => controller.abort();
   signal.addEventListener("abort", abort, { once: true });
   let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, RESOURCE_POLICY.enforced.renderWallSeconds * 1000);
+  const timer = setTimeout(
+    () => {
+      timedOut = true;
+      controller.abort();
+    },
+    (window.wallSeconds ?? RESOURCE_POLICY.enforced.renderWallSeconds) * 1000,
+  );
   const stopped = () =>
     new Error(timedOut ? "Render time limit exceeded." : "Cancelled.");
   try {
@@ -295,25 +307,30 @@ export async function renderPlan(
       if (to <= from) continue;
       const start = seconds(from);
       const end = seconds(to);
-      // Each clip is cut one frame long: a cut of exactly its length can
-      // leave its last frame (or a one-frame window's only frame) short of the
-      // frame-rate filter. The overlay's enable window still ends it on time.
-      const cut = seconds(to - from + FLICKS_PER_SECOND / 30);
-      const index = await input(
-        layer,
-        layer.kind === "image"
-          ? ["-loop", "1", "-t", cut]
-          : [
-              "-ss",
-              seconds(layer.sourceStartTicks + (from - layer.startTicks)),
-              "-t",
-              cut,
-            ],
-      );
       const clip = `c${n}`,
         next = `v${n++}`;
+      let timed: string;
+      if (layer.kind === "image") {
+        // A still: one frame looped for the clip's part of the window, cut
+        // one frame long and ended by the overlay's enable window.
+        const cut = seconds(to - from + FRAME);
+        const index = await input(layer, ["-loop", "1", "-t", cut]);
+        timed = `[${index}:v]trim=duration=${cut},setpts=PTS-STARTPTS+${ptsOffset(from)}`;
+      } else {
+        // Every source frame keeps its own timeline time, clip start plus
+        // its distance from the clip's source start, in export and in any
+        // window alike, so the frame-rate filter picks the same source frame
+        // for each output frame at any source rate. A window reads from up
+        // to two frames earlier (never before the clip) so the frame shown at
+        // its start is available; the overlay's enable window hides them.
+        const lead = Math.min(from - layer.startTicks, 2 * FRAME);
+        const seek = layer.sourceStartTicks + (from - layer.startTicks) - lead;
+        const span = seconds(to - from + lead + FRAME);
+        const index = await input(layer, ["-ss", seconds(seek), "-t", span]);
+        timed = `[${index}:v]trim=duration=${span},setpts=PTS+${ptsOffset(from - lead)}`;
+      }
       filters.push(
-        `[${index}:v]trim=duration=${cut},setpts=PTS-STARTPTS+${ptsOffset(from)},fps=${rate},scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,setsar=1[${clip}]`,
+        `${timed},fps=${rate},scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,setsar=1[${clip}]`,
         `[${visual}][${clip}]overlay=x=(W-w)/2:y=(H-h)/2:enable='gte(t,${start})*lt(t,${end})':eof_action=pass[${next}]`,
       );
       visual = next;

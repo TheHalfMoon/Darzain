@@ -579,6 +579,7 @@ function App() {
                     )}
                     unsaved={history.past.length > 0}
                     playing={playing}
+                    onSave={() => run(async () => void (await save()))}
                   />
                 </section>
                 <section className="inspector">

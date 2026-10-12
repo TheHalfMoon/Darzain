@@ -13,12 +13,14 @@ type Props = {
   totalFrames: number;
   unsaved: boolean;
   playing: boolean;
+  // Saves the edits, so the reference shows the current timeline.
+  onSave: () => void;
 };
 
 const SEGMENT_FRAMES = 60;
 
 export function ReferencePreview(props: Props) {
-  const { projectId, revision, totalFrames, unsaved, playing } = props;
+  const { projectId, revision, totalFrames, unsaved, playing, onSave } = props;
   const frame = Math.max(0, Math.min(totalFrames - 1, props.frame));
   // Follow the playhead only once it rests, so scrubbing does not queue
   // renders; nothing is requested during playback.
@@ -28,11 +30,13 @@ export function ReferencePreview(props: Props) {
     const timer = setTimeout(() => setSettled(frame), 250);
     return () => clearTimeout(timer);
   }, [frame, playing]);
-  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  // Which image finished, so a cached image that loads at once is never
+  // shown as still rendering.
+  const [loaded, setLoaded] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   const [segment, setSegment] = useState<string | null>(null);
   const base = `/api/v1/projects/${encodeURIComponent(projectId)}/preview?revision=${revision}`;
   const src = `${base}&kind=frame&start=${settled}`;
-  useEffect(() => setState("loading"), [src]);
   useEffect(() => setSegment(null), [projectId, revision]);
   if (totalFrames < 1)
     return (
@@ -48,6 +52,11 @@ export function ReferencePreview(props: Props) {
           Saved revision {revision}, frame {settled}
           {unsaved ? " · Stale: save to include your latest edits" : ""}
         </span>
+        {unsaved ? (
+          <button type="button" onClick={onSave}>
+            Save and refresh
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() =>
@@ -72,13 +81,17 @@ export function ReferencePreview(props: Props) {
         <img
           src={src}
           alt={`Reference frame ${settled} of saved revision ${revision}`}
-          data-state={state}
-          onLoad={() => setState("ready")}
-          onError={() => setState("error")}
+          data-state={
+            failed === src ? "error" : loaded === src ? "ready" : "loading"
+          }
+          onLoad={() => setLoaded(src)}
+          onError={() => setFailed(src)}
         />
       )}
-      {state === "loading" && !segment ? <small>Rendering…</small> : null}
-      {state === "error" && !segment ? (
+      {loaded !== src && failed !== src && !segment ? (
+        <small>Rendering…</small>
+      ) : null}
+      {failed === src && !segment ? (
         <small className="error">
           The reference preview could not be rendered for this revision.
         </small>

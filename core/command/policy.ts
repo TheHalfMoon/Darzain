@@ -31,6 +31,10 @@ export const RESOURCE_POLICY = Object.freeze({
     // the longest segment one request may render (5 s at 30 fps).
     previewCacheBytes: 256 * MiB,
     previewSegmentFrames: 150,
+    // Preview requests waiting for the one preview renderer, and each
+    // preview render's wall-clock limit.
+    previewQueueDepth: 6,
+    previewWallSeconds: 30,
     // A constant-rate conversion of a source up to ten minutes long.
     conversionWallSeconds: 900,
     renderMemoryBytes: 2 * GiB,
