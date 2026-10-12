@@ -1585,6 +1585,10 @@ export class ProjectStore {
   ) {
     if (!/^[a-f0-9]{64}$/.test(a.hash))
       throw new CommandError("VALIDATION", "Asset hash is invalid.");
+    // Only the canonical media extensions: a crafted extension could
+    // otherwise name a path outside this project.
+    if (!AssetSchema.shape.extension.safeParse(a.extension).success)
+      throw new CommandError("VALIDATION", "Asset extension is invalid.");
     const object = this.#database
       .prepare(
         "SELECT state FROM asset_objects WHERE project_id = ? AND digest = ?",

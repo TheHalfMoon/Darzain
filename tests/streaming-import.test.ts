@@ -465,3 +465,23 @@ test("imports started in the same tick still respect the concurrency cap", async
   ]);
   store.close();
 });
+
+test("objects resolve only with a canonical media extension", async () => {
+  const { root, store, project } = await workspace();
+  const wav = path.join(root, "tone.wav");
+  ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", wav]);
+  const { asset } = await store.importAsset(
+    project.id,
+    "tone.wav",
+    await readFile(wav),
+  );
+  assert.ok(await store.readyObjectFile(project.id, asset));
+  await assert.rejects(
+    store.readyObjectFile(project.id, {
+      ...asset,
+      extension: "x/../../other/assets/name.mp4",
+    }),
+    (e: unknown) => e instanceof CommandError && e.code === "VALIDATION",
+  );
+  store.close();
+});
