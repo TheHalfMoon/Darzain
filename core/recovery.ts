@@ -137,14 +137,18 @@ const isInside = (parent: string, child: string) => {
 // would copy itself, and a workspace inside the backups would be backed up
 // with them.
 export async function assertSeparate(root: string, other: string) {
-  // A folder that does not exist yet resolves through its nearest existing
-  // ancestor, so a link on the way is followed as it will be.
+  // Each path resolves through its nearest ancestor that resolves at all
+  // (a junction or link to its target), so a folder that does not exist
+  // yet is judged by where it will be.
   const real = async (p: string) => {
-    const base = await existingAncestor(p);
-    return path.join(
-      await realpath(base).catch(() => base),
-      path.relative(base, path.resolve(p)),
-    );
+    let base = path.resolve(p);
+    for (;;) {
+      const resolved = await realpath(base).catch(() => null);
+      if (resolved)
+        return path.join(resolved, path.relative(base, path.resolve(p)));
+      if (path.dirname(base) === base) return path.resolve(p);
+      base = path.dirname(base);
+    }
   };
   // Windows paths compare without case; POSIX paths with it.
   const fold = (p: string) =>

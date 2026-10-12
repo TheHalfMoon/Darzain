@@ -8,6 +8,7 @@ import {
   readdir,
   rm,
   stat,
+  symlink,
   utimes,
   writeFile,
 } from "node:fs/promises";
@@ -589,6 +590,14 @@ test("restores are refused without disk space, run one at a time and never nest 
     code: "VALIDATION",
   });
   await assert.rejects(stat(path.join(root, "..rec")));
+  // A junction (or link) into the workspace is followed, whether the
+  // recovery folder is the link itself or a folder still to be made below it.
+  await mkdir(path.join(root, "inner"));
+  const link = path.join(base, "link");
+  await symlink(path.join(root, "inner"), link, "junction");
+  for (const home of [link, path.join(link, "rec")])
+    await assert.rejects(backupWorkspace(store, home), { code: "VALIDATION" });
+  assert.deepEqual(await readdir(path.join(root, "inner")), []);
   // A restore into a folder inside its own backup is refused and leaves
   // nothing behind.
   await assert.rejects(restoreWorkspace(backupDir, path.join(backupDir, "x")), {
