@@ -26,6 +26,10 @@ const print = (value: unknown) => console.log(JSON.stringify(value, null, 2));
 try {
   if (command === "diagnose" && args[0]) {
     const scratch = args.indexOf("--scratch");
+    if (scratch > 0 && !args[scratch + 1]) {
+      console.error(usage);
+      process.exit(64);
+    }
     const report = await diagnoseWorkspace(path.resolve(args[0]), {
       verifyObjects: args.includes("--verify-objects"),
       scratch: scratch > 0 ? path.resolve(args[scratch + 1]) : undefined,

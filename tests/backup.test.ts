@@ -451,6 +451,38 @@ test("a damaged write-ahead log is diagnosed and refused, and stays as found; a 
     false,
   );
 
+  // A power cut can tear any frame of the last, unsynced transaction (here
+  // its first frame never reached the disk); SQLite drops only that
+  // transaction, so the workspace opens.
+  const cut = path.join(base, "power-cut");
+  await mkdir(cut);
+  await copyFile(
+    path.join(crashed, "workspace.sqlite"),
+    path.join(cut, "workspace.sqlite"),
+  );
+  const cutLog = Buffer.from(await readFile(wal));
+  const frameBytes = 24 + cutLog.readUInt32BE(8);
+  const frames = (cutLog.length - 32) / frameBytes;
+  const isCommit = (i: number) =>
+    cutLog.readUInt32BE(32 + i * frameBytes + 4) !== 0;
+  let previous = frames - 2;
+  while (previous >= 0 && !isCommit(previous)) previous--;
+  assert.ok(isCommit(frames - 1));
+  assert.ok(frames - 1 - previous >= 2, "the last transaction spans frames");
+  cutLog.fill(
+    0,
+    32 + (previous + 1) * frameBytes,
+    32 + (previous + 2) * frameBytes,
+  );
+  await writeFile(path.join(cut, "workspace.sqlite-wal"), cutLog);
+  const cutReport = await inspectWal(path.join(cut, "workspace.sqlite-wal"));
+  assert.equal(cutReport?.damaged, false);
+  assert.equal(cutReport?.unsyncedTail, true);
+  const reopened = new ProjectStore(cut);
+  await reopened.initialize();
+  assert.equal((await reopened.load(project.id)).revision, head - 1);
+  reopened.close();
+
   // Damage in the middle: SQLite would silently drop later commits.
   const log = Buffer.from(await readFile(wal));
   log.fill(0x5a, Math.floor(log.length / 2), Math.floor(log.length / 2) + 2000);
@@ -479,11 +511,15 @@ test("malformed object rows are recorded, quarantined on restore and reported by
   db.prepare(
     "INSERT INTO asset_objects(project_id, digest, byte_length, state, generation) VALUES (?, ?, 10, 'ready', 1)",
   ).run("../evil", "AB".repeat(32));
+  // An id longer than a report keeps is still quarantined as stored.
+  db.prepare(
+    "INSERT INTO asset_objects(project_id, digest, byte_length, state, generation) VALUES (?, ?, 10, 'ready', 1)",
+  ).run("x".repeat(300), "cd".repeat(32));
   db.close();
   const report = await diagnoseWorkspace(root);
   assert.deepEqual(
-    report.objects.invalid.map((o) => o.projectId),
-    ["../evil"],
+    report.objects.invalid.map((o) => o.projectId.slice(0, 7)),
+    ["../evil", "xxxxxxx"],
   );
   // The offline backup reads the database as it is and records the row.
   const source = await offlineSource(root);
@@ -493,12 +529,27 @@ test("malformed object rows are recorded, quarantined on restore and reported by
   } finally {
     await source.close();
   }
-  assert.equal(made.damaged, 1);
+  assert.equal(made.damaged, 2);
   const restored = await restoreFromHome(home, made.backupId);
   assert.deepEqual(
-    restored.quarantined.map((q) => [q.projectId, q.reason]),
-    [["../evil", "invalid"]],
+    restored.quarantined.map((q) => [q.projectId.slice(0, 7), q.reason]),
+    [
+      ["../evil", "invalid"],
+      ["xxxxxxx", "invalid"],
+    ],
   );
+  const check = new DatabaseSync(path.join(restored.root, "workspace.sqlite"), {
+    readOnly: true,
+  });
+  const stillReady = (
+    check
+      .prepare(
+        "SELECT count(*) AS n FROM asset_objects WHERE state = 'ready' AND (project_id = '../evil' OR length(project_id) = 300)",
+      )
+      .get() as { n: number }
+  ).n;
+  check.close();
+  assert.equal(stillReady, 0);
   assert.equal(restored.objectsVerified, 1);
   // Nothing was written outside the restored root.
   await assert.rejects(stat(path.join(home, "restored", "evil")));

@@ -137,7 +137,15 @@ const isInside = (parent: string, child: string) => {
 // would copy itself, and a workspace inside the backups would be backed up
 // with them.
 export async function assertSeparate(root: string, other: string) {
-  const real = (p: string) => realpath(p).catch(() => path.resolve(p));
+  // A folder that does not exist yet resolves through its nearest existing
+  // ancestor, so a link on the way is followed as it will be.
+  const real = async (p: string) => {
+    const base = await existingAncestor(p);
+    return path.join(
+      await realpath(base).catch(() => base),
+      path.relative(base, path.resolve(p)),
+    );
+  };
   // Windows paths compare without case; POSIX paths with it.
   const fold = (p: string) =>
     process.platform === "win32" ? p.toLowerCase() : p;
@@ -545,11 +553,14 @@ async function restore(
     );
     const quarantined: { projectId: string; digest: string; reason: string }[] =
       [];
+    const toQuarantine: ObjectRow[] = [];
     let verified = 0;
     for (const row of ready) {
       const key = `${row.projectId}/${row.digest}`;
       const entry = listed.get(key);
-      let result: string = recorded.get(key) ?? "unlisted";
+      let result: string = malformed(row)
+        ? "invalid"
+        : (recorded.get(key) ?? "unlisted");
       if (entry && !malformed(row) && entry.bytes === row.bytes) {
         const parts = objectParts(row.projectId, row.digest);
         result = await copyVerified(
@@ -559,7 +570,11 @@ async function restore(
         );
       }
       if (result === "ok") verified++;
-      else quarantined.push({ ...reported(row), reason: result });
+      else {
+        quarantined.push({ ...reported(row), reason: result });
+        // The database is updated with the row as found, not as reported.
+        toQuarantine.push(row);
+      }
     }
     // What could not be verified is kept registered but never served.
     const db = new DatabaseSync(database);
@@ -568,7 +583,7 @@ async function restore(
         "UPDATE asset_objects SET state = 'quarantined' WHERE project_id = ? AND digest = ?",
       );
       db.exec("BEGIN IMMEDIATE");
-      for (const q of quarantined) quarantine.run(q.projectId, q.digest);
+      for (const q of toQuarantine) quarantine.run(q.projectId, q.digest);
       db.exec("COMMIT");
     } finally {
       db.close();

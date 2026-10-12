@@ -5,13 +5,18 @@
 // a damaged frame are then lost without an error, and the log is deleted
 // at the next checkpoint. This finds that case before anything opens it.
 //
-// A crash may tear only the last frame written, so a single unreadable
-// frame at the end of the log is normal. Frames of the current log
-// generation (the header's salts) found after an unreadable frame are not:
-// they are written transactions SQLite will skip. Frames with other salts
-// are left from before a log restart and are ignored, as SQLite does.
-// Limitation: damage confined to the final frame is indistinguishable from
-// a torn write and is not reported.
+// With synchronous=FULL the log is synced at every commit, so every
+// transaction but the last one written was durable. A power cut can tear
+// any frame of that last, unsynced transaction (the system may write its
+// pages in any order, or leave zero-filled gaps), and SQLite then drops
+// just that transaction: an unsynced tail, which is normal. Damage is
+// proven only when a current-generation frame (the header's salts) follows
+// a commit frame after the first unreadable frame: that commit was synced
+// before anything after it was written, so it and everything before it
+// were durable, and SQLite would skip them. Frames with other salts are
+// left from before a log restart and are ignored, as SQLite does.
+// Limitation: damage confined to the last transaction cannot be told apart
+// from a torn write and is not reported.
 import { open } from "node:fs/promises";
 
 export type WalReport = {
@@ -20,9 +25,12 @@ export type WalReport = {
   headerValid: boolean;
   validFrames: number;
   validCommits: number;
-  // Current-generation frames after the first unreadable one.
+  // Current-generation frames from the first unreadable one on.
   unreadableFrames: number;
+  // Commit frames among them; at most one may be an unsynced final write.
   lostCommits: number;
+  // An unreadable tail that is only the last, unsynced transaction.
+  unsyncedTail: boolean;
   damaged: boolean;
 };
 
@@ -61,6 +69,7 @@ export async function inspectWal(file: string): Promise<WalReport | null> {
       validCommits: 0,
       unreadableFrames: 0,
       lostCommits: 0,
+      unsyncedTail: false,
       damaged: false,
     };
     // An empty or header-only log holds no transactions.
@@ -95,7 +104,8 @@ export async function inspectWal(file: string): Promise<WalReport | null> {
     const frameBytes = 24 + pageSize;
     const frame = Buffer.alloc(frameBytes);
     let broken = false;
-    let unreadable = 0;
+    // Current-generation frames found after a lost commit frame.
+    let afterCommit = 0;
     for (let offset = 32; offset + frameBytes <= bytes; offset += frameBytes) {
       await handle.read(frame, 0, frameBytes, offset);
       const current =
@@ -115,19 +125,14 @@ export async function inspectWal(file: string): Promise<WalReport | null> {
           continue;
         }
         broken = true;
-        // The first unreadable frame may be a torn final write.
-        if (current) unreadable++;
-        continue;
       }
-      if (current) {
-        unreadable++;
-        report.unreadableFrames++;
-        if (commit) report.lostCommits++;
-      }
+      if (!current) continue;
+      report.unreadableFrames++;
+      if (report.lostCommits > 0) afterCommit++;
+      if (commit) report.lostCommits++;
     }
-    // Damage: current-generation frames after the first unreadable frame.
-    if (report.unreadableFrames > 0) report.unreadableFrames = unreadable;
-    report.damaged = report.unreadableFrames > 0;
+    report.damaged = afterCommit > 0;
+    report.unsyncedTail = report.unreadableFrames > 0 && !report.damaged;
     return report;
   } finally {
     await handle.close();
