@@ -4,19 +4,28 @@ Updated: 2026-10-12. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 
 **Phase:** P01 authority (T1–T3), implementation authorized by the [founder decision record](../docs/FOUNDER_DECISION_RECORD.md) against plan `edbaba6c4f5f2f42e968b4ab2273c8e11620d9af`. [IMPLEMENTATION_PLAN](../docs/IMPLEMENTATION_PLAN.md) is the sole task authority; [operational contracts](../docs/OPERATIONAL_CONTRACTS.md) define protocols. Release verdict: **NO-GO** until every T10 gate passes.
 
-**Verified main:** `1ce242b1` (T4b PR #10 merged at reviewed head `79e56b38`; tree identical). T4a #9 `2b0db1bd`, T3 #8 `539688b3`, T2 #7 `27e3c7da`, T1 #6 `c1664985`; planning PRs #3–#5 merged earlier.
+**Verified main:** `24dd0a2a` (T5 PR #11 merged at reviewed head `6a70eac6`; tree identical). T4b #10 `1ce242b1`, T4a #9 `2b0db1bd`, T3 #8 `539688b3`, T2 #7 `27e3c7da`, T1 #6 `c1664985`; planning PRs #3–#5 merged earlier.
 
-| Task | Status | Evidence |
-|---|---|---|
-| T1 command boundary and import guard | **Merged** (#6, `c1664985`) | Combined + security fresh-context reviews (3 cycles, all must-fix resolved); CI `qualify` on exact head; Windows tests + Edge E2E |
-| T2 SQLite snapshot authority | **Merged** (#7, `27e3c7da`) | Combined + security reviews (3 cycles, 3 must-fix resolved); CI `qualify` on exact head after a Linux-only permission fix; Windows tests + Edge E2E |
-| T3 canonical v1 and migration | **Merged** (#8, `539688b3`) | Combined + security reviews (3 cycles; 4 must-fix resolved incl. source-aliasing writes); CI `qualify` on exact head; Windows tests + Edge E2E |
-| T4a process ownership and owned probes | **Merged** (#9, `2b0db1bd`) | Combined + security reviews (3 cycles; 4 must-fix resolved incl. pipe-name traversal); CI `qualify` on exact head; 13 Windows ownership/probe tests; WMI job escape recorded as T9 release blocker |
-| T4b streaming import, asset tables, ≥2 GiB | **Merged** (#10, `1ce242b1`) | Combined + security reviews (3 cycles + delta; must-fix resolved incl. slow-loris and admission race); CI `qualify` on exact head after a Linux-only publish-race fix; large-import receipt: 2.24 GB, peak 154 MiB ≤ 300 MiB |
-| T5 durable jobs + VFR derivatives | In review on `feat/t5-durable-jobs` | Windows tests + Edge E2E |
-| T6–T10 | Not started (T6 work in progress on `feat/t6-timeline-reducers`) | — |
+| Task                                       | Status                                                               | Evidence                                                                                                                                                                                                                                                                    |
+| ------------------------------------------ | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1 command boundary and import guard       | **Merged** (#6, `c1664985`)                                          | Combined + security fresh-context reviews (3 cycles, all must-fix resolved); CI `qualify` on exact head; Windows tests + Edge E2E                                                                                                                                           |
+| T2 SQLite snapshot authority               | **Merged** (#7, `27e3c7da`)                                          | Combined + security reviews (3 cycles, 3 must-fix resolved); CI `qualify` on exact head after a Linux-only permission fix; Windows tests + Edge E2E                                                                                                                         |
+| T3 canonical v1 and migration              | **Merged** (#8, `539688b3`)                                          | Combined + security reviews (3 cycles; 4 must-fix resolved incl. source-aliasing writes); CI `qualify` on exact head; Windows tests + Edge E2E                                                                                                                              |
+| T4a process ownership and owned probes     | **Merged** (#9, `2b0db1bd`)                                          | Combined + security reviews (3 cycles; 4 must-fix resolved incl. pipe-name traversal); CI `qualify` on exact head; 13 Windows ownership/probe tests; WMI job escape recorded as T9 release blocker                                                                          |
+| T4b streaming import, asset tables, ≥2 GiB | **Merged** (#10, `1ce242b1`)                                         | Combined + security reviews (3 cycles + delta; must-fix resolved incl. slow-loris and admission race); CI `qualify` on exact head after a Linux-only publish-race fix; large-import receipt: 2.24 GB, peak 154 MiB ≤ 300 MiB                                                |
+| T5 durable jobs + VFR derivatives          | **Merged** (#11, `24dd0a2a`)                                         | Combined + security reviews (2 cycles + deltas; 6 must-fix resolved incl. VFR rotation, upload loss on graceful stops, runaway conversions, orphaned objects); CI `qualify` on exact head (fresh build + E2E); Windows FFmpeg kill tests at service, owner and launch seams |
+| T6 timeline reducers and donor adapters    | In review on `feat/t6-timeline-reducers`                             | Windows tests + fresh-build Edge E2E                                                                                                                                                                                                                                        |
+| T7–T10                                     | Not started (T7 fonts/ASS groundwork on `feat/t7-render-typography`) | —                                                                                                                                                                                                                                                                           |
 
-## T5 surface (in review)
+## T6 surface (in review)
+
+- Canonical `yamakan.project` v2: audio gain and linear fades, scenes with shots. Edit view gains optional gain/fade/shot fields (lossless projection).
+- `core/timeline/operations.ts`: typed operations (scene/shot, track, clip add/trim/split/move/remove, title, audio) reduced by `applyBatch` (1–64 operations, validated once). OpenCut overlap (placement checks) and snapping (`clip.move` with an optional `snapTicks`, start or end to the nearest clip edge) adapted behind checked tick types and qualified by fixtures (`core/donors/opencut`, pinned and noticed).
+- Schema v4: `edit_history`, `edit_cursor`. `yamakan.project.applyBatch`, `undo`, `redo` are revision-bound mutations; a stale undo conflicts; only the principal that wrote a step may undo or redo it; non-batch commits clear history. Commits refuse when free space is below the import reserve plus one snapshot.
+- The editor applies split and delete through the same reducer on its local edit view (`src/edit-ops.ts`) and clamps fades on drag/trim with the shared rule, so UI and tool edits give identical canonical bytes.
+- Render applies audio gain (`volume`) and fades (`afade`).
+
+## T5 surface (merged)
 
 - Schema v3: `jobs` (intent: project, frozen revision, idempotency key, payload), `attempts` (generation, worker PID, outcome) and `supervisor` (generation). `core/jobs.ts` `JobSupervisor`: every transition is a fenced compare-and-swap in one transaction; a restart takes a new generation, marks earlier attempts failed and re-queues their jobs (local work only). Unknown payloads are quarantined; admission counts only active jobs (`activeJobs` 128).
 - Export renders run on an owned FFmpeg worker (`renderWallSeconds` 180, `renderMemoryBytes` 2 GiB) whose identity is durable before it resumes; partial outputs are never registered, and success, artifact and cancellation are decided by the database.
@@ -69,18 +78,22 @@ Updated: 2026-10-12. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 
 ## Tooling status (actual, 2026-10-11)
 
-| Tool | Status |
-|---|---|
-| Jev 2026.919.0 | Installed; **blocked**: no TypeSafe API key on this machine (`JEV_API_KEY` unset, no stored login). No Jev result is claimed. |
+| Tool                | Status                                                                                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Jev 2026.919.0      | Installed; **blocked**: no TypeSafe API key on this machine (`JEV_API_KEY` unset, no stored login). No Jev result is claimed.                            |
 | Alibaba OCR 1.12.13 | Installed; no LLM provider configured. Only **delegate mode** (file/rule selection; host agent performs the review) runs. Not a model-backed OCR review. |
-| Graft 0.21.1 | Keyless structural build works (`graft build`, no `--deep`). |
-| PStack | Markdown playbook at `~/.tooling/pstack`; applied as review discipline by the agent, not as an executed automated check. |
-| REA | Not reachable from the Claude Code session on this machine (no `rea` binary on PATH; MCP registration is Codex-only). |
-| E2E | Real Windows runs: `npm test` and `npm run test:e2e` (Microsoft Edge, headless). |
+| Graft 0.21.1        | Keyless structural build works (`graft build`, no `--deep`).                                                                                             |
+| PStack              | Markdown playbook at `~/.tooling/pstack`; applied as review discipline by the agent, not as an executed automated check.                                 |
+| REA                 | Not reachable from the Claude Code session on this machine (no `rea` binary on PATH; MCP registration is Codex-only).                                    |
+| E2E                 | Real Windows runs: `npm test` and `npm run test:e2e` (Microsoft Edge, headless).                                                                         |
 
 ## Blockers
 
 - **Disk:** C: has ~3 GiB free (99% used); D: has ~20 GiB free. Clone and npm cache live on D:. T4's ≥2 GiB import and T10 media tests need a disk-capacity preflight and may need space freed by the founder.
 - Jev key and an OCR LLM backend are founder-provided resources; without them those reviews stay recorded as unavailable.
 
-**Next executable task:** T6 timeline reducers (canonical v2, batch/undo/redo) after T5 merges.
+**Next executable task:** T7 render plan and typography (versioned plan compiler, ASS/libass titles with pinned OFL Arabic/Latin fonts) after T6 merges.
+
+**Recorded for T9 from T6 reviews:** undo/redo write full snapshots and consume the 10,000-revision budget (compaction or head re-pointing); edit history is pruned only by MAX_REVISION; track overlap is enforced by reducers, not by canonical validation (needs a migration decision for existing projects); a request retried across the snapshot format change (`/1`→`/2`) gets IDEMPOTENCY_MISMATCH. Undo binds to the principal, and the CLI and all MCP agents share `local-client` (per-agent identities come with grants).
+
+**Recorded for T9 from T5 reviews:** GC for crash-window orphans and hidden retained originals; a retry/discard command for `reconciliationRequired` jobs; attempt reason codes instead of error text; conversion space in the import reservation.

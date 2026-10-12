@@ -181,7 +181,7 @@ test("an injected out-of-space failure while staging commits nothing", async () 
   store.close();
 });
 
-test("a version 2 workspace with imported media upgrades to version 3 and keeps it", async () => {
+test("a version 2 workspace with imported media upgrades to the current version and keeps it", async () => {
   const { root, store, project } = await workspace();
   const wav = path.join(root, "tone.wav");
   ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", wav]);
@@ -193,7 +193,7 @@ test("a version 2 workspace with imported media upgrades to version 3 and keeps 
   store.close();
   const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
   db.exec(
-    "DROP TABLE attempts; DROP TABLE jobs; DROP TABLE supervisor; PRAGMA user_version = 2",
+    "DROP TABLE edit_cursor; DROP TABLE edit_history; DROP TABLE attempts; DROP TABLE jobs; DROP TABLE supervisor; PRAGMA user_version = 2",
   );
   db.close();
   const reopened = new ProjectStore(root);
@@ -202,7 +202,7 @@ test("a version 2 workspace with imported media upgrades to version 3 and keeps 
   assert.equal(
     (check.prepare("PRAGMA user_version").get() as { user_version: number })
       .user_version,
-    3,
+    4,
   );
   assert.equal(rows(root, "jobs"), 0);
   assert.equal(rows(root, "supervisor"), 1);
@@ -217,7 +217,7 @@ test("a version 1 workspace database upgrades step by step to the current versio
   store.close();
   const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
   db.exec(
-    "DROP TABLE attempts; DROP TABLE jobs; DROP TABLE supervisor; DROP TABLE asset_versions; DROP TABLE asset_objects; DROP TABLE pending_work; PRAGMA user_version = 1",
+    "DROP TABLE edit_cursor; DROP TABLE edit_history; DROP TABLE attempts; DROP TABLE jobs; DROP TABLE supervisor; DROP TABLE asset_versions; DROP TABLE asset_objects; DROP TABLE pending_work; PRAGMA user_version = 1",
   );
   db.close();
   const reopened = new ProjectStore(root);
@@ -226,7 +226,7 @@ test("a version 1 workspace database upgrades step by step to the current versio
   assert.equal(
     (check.prepare("PRAGMA user_version").get() as { user_version: number })
       .user_version,
-    3,
+    4,
   );
   assert.equal(rows(root, "asset_objects"), 0);
   assert.equal(rows(root, "jobs"), 0);
@@ -341,7 +341,7 @@ test("upgrading to schema v2 registers existing assets (ready, or quarantined if
   await truncate(badFile, 10);
   const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
   db.exec(
-    "DROP TABLE attempts; DROP TABLE jobs; DROP TABLE supervisor; DROP TABLE asset_versions; DROP TABLE asset_objects; DROP TABLE pending_work; PRAGMA user_version = 1",
+    "DROP TABLE edit_cursor; DROP TABLE edit_history; DROP TABLE attempts; DROP TABLE jobs; DROP TABLE supervisor; DROP TABLE asset_versions; DROP TABLE asset_objects; DROP TABLE pending_work; PRAGMA user_version = 1",
   );
   db.close();
   const reopened = new ProjectStore(root);

@@ -64,7 +64,7 @@ test("every command input is strict, bounded and free of executable or path para
   const tools = catalog();
   assert.equal(tools.length, Object.keys(commands).length);
   for (const tool of tools) {
-    assert.match(tool.name, /^yamakan\.[a-z]+\.[a-z]+$/);
+    assert.match(tool.name, /^yamakan\.[a-z]+\.[a-z][a-zA-Z]*$/);
     assert.ok(Scopes.includes(tool.scope as Scope));
     visit(tool.inputSchema, tool.name);
   }

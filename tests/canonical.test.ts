@@ -83,7 +83,7 @@ test("the 30 fps editing shape round-trips losslessly through canonical v1", () 
   const view = richView();
   const canonical = fromEditView(view, "ar");
   assert.equal(canonical.format, FORMAT);
-  assert.equal(canonical.formatVersion, 1);
+  assert.equal(canonical.formatVersion, 2);
   assert.equal(canonical.language, "ar");
   assert.deepEqual(canonical.output.fps, { num: 30, den: 1 });
   // One 30 fps frame is exactly 23,520,000 flicks.
@@ -152,12 +152,12 @@ test("canonical validation enforces refs, safe integers and strict keys", () => 
 test("newer formats can be inspected but not parsed for editing", () => {
   const newer = {
     ...fromEditView(richView()),
-    formatVersion: 2,
+    formatVersion: 3,
     futureField: { x: 1 },
   };
   assert.deepEqual(inspectFormat(newer), {
     format: FORMAT,
-    formatVersion: 2,
+    formatVersion: 3,
     supported: false,
   });
   assert.throws(
@@ -173,4 +173,29 @@ test("newer formats can be inspected but not parsed for editing", () => {
     formatVersion: null,
     supported: false,
   });
+});
+
+test("a stored v1 canonical snapshot upgrades to v2 losslessly; v1 with v2 fields is refused", () => {
+  const v2 = fromEditView(richView(), "ar");
+  // The same project as v1 stored it: no gain, fades or shots.
+  const v1 = JSON.parse(JSON.stringify(v2));
+  v1.formatVersion = 1;
+  for (const c of v1.clips) {
+    delete c.gainDb;
+    delete c.fadeInTicks;
+    delete c.fadeOutTicks;
+  }
+  for (const s of v1.scenes) delete s.shots;
+  assert.deepEqual(parseCanonical(v1), v2);
+  for (const tamper of [
+    (x: any) => (x.clips[2].gainDb = -6),
+    (x: any) => (x.scenes[0].shots = []),
+  ]) {
+    const claimed = JSON.parse(JSON.stringify(v1));
+    tamper(claimed);
+    assert.throws(
+      () => parseCanonical(claimed),
+      (e: unknown) => e instanceof CommandError && e.code === "VALIDATION",
+    );
+  }
 });

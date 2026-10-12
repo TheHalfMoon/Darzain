@@ -187,9 +187,10 @@
       "Adapt buildTimelineCommand algorithm only: canonical frame data, local process isolation, explicit audio mixing, safe title files, cancellation and verified atomic output.",
       "T1: prefer YAMAKAN_FFMPEG/YAMAKAN_FONT with DARZAIN_* compatibility fallback; product name in comments.",
       "T1 review: render threads and session job limit read the server resource policy; public FFmpeg errors are classified and path-free, with the stderr tail kept as the server-side error cause. Job error messages are redacted of the workspace root.",
-      "T5: rendering runs through the owned worker (core/process) into a per-attempt staging folder with policy wall-clock and memory limits and an onCreated identity hook; returns the verified unpublished output; publication and job state moved to core/jobs.ts (the in-memory RenderQueue is removed); input protocols restricted to file. Inputs are restricted to the accepted container formats (MEDIA_FORMATS) as well."
+      "T5: rendering runs through the owned worker (core/process) into a per-attempt staging folder with policy wall-clock and memory limits and an onCreated identity hook; returns the verified unpublished output; publication and job state moved to core/jobs.ts (the in-memory RenderQueue is removed); input protocols restricted to file. Inputs are restricted to the accepted container formats (MEDIA_FORMATS) as well.",
+      "T6: audio clips apply schema-bounded gain (volume) and linear fades (afade) in clip time before placement."
     ],
-    "importedSha256": "64ac9324714706060098964adb3b37c72d10766b70cc31cf01be5acb8574b275"
+    "importedSha256": "8a98e06cabec5c4645e66d14a322f17a41923cb124c775c5f6ec6e8dd022388c"
   },
   {
     "source": "TheHalfMoon/Skelet",
@@ -212,5 +213,42 @@
       "Use Darzain module import; verify absolute generated temporary fixture paths before recursive cleanup on Windows; format test source."
     ],
     "authorization": "Founder-provided authorization in the Darzain master directive. No repository license file was found in this pinned snapshot; no third-party license is inferred."
+  },
+  {
+    "source": "OpenCut-app/opencut-classic",
+    "sha": "cf5e79e919144200294fb9fed22a222592a0aeea",
+    "authorization": "Founder source-reuse authorization (docs/FOUNDER_DECISION_RECORD.md); MIT license preserved in notices/OpenCut-LICENSE",
+    "original": "apps/web/src/timeline/snapping/build.ts",
+    "imported": "core/donors/opencut/snapping.ts",
+    "sha256": "7cf9b8dc203a691af38e99d16ceb401cb881055b93244f9f6afa65338ef46e1a",
+    "modifications": [
+      "Combined with snapping/resolve.ts and types.ts into one module; integer flick ticks replace the wasm MediaTime brand; formatted with Prettier."
+    ],
+    "importedSha256": "c6b1499dec71a5c4d25217a9481a133400a73bad7e6d289f9f1699f1ad47d279"
+  },
+  {
+    "source": "OpenCut-app/opencut-classic",
+    "sha": "cf5e79e919144200294fb9fed22a222592a0aeea",
+    "authorization": "Founder source-reuse authorization (docs/FOUNDER_DECISION_RECORD.md); MIT license preserved in notices/OpenCut-LICENSE",
+    "original": "apps/web/src/timeline/snapping/resolve.ts",
+    "imported": "core/donors/opencut/snapping.ts",
+    "sha256": "73f7865940cd914b09070ca3daa03325b03a31bd33ebb6766dc0975736c6fc0d",
+    "modifications": [
+      "Combined with snapping/build.ts and types.ts into one module; integer flick ticks replace the wasm MediaTime brand; formatted with Prettier."
+    ],
+    "importedSha256": "c6b1499dec71a5c4d25217a9481a133400a73bad7e6d289f9f1699f1ad47d279"
+  },
+  {
+    "source": "OpenCut-app/opencut-classic",
+    "sha": "cf5e79e919144200294fb9fed22a222592a0aeea",
+    "authorization": "Founder source-reuse authorization (docs/FOUNDER_DECISION_RECORD.md); MIT license preserved in notices/OpenCut-LICENSE",
+    "original": "apps/web/src/timeline/placement/overlap.ts",
+    "imported": "core/donors/opencut/overlap.ts",
+    "sha256": "0ed2ec979ea29d56a2dbbc3f456a8e4bee0850eddb342ad9dbaa6742c16d0001",
+    "modifications": [
+      "Elements are Yamakan clips ({ id, startTicks, durationTicks }) in integer flick ticks; PlacementTimeSpan inlined; formatted with Prettier.",
+      "T6 review: element and span ends use checked tick addition (addTicks)."
+    ],
+    "importedSha256": "56d0629bd8f19b517644df9ae4205b8166bda5521c8c81d6e1b54a4a0ac01ef7"
   }
 ]

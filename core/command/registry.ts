@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ProjectSchema, Id } from "../project.ts";
+import { BatchSchema } from "../timeline/operations.ts";
 import { SNAPSHOT_FORMAT } from "../store.ts";
 import type { ProjectStore, RequestReceipt } from "../store.ts";
 import { canonicalJson, sha256Hex } from "../donors/ninerr/canonical.ts";
@@ -114,6 +115,54 @@ export const commands = {
         a.expectedHeadFingerprint,
         receipt,
       ),
+  }),
+  "yamakan.project.applyBatch": define({
+    scope: "project:write",
+    mutation: true,
+    summary:
+      "Apply up to 64 typed timeline operations atomically as one revision.",
+    input: z
+      .object({
+        projectId: Id,
+        expectedRevision: z.number().int().nonnegative(),
+        operations: BatchSchema,
+      })
+      .strict(),
+    run: ({ store, receipt, principal }, a) =>
+      store.applyOperations(
+        a.projectId,
+        a.expectedRevision,
+        a.operations,
+        principal.id,
+        receipt,
+      ),
+  }),
+  "yamakan.project.undo": define({
+    scope: "project:write",
+    mutation: true,
+    summary:
+      "Undo the last applied batch as a new revision (only from the head it produced).",
+    input: z
+      .object({
+        projectId: Id,
+        expectedRevision: z.number().int().nonnegative(),
+      })
+      .strict(),
+    run: ({ store, receipt, principal }, a) =>
+      store.undo(a.projectId, a.expectedRevision, principal.id, receipt),
+  }),
+  "yamakan.project.redo": define({
+    scope: "project:write",
+    mutation: true,
+    summary: "Redo the last undone batch as a new revision.",
+    input: z
+      .object({
+        projectId: Id,
+        expectedRevision: z.number().int().nonnegative(),
+      })
+      .strict(),
+    run: ({ store, receipt, principal }, a) =>
+      store.redo(a.projectId, a.expectedRevision, principal.id, receipt),
   }),
   "yamakan.project.save": define({
     scope: "project:write",
