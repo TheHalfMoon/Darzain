@@ -369,14 +369,39 @@ test("undo and redo are new revisions bound to the head they were made for", asy
 test("audio gain and fades are rendered, not dropped", async () => {
   const { store, queue, project, audio, call } = await workspace();
   const [picture, sound] = project.tracks.map((t) => t.id);
-  const loudness = async (gainDb: number, key: string) => {
+  // Mean level of the rendered audio over [start, start + seconds).
+  const level = (file: string, start: number, seconds: number) => {
+    const out = spawnSync(
+      mediaTools().ffmpeg,
+      [
+        "-hide_banner",
+        "-ss",
+        String(start),
+        "-t",
+        String(seconds),
+        "-i",
+        file,
+        "-af",
+        "volumedetect",
+        "-f",
+        "null",
+        "-",
+      ],
+      { encoding: "utf8", windowsHide: true },
+    );
+    return Number(/mean_volume: (-?[\d.]+) dB/.exec(out.stderr)![1]);
+  };
+  const render = async (
+    audioOps: { gainDb?: number; fadeInTicks?: number },
+    key: string,
+  ) => {
     const current = await store.load(project.id);
-    const result = await call("yamakan.project.applyBatch", {
+    await call("yamakan.project.applyBatch", {
       projectId: project.id,
       expectedRevision: current.revision,
       operations: [
         ...(current.clips.length
-          ? [{ type: "clip.setAudio", clipId: ids.tone, gainDb }]
+          ? []
           : [
               {
                 type: "clip.add",
@@ -398,29 +423,35 @@ test("audio gain and fades are rendered, not dropped", async () => {
                 durationTicks: 60 * F,
                 sourceStartTicks: 0,
               },
-              { type: "clip.setAudio", clipId: ids.tone, gainDb },
             ]),
+        { type: "clip.setAudio", clipId: ids.tone, ...audioOps },
       ],
     });
     const job = await queue.submit(project.id, key);
-    for (let t = 0; t < 60000; t += 50) {
-      const s = queue.status(job.id);
-      if (s.state === "COMPLETED") break;
-      if (s.state === "FAILED") throw new Error(s.error ?? "render failed");
+    let done = queue.status(job.id);
+    for (
+      let t = 0;
+      t < 60000 && !["COMPLETED", "FAILED"].includes(done.state);
+      t += 50
+    ) {
       await new Promise((r) => setTimeout(r, 50));
+      done = queue.status(job.id);
     }
-    const file = await store.file(project.id, "exports", job.id, "render.mp4");
-    const out = spawnSync(
-      mediaTools().ffmpeg,
-      ["-hide_banner", "-i", file, "-af", "volumedetect", "-f", "null", "-"],
-      { encoding: "utf8", windowsHide: true },
-    );
-    void result;
-    return Number(/mean_volume: (-?[\d.]+) dB/.exec(out.stderr)![1]);
+    assert.equal(done.state, "COMPLETED", done.error ?? "");
+    return store.file(project.id, ...done.artifact!.split("/"));
   };
-  const full = await loudness(0, "full");
-  const quiet = await loudness(-30, "quiet");
-  assert.ok(full - quiet > 25, `gain applied: ${full} dB vs ${quiet} dB`);
+  const full = await render({ gainDb: 0, fadeInTicks: 0 }, "full");
+  const quiet = await render({ gainDb: -30, fadeInTicks: 0 }, "quiet");
+  assert.ok(level(full, 0, 2) - level(quiet, 0, 2) > 25, "gain is applied");
+  // Control: without a fade, the opening is as loud as the steady tone.
+  assert.ok(Math.abs(level(full, 0, 0.1) - level(full, 1.2, 0.5)) < 3);
+  // A one-second fade-in: the opening is far quieter than the steady tone.
+  const faded = await render({ gainDb: 0, fadeInTicks: 30 * F }, "fade-in");
+  assert.ok(
+    level(faded, 1.2, 0.5) - level(faded, 0, 0.1) > 15,
+    "the fade-in is applied",
+  );
+  assert.ok(Math.abs(level(faded, 1.2, 0.5) - level(full, 1.2, 0.5)) < 1);
   await queue.close();
   store.close();
 });

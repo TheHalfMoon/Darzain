@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { once } from "node:events";
+import { mediaTools } from "../core/process/workers.ts";
 
 test("loopback API rejects unauthenticated and cross-site access; restart preserves edits", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-http-"));
@@ -309,5 +310,117 @@ test("loopback API rejects unauthenticated and cross-site access; restart preser
     assert.deepEqual((await reopened.json()).result, saved.result);
   } finally {
     await stop();
+  }
+});
+
+test("a VFR upload returns 202 with a conversion job; the converted asset joins the project", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "yamakan-http-vfr-"));
+  const port = 24319;
+  const origin = `http://127.0.0.1:${port}`;
+  const script = fileURLToPath(new URL("../server/main.ts", import.meta.url));
+  const child = fork(script, [], {
+    env: {
+      ...process.env,
+      YAMAKAN_WORKSPACE: root,
+      YAMAKAN_PORT: String(port),
+    },
+    silent: true,
+    windowsHide: true,
+  });
+  try {
+    let errors = "";
+    child.stderr?.on("data", (chunk) => (errors += String(chunk)));
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`Server startup timeout: ${errors}`)),
+        10000,
+      );
+      child.stdout?.on("data", (chunk) => {
+        if (String(chunk).includes("Yamakan is running")) {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+    });
+    const token = await readFile(path.join(root, "token"), "utf8");
+    const call = async (name: string, args: unknown) =>
+      (
+        await (
+          await fetch(`${origin}/api/v1/call`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ name, arguments: args }),
+          })
+        ).json()
+      ).result;
+    const project = await call("yamakan.project.create", { name: "VFR" });
+    const vfr = path.join(root, "vfr.mp4");
+    execFileSync(
+      mediaTools().ffmpeg,
+      [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc=size=320x240:rate=30:duration=2",
+        "-vf",
+        "select='not(mod(n\\,3))+eq(n\\,1)'",
+        "-fps_mode",
+        "vfr",
+        "-pix_fmt",
+        "yuv420p",
+        vfr,
+      ],
+      { windowsHide: true },
+    );
+    const bytes = await readFile(vfr);
+    const upload = await fetch(
+      `${origin}/api/v1/projects/${project.id}/assets`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "X-Asset-Name": "vfr.mp4",
+          "Content-Length": String(bytes.length),
+        },
+        body: bytes,
+      },
+    );
+    assert.equal(upload.status, 202);
+    const accepted = await upload.json();
+    assert.equal(accepted.asset, null);
+    assert.equal(accepted.project.assets.length, 0);
+    let job = accepted.job;
+    for (
+      let t = 0;
+      t < 60000 && ["QUEUED", "RUNNING"].includes(job.state);
+      t += 100
+    ) {
+      await new Promise((r) => setTimeout(r, 100));
+      job = await call("yamakan.job.status", { jobId: job.id });
+    }
+    assert.equal(job.state, "COMPLETED", job.error ?? "");
+    const opened = await call("yamakan.project.open", {
+      projectId: project.id,
+    });
+    assert.equal(opened.assets.length, 1);
+    assert.equal(job.artifact, `asset:${opened.assets[0].id}`);
+    // A conversion job has no downloadable file.
+    const artifact = await fetch(`${origin}/api/v1/jobs/${job.id}/artifact`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(artifact.status, 404);
+  } finally {
+    if (child.exitCode === null) {
+      const done = once(child, "exit");
+      child.send("shutdown");
+      await done;
+    }
   }
 });

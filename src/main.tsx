@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ProjectSchema } from "../core/project.ts";
+import { RESOURCE_POLICY } from "../core/command/policy.ts";
 import type { Project, Clip } from "../core/project.ts";
 import type { RenderJob } from "../core/render.ts";
 import type { ProjectHistory } from "../core/store.ts";
@@ -323,10 +324,19 @@ function App() {
                         `Converting ${file.name} to a constant frame rate before editing…`,
                       );
                       let job = v.job;
+                      // Stop waiting (the job continues) after twice the
+                      // conversion time limit, queueing included.
+                      const deadline =
+                        Date.now() +
+                        2000 * RESOURCE_POLICY.enforced.conversionWallSeconds;
                       while (
                         job.state === "QUEUED" ||
                         job.state === "RUNNING"
                       ) {
+                        if (Date.now() > deadline)
+                          throw new Error(
+                            `${file.name} is still converting; it will appear in the asset list when it finishes.`,
+                          );
                         await new Promise((resolve) =>
                           setTimeout(resolve, 500),
                         );

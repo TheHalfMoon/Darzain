@@ -1,21 +1,38 @@
 # Yamakan current frontier
 
-Updated: 2026-10-11. Canonical repository: `TheHalfMoon/Yamakan` (default branch `main`).
+Updated: 2026-10-12. Canonical repository: `TheHalfMoon/Yamakan` (default branch `main`).
 
 **Phase:** P01 authority (T1–T3), implementation authorized by the [founder decision record](../docs/FOUNDER_DECISION_RECORD.md) against plan `edbaba6c4f5f2f42e968b4ab2273c8e11620d9af`. [IMPLEMENTATION_PLAN](../docs/IMPLEMENTATION_PLAN.md) is the sole task authority; [operational contracts](../docs/OPERATIONAL_CONTRACTS.md) define protocols. Release verdict: **NO-GO** until every T10 gate passes.
 
-**Verified main:** `539688b3` (T3 PR #8 merged at reviewed head `71f6cf19`; tree identical). T2 #7 `27e3c7da`, T1 #6 `c1664985`; planning PRs #3–#5 merged earlier.
+**Verified main:** `1ce242b1` (T4b PR #10 merged at reviewed head `79e56b38`; tree identical). T4a #9 `2b0db1bd`, T3 #8 `539688b3`, T2 #7 `27e3c7da`, T1 #6 `c1664985`; planning PRs #3–#5 merged earlier.
 
 | Task | Status | Evidence |
 |---|---|---|
 | T1 command boundary and import guard | **Merged** (#6, `c1664985`) | Combined + security fresh-context reviews (3 cycles, all must-fix resolved); CI `qualify` on exact head; Windows tests + Edge E2E |
 | T2 SQLite snapshot authority | **Merged** (#7, `27e3c7da`) | Combined + security reviews (3 cycles, 3 must-fix resolved); CI `qualify` on exact head after a Linux-only permission fix; Windows tests + Edge E2E |
 | T3 canonical v1 and migration | **Merged** (#8, `539688b3`) | Combined + security reviews (3 cycles; 4 must-fix resolved incl. source-aliasing writes); CI `qualify` on exact head; Windows tests + Edge E2E |
-| T4a process ownership and owned probes | In review on `feat/t4-assets-owned-probes` | See the T4a PR body |
-| T4b streaming import, asset tables, ≥2 GiB | Next | — |
-| T5–T10 | Not started | — |
+| T4a process ownership and owned probes | **Merged** (#9, `2b0db1bd`) | Combined + security reviews (3 cycles; 4 must-fix resolved incl. pipe-name traversal); CI `qualify` on exact head; 13 Windows ownership/probe tests; WMI job escape recorded as T9 release blocker |
+| T4b streaming import, asset tables, ≥2 GiB | **Merged** (#10, `1ce242b1`) | Combined + security reviews (3 cycles + delta; must-fix resolved incl. slow-loris and admission race); CI `qualify` on exact head after a Linux-only publish-race fix; large-import receipt: 2.24 GB, peak 154 MiB ≤ 300 MiB |
+| T5 durable jobs + VFR derivatives | In review on `feat/t5-durable-jobs` | Windows tests + Edge E2E |
+| T6–T10 | Not started (T6 work in progress on `feat/t6-timeline-reducers`) | — |
 
-## T4a surface (in review)
+## T5 surface (in review)
+
+- Schema v3: `jobs` (intent: project, frozen revision, idempotency key, payload), `attempts` (generation, worker PID, outcome) and `supervisor` (generation). `core/jobs.ts` `JobSupervisor`: every transition is a fenced compare-and-swap in one transaction; a restart takes a new generation, marks earlier attempts failed and re-queues their jobs (local work only). Unknown payloads are quarantined; admission counts only active jobs (`activeJobs` 128).
+- Export renders run on an owned FFmpeg worker (`renderWallSeconds` 180, `renderMemoryBytes` 2 GiB) whose identity is durable before it resumes; partial outputs are never registered, and success, artifact and cancellation are decided by the database.
+- T5b: variable-frame-rate uploads return 202 with a job. The constant-rate derivative attaches as the asset's selected version with lineage; the original object stays retained; attachment and job success commit together. Import is split into stage and attach.
+
+## T4b surface (merged)
+
+- Streaming import: staged with incremental SHA-256, declared-size budget, early signature check, dynamic disk preflight, owned probe, streamed CAS publication, and object/version rows committed with the snapshot. HTTP uploads require Content-Length; playback/download stream byte ranges from disk.
+- Schema v2: `asset_objects`, `asset_versions` (probe incl. time base, frame rate, VFR). Ordered transactional schema steps.
+- `npm run qualify:large-import`: receipt in `docs/evidence/qualification/t4-large-import.json`.
+
+## Release blockers recorded
+
+- **WMI escape from worker jobs:** a compromised worker can start a process outside its Job Object via WMI. Requires a restricted/low-integrity/AppContainer worker token (T9).
+
+## T4a surface (merged)
 
 - `native/procd` (Rust, no dependencies): owns probe workers now; FFmpeg rendering moves onto it in T5. Each worker is created suspended inside its own KILL_ON_JOB_CLOSE, single-process Job Object (atomic `PROC_THREAD_ATTRIBUTE_JOB_LIST`, no breakaway), with an inherited-handle allowlist, a minimal environment, an executable allowlist and MSVCRT-exact argument quoting. Output travels over anonymous pipes relayed by procd (no named objects). Workers resume only after the service records their identity. Service death → procd stdin EOF → jobs terminated; procd death → the OS closes the jobs.
 - `core/process/owner.ts` + `workers.ts`: one owner per service; FFmpeg/ffprobe resolved to absolute paths once. Non-Windows hosts run an explicitly unqualified development mode.
@@ -66,4 +83,4 @@ Updated: 2026-10-11. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 - **Disk:** C: has ~3 GiB free (99% used); D: has ~20 GiB free. Clone and npm cache live on D:. T4's ≥2 GiB import and T10 media tests need a disk-capacity preflight and may need space freed by the founder.
 - Jev key and an OCR LLM backend are founder-provided resources; without them those reviews stay recorded as unavailable.
 
-**Next executable task:** T4b streaming import, asset object/version tables, disk preflight, ENOSPC injection and the ≥2 GiB import memory gate.
+**Next executable task:** T6 timeline reducers (canonical v2, batch/undo/redo) after T5 merges.

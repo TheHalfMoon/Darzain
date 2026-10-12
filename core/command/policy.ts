@@ -15,13 +15,20 @@ export const RESOURCE_POLICY = Object.freeze({
     assetImportBytes: 4 * GiB,
     // Free space kept after staging plus publication of an import.
     diskReserveBytes: 256 * MiB,
+    // Uploads in flight at once, and the slowest sustained upload accepted.
+    concurrentImports: 2,
+    minUploadBytesPerSecond: 1 * MiB,
     assetsPerProject: 200,
     timelineFrames: 18000,
     // The render queue is a single serial tail; this documents, not configures, it.
     activeRenderWorkers: 1,
     // Active (non-terminal) jobs admitted at once; history never counts.
     activeJobs: 128,
+    // Active constant-rate conversions per project, so exports are not starved.
+    activeConversionsPerProject: 4,
     renderWallSeconds: 180,
+    // A constant-rate conversion of a source up to ten minutes long.
+    conversionWallSeconds: 900,
     renderMemoryBytes: 2 * GiB,
     renderThreads: 2,
     mediaDimension: 4096,
