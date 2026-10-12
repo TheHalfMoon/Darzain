@@ -6,8 +6,15 @@
 // from an earlier generation: their Job Object workers died with that service,
 // so they are marked failed and their jobs re-queued (local work only, never
 // a paid resubmission). Partial outputs are never registered.
-import { mkdir, rename, rm, unlink } from "node:fs/promises";
-import { createReadStream } from "node:fs";
+import {
+  mkdir,
+  open,
+  rename,
+  rm,
+  rmdir,
+  statfs,
+  unlink,
+} from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -15,7 +22,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { ProjectStore } from "./store.ts";
 import { AssetSchema } from "./project.ts";
 import type { Asset } from "./project.ts";
-import { probe } from "./media.ts";
+import { MEDIA_FORMATS, probe } from "./media.ts";
 import { mediaTools, workers } from "./process/workers.ts";
 import { renderProject } from "./render.ts";
 import type { RenderJob } from "./render.ts";
@@ -34,6 +41,10 @@ export type JobState =
   | "reconciliationRequired";
 const TERMINAL = ["succeeded", "cancelled", "failed", "reconciliationRequired"];
 const terminalSql = TERMINAL.map((s) => `'${s}'`).join(", ");
+// Attempts interrupted by a crash (not a graceful stop) are retried locally
+// at most this many times; the job is then set aside for reconciliation.
+const MAX_INTERRUPTIONS = 3;
+const INTERRUPTED = "Interrupted by a service restart.";
 
 type Row = {
   job_id: string;
@@ -87,6 +98,9 @@ export class JobSupervisor {
   #closing = false;
   #controllers = new Map<string, AbortController>();
   #progress = new Map<string, number>();
+  #setAside: string[] = [];
+  // Set once a newer service run has taken the queue; this one never claims again.
+  #superseded = false;
 
   constructor(store: ProjectStore, options: SupervisorOptions = {}) {
     this.store = store;
@@ -96,6 +110,8 @@ export class JobSupervisor {
   // Takes a new generation, fences and reconciles earlier attempts, and starts
   // running queued work.
   async start() {
+    // A second start would fence out this supervisor's own live attempts.
+    if (this.#generation) return;
     const interrupted = this.store.transaction((db) => {
       db.prepare(
         "UPDATE supervisor SET generation = generation + 1 WHERE id = 1",
@@ -107,27 +123,40 @@ export class JobSupervisor {
       ).generation;
       const stale = db
         .prepare(
-          "SELECT a.job_id, a.attempt_no, j.project_id, j.cancel_requested FROM attempts a JOIN jobs j ON j.job_id = a.job_id WHERE a.state IN ('preparing', 'running', 'validating') AND a.generation < ?",
+          "SELECT a.job_id, a.attempt_no, j.kind, j.project_id, j.cancel_requested FROM attempts a JOIN jobs j ON j.job_id = a.job_id WHERE a.state IN ('preparing', 'running', 'validating') AND a.generation < ?",
         )
         .all(this.#generation) as {
         job_id: string;
         attempt_no: number;
+        kind: string;
         project_id: string;
         cancel_requested: number;
       }[];
       for (const a of stale) {
         db.prepare(
-          "UPDATE attempts SET state = 'failed', error = 'Interrupted by a service restart.' WHERE job_id = ? AND attempt_no = ?",
-        ).run(a.job_id, a.attempt_no);
+          "UPDATE attempts SET state = 'failed', error = ? WHERE job_id = ? AND attempt_no = ?",
+        ).run(INTERRUPTED, a.job_id, a.attempt_no);
         db.prepare(
           "UPDATE jobs SET state = ?, progress = 0 WHERE job_id = ?",
         ).run(a.cancel_requested ? "cancelled" : "queued", a.job_id);
       }
       return stale;
     });
-    // Unregistered partial outputs of interrupted attempts are removed.
-    for (const a of interrupted)
+    // Unregistered outputs of interrupted attempts are removed, including an
+    // export published just before its success could commit.
+    for (const a of interrupted) {
+      if (a.kind === "export")
+        await unlink(
+          await this.store.file(
+            a.project_id,
+            "exports",
+            a.job_id,
+            `render-${a.attempt_no}.mp4`,
+          ),
+        ).catch(() => {});
       await this.#cleanup(a.project_id, a.job_id, a.attempt_no);
+      await this.#release(a.job_id);
+    }
     this.#pump();
   }
 
@@ -150,12 +179,14 @@ export class JobSupervisor {
 
   async submit(projectId: string, key: string) {
     if (this.#closing) throw new Error("Render queue is closing.");
+    this.#current();
     if (!this.#generation) await this.start();
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(key))
       throw new Error("Invalid idempotency key.");
     const project = await this.store.load(projectId);
     if (this.#closing) throw new Error("Render queue is closing.");
     const row = this.store.transaction((db) => {
+      this.#currentIn(db);
       const existing = db
         .prepare(
           "SELECT * FROM jobs WHERE project_id = ? AND kind = 'export' AND frozen_revision = ? AND idempotency_key = ?",
@@ -222,23 +253,42 @@ export class JobSupervisor {
       return this.#row(db, jobId)!;
     });
     this.#controllers.get(jobId)?.abort();
+    if (row.state === "cancelled") void this.#release(jobId);
     return this.#view(row);
   }
 
   #pump() {
-    if (this.#loop || this.#closing || !this.#generation) return;
+    if (this.#loop || this.#closing || this.#superseded || !this.#generation)
+      return;
     this.#loop = (async () => {
       // One active render worker at a time (policy activeRenderWorkers).
       for (;;) {
         if (this.#closing) break;
         const claimed = this.#claim();
+        for (const jobId of this.#setAside.splice(0))
+          await this.#release(jobId);
         if (!claimed) break;
         await this.#execute(claimed.row, claimed.attempt);
       }
-    })().finally(() => {
-      this.#loop = null;
-      if (!this.#closing && this.#hasQueued()) this.#pump();
-    });
+    })()
+      // A store error (BUSY, for example) ends this pass; it is retried after
+      // a pause rather than in a tight loop.
+      .then(
+        () => false,
+        () => true,
+      )
+      .then((failed) => {
+        this.#loop = null;
+        if (failed) {
+          if (!this.#closing) setTimeout(() => this.#pump(), 1000).unref();
+          return;
+        }
+        let more = false;
+        try {
+          more = !this.#closing && this.#hasQueued();
+        } catch {}
+        if (more) this.#pump();
+      });
   }
   #hasQueued() {
     return Boolean(
@@ -250,31 +300,61 @@ export class JobSupervisor {
 
   #claim() {
     return this.store.transaction((db) => {
-      const row = db
-        .prepare(
-          "SELECT * FROM jobs WHERE state = 'queued' ORDER BY rowid LIMIT 1",
-        )
-        .get() as Row | undefined;
-      if (!row) return null;
-      const attempt =
-        (
+      const current = (
+        db.prepare("SELECT generation FROM supervisor WHERE id = 1").get() as {
+          generation: number;
+        }
+      ).generation;
+      // A newer service run owns the queue; this one stops claiming.
+      if (current !== this.#generation) {
+        this.#superseded = true;
+        return null;
+      }
+      for (;;) {
+        const row = db
+          .prepare(
+            "SELECT * FROM jobs WHERE state = 'queued' ORDER BY rowid LIMIT 1",
+          )
+          .get() as Row | undefined;
+        if (!row) return null;
+        const attempt =
+          (
+            db
+              .prepare(
+                "SELECT coalesce(max(attempt_no), 0) AS n FROM attempts WHERE job_id = ?",
+              )
+              .get(row.job_id) as { n: number }
+          ).n + 1;
+        const interruptions = (
           db
             .prepare(
-              "SELECT coalesce(max(attempt_no), 0) AS n FROM attempts WHERE job_id = ?",
+              "SELECT count(*) AS n FROM attempts WHERE job_id = ? AND error = ?",
             )
-            .get(row.job_id) as { n: number }
-        ).n + 1;
-      const moved = db
-        .prepare(
-          "UPDATE jobs SET state = 'preparing', error = NULL WHERE job_id = ? AND state = 'queued'",
-        )
-        .run(row.job_id);
-      if (moved.changes !== 1) return null;
-      db.prepare(
-        "INSERT INTO attempts(job_id, attempt_no, generation, state) VALUES (?, ?, ?, 'preparing')",
-      ).run(row.job_id, attempt, this.#generation);
-      return { row: { ...row, state: "preparing" as JobState }, attempt };
+            .get(row.job_id, INTERRUPTED) as { n: number }
+        ).n;
+        if (interruptions >= MAX_INTERRUPTIONS) {
+          db.prepare(
+            "UPDATE jobs SET state = 'reconciliationRequired', error = 'The job was interrupted too many times.' WHERE job_id = ?",
+          ).run(row.job_id);
+          this.#setAside.push(row.job_id);
+          continue;
+        }
+        return this.#claimIn(db, row, attempt);
+      }
     });
+  }
+
+  #claimIn(db: DatabaseSync, row: Row, attempt: number) {
+    const moved = db
+      .prepare(
+        "UPDATE jobs SET state = 'preparing', error = NULL WHERE job_id = ? AND state = 'queued'",
+      )
+      .run(row.job_id);
+    if (moved.changes !== 1) return null;
+    db.prepare(
+      "INSERT INTO attempts(job_id, attempt_no, generation, state) VALUES (?, ?, ?, 'preparing')",
+    ).run(row.job_id, attempt, this.#generation);
+    return { row: { ...row, state: "preparing" as JobState }, attempt };
   }
 
   // Fenced transition: only this generation's attempt may move the job.
@@ -343,9 +423,12 @@ export class JobSupervisor {
   }
   #markValidating(jobId: string, attempt: number) {
     this.#fenced(jobId, attempt, (db) => {
-      db.prepare(
-        "UPDATE jobs SET state = 'validating' WHERE job_id = ? AND state = 'running'",
-      ).run(jobId);
+      const moved = db
+        .prepare(
+          "UPDATE jobs SET state = 'validating' WHERE job_id = ? AND state = 'running' AND cancel_requested = 0",
+        )
+        .run(jobId);
+      if (moved.changes !== 1) throw new Error("Cancelled.");
       db.prepare(
         "UPDATE attempts SET state = 'validating' WHERE job_id = ? AND attempt_no = ?",
       ).run(jobId, attempt);
@@ -413,6 +496,12 @@ export class JobSupervisor {
           "Job payload is invalid and was quarantined.",
         );
     } catch (e) {
+      // An output that was not registered as the job's artifact is removed
+      // before the terminal state becomes visible.
+      if (output.published) {
+        await unlink(output.published).catch(() => {});
+        output.published = null;
+      }
       const cancelled = this.store.read(
         (db) => this.#row(db, jobId)?.cancel_requested === 1,
       );
@@ -435,11 +524,35 @@ export class JobSupervisor {
         // Fenced out: a newer service run owns this job now.
       }
     } finally {
-      // An output that was not registered as the job's artifact is removed.
-      if (output.published) await unlink(output.published).catch(() => {});
       this.#controllers.delete(jobId);
       this.#progress.delete(jobId);
       await this.#cleanup(row.project_id, jobId, attempt);
+      // Removed only when empty: an export's artifact keeps its folder.
+      await rmdir(
+        await this.store.file(row.project_id, "exports", jobId),
+      ).catch(() => {});
+      await this.#release(jobId);
+    }
+  }
+
+  // A conversion that ended without success releases the staged original it
+  // was holding; it never joined the project, so nothing else refers to it.
+  async #release(jobId: string) {
+    try {
+      const row = this.store.read((db) => this.#row(db, jobId));
+      if (
+        row?.kind !== "cfr-derivative" ||
+        !["failed", "cancelled"].includes(row.state)
+      )
+        return;
+      const payload = DerivativePayload.safeParse(safeJson(row.payload));
+      if (payload.success)
+        await this.store.discardStagedVersion(
+          row.project_id,
+          payload.data.asset.id,
+        );
+    } catch {
+      // Left for the T9 garbage collector.
     }
   }
 
@@ -468,14 +581,20 @@ export class JobSupervisor {
       row.project_id,
       "exports",
       jobId,
-      "render.mp4",
+      `render-${attempt}.mp4`,
     );
     await rename(partial, target);
     output.published = target;
     await this.#options.fault?.("after-publish", jobId);
+    await this.#cleanup(row.project_id, jobId, attempt);
     await this.#options.fault?.("before-succeed", jobId);
     this.store.transaction((db) =>
-      this.#succeedIn(db, jobId, attempt, `exports/${jobId}/render.mp4`),
+      this.#succeedIn(
+        db,
+        jobId,
+        attempt,
+        `exports/${jobId}/render-${attempt}.mp4`,
+      ),
     );
     output.published = null;
   }
@@ -502,62 +621,107 @@ export class JobSupervisor {
     await mkdir(dir, { recursive: true });
     const seconds = Math.max(1, asset.durationFrames / 30);
     let progress = "";
-    const result = await workers().run({
-      executable: mediaTools().ffmpeg,
-      args: [
-        "-hide_banner",
-        "-nostdin",
-        "-y",
-        "-protocol_whitelist",
-        "file",
-        "-i",
-        source,
-        "-map",
-        "0:v:0",
-        "-map",
-        "0:a:0?",
-        "-fps_mode",
-        "cfr",
-        "-r",
-        `${payload.frameRate.num}/${payload.frameRate.den}`,
-        "-c:v",
-        "libx264",
-        "-preset",
-        "veryfast",
-        "-crf",
-        "18",
-        "-pix_fmt",
-        "yuv420p",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
-        "-movflags",
-        "+faststart",
-        "-progress",
-        "pipe:1",
-        "derivative.mp4",
-      ],
-      cwd: dir,
-      memoryBytes: RESOURCE_POLICY.enforced.renderMemoryBytes,
-      signal,
-      stderrLimit: 8000,
-      onCreated: (pid) => this.#markRunning(jobId, attempt, pid),
-      onStdout: (chunk) => {
-        progress += chunk.toString("utf8");
-        const lines = progress.split("\n");
-        progress = lines.pop() || "";
-        for (const line of lines) {
-          const match = /^out_time_us=(\d+)/.exec(line);
-          if (match)
-            this.#progress.set(
-              jobId,
-              Math.min(0.99, Number(match[1]) / 1e6 / seconds),
-            );
-        }
-      },
-    });
     if (signal.aborted) throw new Error("Cancelled.");
+    // The conversion and its published copy share the space above the
+    // import reserve; FFmpeg stops writing at that size (-fs).
+    const space = await statfs(dir);
+    const outputCap = Math.min(
+      RESOURCE_POLICY.enforced.assetImportBytes,
+      Math.floor(
+        (Number(space.bavail) * Number(space.bsize) -
+          RESOURCE_POLICY.enforced.diskReserveBytes) /
+          2,
+      ),
+    );
+    if (outputCap < 16 * 1024 * 1024)
+      throw new CommandError(
+        "LIMIT_EXCEEDED",
+        "Insufficient free disk space for the conversion.",
+      );
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    signal.addEventListener("abort", abort, { once: true });
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, RESOURCE_POLICY.enforced.conversionWallSeconds * 1000);
+    const result = await workers()
+      .run({
+        executable: mediaTools().ffmpeg,
+        args: [
+          "-hide_banner",
+          "-nostdin",
+          "-y",
+          "-threads",
+          String(RESOURCE_POLICY.enforced.renderThreads),
+          "-protocol_whitelist",
+          "file",
+          "-format_whitelist",
+          MEDIA_FORMATS,
+          "-i",
+          source,
+          "-map",
+          "0:v:0",
+          "-map",
+          "0:a:0?",
+          // libx264 4:2:0 needs even dimensions; FFmpeg has already applied
+          // any display rotation, so these are the upright dimensions.
+          "-vf",
+          "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+          "-fps_mode",
+          "cfr",
+          "-r",
+          `${payload.frameRate.num}/${payload.frameRate.den}`,
+          // Constant-rate filling can hold the last frame past the source's
+          // recorded duration; the asset keeps the duration it was probed with.
+          "-t",
+          String(asset.durationFrames / 30),
+          "-c:v",
+          "libx264",
+          "-preset",
+          "veryfast",
+          "-crf",
+          "18",
+          "-pix_fmt",
+          "yuv420p",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "192k",
+          "-movflags",
+          "+faststart",
+          "-fs",
+          String(outputCap),
+          "-progress",
+          "pipe:1",
+          "derivative.mp4",
+        ],
+        cwd: dir,
+        memoryBytes: RESOURCE_POLICY.enforced.renderMemoryBytes,
+        signal: controller.signal,
+        stderrLimit: 8000,
+        onCreated: (pid) => this.#markRunning(jobId, attempt, pid),
+        onStdout: (chunk) => {
+          progress += chunk.toString("utf8");
+          const lines = progress.split("\n");
+          progress = lines.pop() || "";
+          for (const line of lines) {
+            const match = /^out_time_us=(\d+)/.exec(line);
+            if (match)
+              this.#progress.set(
+                jobId,
+                Math.min(0.99, Number(match[1]) / 1e6 / seconds),
+              );
+          }
+        },
+      })
+      .finally(() => {
+        clearTimeout(timer);
+        signal.removeEventListener("abort", abort);
+      });
+    if (signal.aborted) throw new Error("Cancelled.");
+    if (timedOut) throw new Error("Conversion time limit exceeded.");
     if (result.code !== 0)
       throw new Error(
         `FFmpeg failed to convert the source (exit ${result.code}).`,
@@ -568,31 +732,84 @@ export class JobSupervisor {
     if (
       !probed.hasVideo ||
       probed.variableFrameRate ||
-      probed.width !== asset.width ||
-      probed.height !== asset.height ||
-      // Filling a VFR stream to constant rate can extend it to its nominal end.
-      Math.abs(probed.durationFrames - asset.durationFrames) >
-        Math.max(2, Math.ceil(asset.durationFrames * 0.05))
+      probed.width !== even(asset.width) ||
+      probed.height !== even(asset.height) ||
+      Math.abs(probed.durationFrames - asset.durationFrames) > 2
     )
       throw new Error("Converted output failed verification.");
     this.#markValidating(jobId, attempt);
-    const stored = await this.store.importObject(
-      row.project_id,
-      createReadStream(file) as AsyncIterable<Uint8Array>,
-    );
+    // Held from before the copy is written until its rows commit (or it is
+    // discarded), so no concurrent discard can remove the same bytes.
+    const publication = await this.store.beginPublication(row.project_id);
+    try {
+      await this.#publishDerivative(row, attempt, asset, file, probed, () =>
+        publication(),
+      );
+    } finally {
+      publication();
+    }
+  }
+
+  async #publishDerivative(
+    row: Row,
+    attempt: number,
+    asset: Asset,
+    file: string,
+    probed: Awaited<ReturnType<typeof probe>>,
+    endPublication: () => void,
+  ) {
+    const jobId = row.job_id;
+    // The handle opens eagerly and closes before the attempt folder is
+    // removed, so no deferred open can race that cleanup.
+    const handle = await open(file, "r");
+    let stored;
+    try {
+      stored = await this.store.importObject(
+        row.project_id,
+        handle.createReadStream({
+          autoClose: false,
+        }) as AsyncIterable<Uint8Array>,
+      );
+    } finally {
+      await handle.close();
+    }
+    // The derivative joins the project as its own version, so an asset id is
+    // always the version bound to its bytes; lineage names the original.
     const derived = AssetSchema.parse({
       ...asset,
+      id: randomUUID(),
       extension: "mp4",
       hash: stored.sha256,
       bytes: stored.byteLength,
+      width: probed.width,
+      height: probed.height,
       durationFrames: probed.durationFrames,
     });
-    await this.#options.fault?.("before-succeed", jobId);
-    await this.store.attachAsset(row.project_id, derived, (db) => {
+    await this.#cleanup(row.project_id, jobId, attempt);
+    try {
+      await this.#options.fault?.("before-succeed", jobId);
+      await this.#attachDerivative(row, attempt, asset, derived, probed);
+    } catch (e) {
+      // Losing the commit leaves the published copy unregistered; remove it
+      // unless another publication or row now shares those bytes.
+      endPublication();
+      await this.store.discardUnregisteredObject(row.project_id, derived.hash);
+      throw e;
+    }
+  }
+
+  #attachDerivative(
+    row: Row,
+    attempt: number,
+    asset: Asset,
+    derived: Asset,
+    probed: Awaited<ReturnType<typeof probe>>,
+  ) {
+    return this.store.attachAsset(row.project_id, derived, (db) => {
       ProjectStore.registerDerivative(
         db,
         row.project_id,
-        { hash: derived.hash, bytes: derived.bytes },
+        { id: derived.id, hash: derived.hash, bytes: derived.bytes },
         {
           format: probed.format,
           width: probed.width,
@@ -604,7 +821,7 @@ export class JobSupervisor {
           conversion: "cfr/1",
         },
       );
-      this.#succeedIn(db, jobId, attempt, `asset:${asset.id}`);
+      this.#succeedIn(db, row.job_id, attempt, `asset:${derived.id}`);
     });
   }
 
@@ -614,19 +831,28 @@ export class JobSupervisor {
     projectId: string,
     staged: {
       asset: Asset;
-      probe: { frameRate: { num: number; den: number } | null };
+      probe: {
+        frameRate: { num: number; den: number } | null;
+        averageFrameRate?: { num: number; den: number } | null;
+      };
     },
   ) {
     if (this.#closing) throw new Error("Render queue is closing.");
     if (!this.#generation) await this.start();
+    this.#current();
     const project = await this.store.load(projectId);
     const payload = DerivativePayload.parse({
       format: "cfr/1",
       asset: staged.asset,
-      frameRate: staged.probe.frameRate ?? { num: 30, den: 1 },
+      frameRate: standardRate(
+        staged.probe.frameRate,
+        staged.probe.averageFrameRate ?? null,
+      ),
     });
-    const key = `cfr-${staged.asset.hash}`;
+    // Each upload stages its own version, so each gets its own conversion.
+    const key = `cfr-${staged.asset.id}`;
     const row = this.store.transaction((db) => {
+      this.#currentIn(db);
       const existing = db
         .prepare(
           "SELECT * FROM jobs WHERE project_id = ? AND kind = 'cfr-derivative' AND idempotency_key = ?",
@@ -647,6 +873,19 @@ export class JobSupervisor {
       ).n;
       if (active >= RESOURCE_POLICY.enforced.activeJobs)
         throw new CommandError("LIMIT_EXCEEDED", "Too many active jobs.");
+      // Conversions are long; a few per project leave room for exports.
+      const converting = (
+        db
+          .prepare(
+            `SELECT count(*) AS n FROM jobs WHERE project_id = ? AND kind = 'cfr-derivative' AND state NOT IN (${terminalSql})`,
+          )
+          .get(projectId) as { n: number }
+      ).n;
+      if (converting >= RESOURCE_POLICY.enforced.activeConversionsPerProject)
+        throw new CommandError(
+          "LIMIT_EXCEEDED",
+          "Too many conversions are in progress for this project.",
+        );
       const jobId = randomUUID();
       db.prepare(
         "INSERT INTO jobs(job_id, kind, project_id, frozen_revision, idempotency_key, payload, state) VALUES (?, 'cfr-derivative', ?, ?, ?, ?, 'queued')",
@@ -663,12 +902,68 @@ export class JobSupervisor {
     return this.#view(row);
   }
 
+  // Inside a submission transaction: a newer service run has taken the
+  // queue, so this supervisor would queue work it never runs.
+  #currentIn(db: DatabaseSync) {
+    const { generation } = db
+      .prepare("SELECT generation FROM supervisor WHERE id = 1")
+      .get() as { generation: number };
+    if (this.#generation && generation !== this.#generation)
+      this.#superseded = true;
+    this.#current();
+  }
+  #current() {
+    if (this.#superseded)
+      throw new CommandError(
+        "UNAVAILABLE",
+        "A newer service run owns the job queue.",
+      );
+  }
+
   // Stops claiming work, terminates running workers and waits for the loop.
   async close() {
     this.#closing = true;
     for (const controller of this.#controllers.values()) controller.abort();
     await this.#loop;
   }
+}
+
+const even = (n: number) => n - (n % 2);
+
+// Constant-rate targets: the nearest common rate to the source's rate. The
+// nominal rate is used when plausible (it keeps every frame of a source that
+// pauses); a nominal above 60 is often a time base or a peak (120 for 60 fps
+// phone video), so the measured average is used instead, capped at 60, and
+// anything unusable becomes 30. A 90000/1 tag never becomes the output rate.
+const RATES = [
+  [24000, 1001],
+  [24, 1],
+  [25, 1],
+  [30000, 1001],
+  [30, 1],
+  [48, 1],
+  [50, 1],
+  [60000, 1001],
+  [60, 1],
+] as const;
+type Rate = { num: number; den: number } | null;
+const rateValue = (rate: Rate) =>
+  rate && rate.den > 0 && rate.num > 0 ? rate.num / rate.den : 0;
+function standardRate(nominal: Rate, average: Rate = null) {
+  const declared = rateValue(nominal);
+  const measured = rateValue(average);
+  const target =
+    declared > 0 && declared <= 60
+      ? declared
+      : measured > 0 && measured <= 120
+        ? Math.min(measured, 60)
+        : 30;
+  const [num, den] = RATES.reduce((best, r) =>
+    Math.abs(r[0] / r[1] - target) < Math.abs(best[0] / best[1] - target)
+      ? r
+      : best,
+  );
+  return { num, den };
 }
 
 function safeJson(text: string): unknown {

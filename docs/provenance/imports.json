@@ -187,10 +187,10 @@
       "Adapt buildTimelineCommand algorithm only: canonical frame data, local process isolation, explicit audio mixing, safe title files, cancellation and verified atomic output.",
       "T1: prefer YAMAKAN_FFMPEG/YAMAKAN_FONT with DARZAIN_* compatibility fallback; product name in comments.",
       "T1 review: render threads and session job limit read the server resource policy; public FFmpeg errors are classified and path-free, with the stderr tail kept as the server-side error cause. Job error messages are redacted of the workspace root.",
-      "T5: rendering runs through the owned worker (core/process) into a per-attempt staging folder with policy wall-clock and memory limits and an onCreated identity hook; returns the verified unpublished output; publication and job state moved to core/jobs.ts (the in-memory RenderQueue is removed); input protocols restricted to file.",
+      "T5: rendering runs through the owned worker (core/process) into a per-attempt staging folder with policy wall-clock and memory limits and an onCreated identity hook; returns the verified unpublished output; publication and job state moved to core/jobs.ts (the in-memory RenderQueue is removed); input protocols restricted to file. Inputs are restricted to the accepted container formats (MEDIA_FORMATS) as well.",
       "T6: audio clips apply schema-bounded gain (volume) and linear fades (afade) in clip time before placement."
     ],
-    "importedSha256": "5aba29072090fe62304f6af8793a9d701024cb54251196dd3ae94ba006b30753"
+    "importedSha256": "8a98e06cabec5c4645e66d14a322f17a41923cb124c775c5f6ec6e8dd022388c"
   },
   {
     "source": "TheHalfMoon/Skelet",
@@ -246,8 +246,9 @@
     "imported": "core/donors/opencut/overlap.ts",
     "sha256": "0ed2ec979ea29d56a2dbbc3f456a8e4bee0850eddb342ad9dbaa6742c16d0001",
     "modifications": [
-      "Elements are Yamakan clips ({ id, startTicks, durationTicks }) in integer flick ticks; PlacementTimeSpan inlined; formatted with Prettier."
+      "Elements are Yamakan clips ({ id, startTicks, durationTicks }) in integer flick ticks; PlacementTimeSpan inlined; formatted with Prettier.",
+      "T6 review: element and span ends use checked tick addition (addTicks)."
     ],
-    "importedSha256": "925466423126e6d92cdfdb61c013b3f97800670a8920baa920d448f57ce4c53d"
+    "importedSha256": "56d0629bd8f19b517644df9ae4205b8166bda5521c8c81d6e1b54a4a0ac01ef7"
   }
 ]

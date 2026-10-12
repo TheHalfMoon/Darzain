@@ -11,6 +11,11 @@ import { CanonicalProjectSchema } from "../canonical.ts";
 import type { CanonicalProject } from "../canonical.ts";
 import { CommandError } from "../command/errors.ts";
 import { canPlaceTimeSpansOnTrack } from "../donors/opencut/overlap.ts";
+import { resolveTimelineSnap } from "../donors/opencut/snapping.ts";
+import type { SnapPoint } from "../donors/opencut/snapping.ts";
+
+// The widest snap an operation may ask for: one second.
+const MAX_SNAP_TICKS = 705_600_000;
 
 const Name = z.string().min(1).max(120);
 const Camera = z
@@ -77,6 +82,9 @@ export const OperationSchema = z.discriminatedUnion("type", [
       clipId: Id,
       trackId: Id.optional(),
       startTicks: Ticks,
+      // Snap the clip's start or end to the nearest other clip edge within
+      // this distance (as an editor drag does); the result is still checked.
+      snapTicks: Ticks.max(MAX_SNAP_TICKS).optional(),
     })
     .strict(),
   z.object({ type: z.literal("clip.remove"), clipId: Id }).strict(),
@@ -163,10 +171,40 @@ function placeable(
 }
 const end = (c: { startTicks: number; durationTicks: number }) =>
   addTicks(c.startTicks, c.durationTicks);
+// Fades never outlast their clip: the fade-in keeps what fits, and the
+// fade-out keeps what is left. Shared with the editor (src/edit-ops.ts), in
+// any unit.
+export function clampFades(
+  duration: number,
+  fadeIn: number,
+  fadeOut: number,
+): [number, number] {
+  const kept = Math.min(fadeIn, duration);
+  return [kept, Math.min(fadeOut, duration - kept)];
+}
+// Titles and still images draw the same picture at every instant: they have
+// no source offset and can be extended in either direction.
+function unsourced(p: CanonicalProject, c: CanonicalProject["clips"][number]) {
+  return (
+    c.title !== null ||
+    p.assets.find((a) => a.id === c.assetId)?.kind === "image"
+  );
+}
+// Every identifier in a project is unique; an add never reuses one.
+function fresh(p: CanonicalProject, id: string) {
+  const used =
+    p.id === id ||
+    p.assets.some((x) => x.id === id) ||
+    p.tracks.some((x) => x.id === id) ||
+    p.clips.some((x) => x.id === id) ||
+    p.scenes.some((s) => s.id === id || s.shots.some((x) => x.id === id));
+  if (used) throw invalid("Identifier is already in use.");
+}
 
 function apply(p: CanonicalProject, op: Operation): void {
   switch (op.type) {
     case "track.add":
+      fresh(p, op.trackId);
       p.tracks.push({
         id: op.trackId,
         name: op.name,
@@ -196,6 +234,7 @@ function apply(p: CanonicalProject, op: Operation): void {
       p.tracks = p.tracks.filter((t) => t.id !== op.trackId);
       return;
     case "clip.add":
+      fresh(p, op.clipId);
       unlocked(p, op.trackId);
       placeable(p, op.trackId, op.startTicks, op.durationTicks);
       p.clips.push({
@@ -217,17 +256,18 @@ function apply(p: CanonicalProject, op: Operation): void {
       const newStart = op.startTicks ?? c.startTicks;
       const newEnd = op.endTicks ?? end(c);
       if (newEnd <= newStart) throw invalid("A clip must keep a duration.");
-      const shift = newStart - c.startTicks;
-      const source = c.sourceStartTicks + (c.title === null ? shift : 0);
-      if (source < 0) throw invalid("Trim extends before the source.");
+      const still = unsourced(p, c);
+      const source = still ? 0 : c.sourceStartTicks + (newStart - c.startTicks);
+      if (!Number.isSafeInteger(source) || source < 0)
+        throw invalid("Trim extends before the source.");
       placeable(p, c.trackId, newStart, newEnd - newStart, c.id);
       c.startTicks = newStart;
       c.durationTicks = newEnd - newStart;
-      c.sourceStartTicks = c.title === null ? source : 0;
-      c.fadeInTicks = Math.min(c.fadeInTicks, c.durationTicks);
-      c.fadeOutTicks = Math.min(
+      c.sourceStartTicks = source;
+      [c.fadeInTicks, c.fadeOutTicks] = clampFades(
+        c.durationTicks,
+        c.fadeInTicks,
         c.fadeOutTicks,
-        c.durationTicks - c.fadeInTicks,
       );
       return;
     }
@@ -236,13 +276,16 @@ function apply(p: CanonicalProject, op: Operation): void {
       unlocked(p, c.trackId);
       if (op.atTicks <= c.startTicks || op.atTicks >= end(c))
         throw invalid("Split point must fall inside the clip.");
+      fresh(p, op.newClipId);
       const first = op.atTicks - c.startTicks;
       const second = {
         ...c,
         id: op.newClipId,
         startTicks: op.atTicks,
         durationTicks: c.durationTicks - first,
-        sourceStartTicks: c.title === null ? c.sourceStartTicks + first : 0,
+        sourceStartTicks: unsourced(p, c)
+          ? 0
+          : addTicks(c.sourceStartTicks, first),
         fadeInTicks: 0,
         fadeOutTicks: Math.min(c.fadeOutTicks, c.durationTicks - first),
       };
@@ -265,9 +308,14 @@ function apply(p: CanonicalProject, op: Operation): void {
       unlocked(p, target);
       if (track(p, target).kind !== track(p, c.trackId).kind)
         throw invalid("Clips move only between tracks of the same kind.");
-      placeable(p, target, op.startTicks, c.durationTicks, c.id);
+      const start = op.snapTicks
+        ? (snapCandidates(p, c, op.startTicks, op.snapTicks).find((s) =>
+            fits(p, target, s, c.durationTicks, c.id),
+          ) ?? op.startTicks)
+        : op.startTicks;
+      placeable(p, target, start, c.durationTicks, c.id);
       c.trackId = target;
-      c.startTicks = op.startTicks;
+      c.startTicks = start;
       return;
     }
     case "clip.remove": {
@@ -295,6 +343,7 @@ function apply(p: CanonicalProject, op: Operation): void {
       return;
     }
     case "scene.add":
+      fresh(p, op.sceneId);
       p.scenes.push({
         id: op.sceneId,
         name: op.name,
@@ -320,6 +369,7 @@ function apply(p: CanonicalProject, op: Operation): void {
     case "shot.add": {
       const s = p.scenes.find((s) => s.id === op.sceneId);
       if (!s) throw invalid("Scene not found.");
+      fresh(p, op.shotId);
       s.shots.push({ id: op.shotId, name: op.name, clipIds: op.clipIds });
       return;
     }
@@ -343,6 +393,55 @@ function apply(p: CanonicalProject, op: Operation): void {
   }
 }
 
+// Starts a moved clip may snap to, nearest first: its start or its end on
+// another clip's edge (on any track) within the threshold.
+function snapCandidates(
+  p: CanonicalProject,
+  moving: CanonicalProject["clips"][number],
+  startTicks: number,
+  snapTicks: number,
+) {
+  const points: SnapPoint[] = p.clips
+    .filter((x) => x.id !== moving.id)
+    .flatMap((x) => [
+      { time: x.startTicks, type: "element-start" as const, elementId: x.id },
+      { time: end(x), type: "element-end" as const, elementId: x.id },
+    ]);
+  const byStart = resolveTimelineSnap({
+    targetTime: startTicks,
+    snapPoints: points,
+    maxSnapDistance: snapTicks,
+  });
+  const byEnd = resolveTimelineSnap({
+    targetTime: addTicks(startTicks, moving.durationTicks),
+    snapPoints: points,
+    maxSnapDistance: snapTicks,
+  });
+  const candidates: [number, number][] = [];
+  if (byStart.snapPoint)
+    candidates.push([byStart.snapDistance, byStart.snappedTime]);
+  if (byEnd.snapPoint && byEnd.snappedTime >= moving.durationTicks)
+    candidates.push([
+      byEnd.snapDistance,
+      byEnd.snappedTime - moving.durationTicks,
+    ]);
+  return candidates.sort((a, b) => a[0] - b[0]).map(([, start]) => start);
+}
+function fits(
+  p: CanonicalProject,
+  trackId: string,
+  startTime: number,
+  duration: number,
+  excludeElementId: string,
+) {
+  try {
+    placeable(p, trackId, startTime, duration, excludeElementId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Applies a whole batch to a copy and validates the result once.
 export function applyBatch(
   project: CanonicalProject,
@@ -354,10 +453,12 @@ export function applyBatch(
     try {
       apply(next, op);
     } catch (e) {
-      if (e instanceof CommandError)
+      if (e instanceof CommandError || e instanceof RangeError)
         throw new CommandError(
-          e.code,
-          `Operation ${index + 1} (${op.type}): ${e.message}`,
+          e instanceof CommandError ? e.code : "VALIDATION",
+          `Operation ${index + 1} (${op.type}): ${
+            e instanceof CommandError ? e.message : "Time is out of range."
+          }`,
         );
       throw e;
     }

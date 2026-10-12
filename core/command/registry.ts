@@ -128,11 +128,12 @@ export const commands = {
         operations: BatchSchema,
       })
       .strict(),
-    run: ({ store, receipt }, a) =>
+    run: ({ store, receipt, principal }, a) =>
       store.applyOperations(
         a.projectId,
         a.expectedRevision,
         a.operations,
+        principal.id,
         receipt,
       ),
   }),
@@ -147,8 +148,8 @@ export const commands = {
         expectedRevision: z.number().int().nonnegative(),
       })
       .strict(),
-    run: ({ store, receipt }, a) =>
-      store.undo(a.projectId, a.expectedRevision, receipt),
+    run: ({ store, receipt, principal }, a) =>
+      store.undo(a.projectId, a.expectedRevision, principal.id, receipt),
   }),
   "yamakan.project.redo": define({
     scope: "project:write",
@@ -160,8 +161,8 @@ export const commands = {
         expectedRevision: z.number().int().nonnegative(),
       })
       .strict(),
-    run: ({ store, receipt }, a) =>
-      store.redo(a.projectId, a.expectedRevision, receipt),
+    run: ({ store, receipt, principal }, a) =>
+      store.redo(a.projectId, a.expectedRevision, principal.id, receipt),
   }),
   "yamakan.project.save": define({
     scope: "project:write",

@@ -212,6 +212,8 @@ const server = createServer(async (req, res) => {
           String(req.headers["x-asset-name"] || ""),
         );
         // Uploads stream to disk; the declared size bounds the work up front.
+        // A rejected upload closes its connection instead of draining the body.
+        res.setHeader("Connection", "close");
         const length = String(req.headers["content-length"] ?? "");
         if (!/^\d{1,16}$/.test(length))
           throw new CommandError(
@@ -226,12 +228,22 @@ const server = createServer(async (req, res) => {
         );
         // Variable-frame-rate video is edited only through a constant-rate
         // derivative; the asset joins the project when that job succeeds.
-        if (staged.probe.variableFrameRate && staged.asset.kind === "video")
+        if (staged.probe.variableFrameRate && staged.asset.kind === "video") {
+          let job;
+          try {
+            authorize(principal, "yamakan.export.video");
+            job = await api.queue.submitDerivative(upload[1], staged);
+          } catch (e) {
+            // No job holds the staged original, so it is released now.
+            await store.discardStagedVersion(upload[1], staged.asset.id);
+            throw e;
+          }
           return json(202, {
             project: await store.load(upload[1]),
             asset: null,
-            job: await api.queue.submitDerivative(upload[1], staged),
+            job,
           });
+        }
         return json(200, {
           project: await store.attachAsset(upload[1], staged.asset),
           asset: staged.asset,
@@ -265,6 +277,9 @@ const server = createServer(async (req, res) => {
         const job = api.queue.status(exportMatch[1]);
         if (job.state !== "COMPLETED" || !job.artifact)
           throw new Error("Artifact is not complete.");
+        // Only export renders are downloadable files.
+        if (!/^exports\/[0-9a-f-]{36}\/render-\d{1,3}\.mp4$/.test(job.artifact))
+          throw new CommandError("NOT_FOUND", "This job has no file artifact.");
         const file = await store.file(
           job.projectId,
           ...job.artifact.split("/"),
@@ -306,6 +321,9 @@ const server = createServer(async (req, res) => {
     fail(toCommandError(e));
   }
 });
+// Long uploads and downloads stay open while data flows; idle sockets close.
+server.requestTimeout = 0;
+server.setTimeout(120_000);
 server.listen(port, "127.0.0.1", () =>
   console.log(`Yamakan is running at ${origin}; workspace ${root}`),
 );

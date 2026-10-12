@@ -183,6 +183,7 @@ extern "system" {
     fn GetExitCodeProcess(process: Handle, code: *mut u32) -> Bool;
     fn CloseHandle(handle: Handle) -> Bool;
     fn GetLastError() -> u32;
+    fn CancelSynchronousIo(thread: Handle) -> Bool;
 }
 
 /// A raw handle owned by exactly one value; closed when it drops.
@@ -523,8 +524,19 @@ fn main() {
                                 WaitForSingleObject(process.0, INFINITE);
                                 GetExitCodeProcess(process.0, &mut code);
                             }
-                            // All output is relayed before the exit is reported.
+                            // Output is relayed before the exit is reported. A write
+                            // end smuggled outside the job could hold a pipe open
+                            // forever, so readers get a bounded grace period and are
+                            // then cancelled.
+                            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+                            while readers.iter().any(|r| !r.is_finished()) && std::time::Instant::now() < deadline {
+                                std::thread::sleep(std::time::Duration::from_millis(10));
+                            }
                             for reader in readers {
+                                if !reader.is_finished() {
+                                    use std::os::windows::io::AsRawHandle;
+                                    unsafe { CancelSynchronousIo(reader.as_raw_handle() as Handle) };
+                                }
                                 let _ = reader.join();
                             }
                             // Dropping the worker closes its job.

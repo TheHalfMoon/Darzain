@@ -9,6 +9,7 @@ import {
 } from "../core/command/registry.ts";
 import type { Principal } from "../core/command/registry.ts";
 import { RESOURCE_POLICY } from "../core/command/policy.ts";
+import { ownershipMode } from "../core/process/owner.ts";
 
 // MVP trust model: one local account. Both principals hold the MVP scopes, but
 // they authenticate through separate credentials.
@@ -29,10 +30,7 @@ export class CreativeAPI {
       apiVersion: API_VERSION,
       service: "yamakan",
       // How media workers are owned on this host; only Windows is qualified.
-      processOwnership:
-        process.platform === "win32"
-          ? "windows-job-object"
-          : "posix-unqualified",
+      processOwnership: ownershipMode(),
       // Only enforced limits are advertised; candidates are unqualified targets.
       resourcePolicy: {
         policy: RESOURCE_POLICY.policy,
