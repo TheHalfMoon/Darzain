@@ -1,0 +1,26 @@
+[
+  {
+    "family": "IBM Plex Sans Arabic",
+    "license": "OFL-1.1",
+    "licenseFile": "notices/IBM-Plex-Sans-Arabic-OFL.txt",
+    "reservedFontName": "Plex",
+    "source": "npm:@expo-google-fonts/ibm-plex-sans-arabic@0.4.2",
+    "sourceIntegrity": "sha512-Cx24iSo/4pWBKHVf69tbVLDUiHWCSTHrhKPw/+SYWLDnyiX10WXh+amNWRSo9N3ruwd+qk9AQgDaIY1KO0u1Ig==",
+    "sourceGitHead": "162035df00af1a3441f3c4962ed7ffdedc2fc118",
+    "note": "Unmodified font files (the Reserved Font Name forbids shipping modified or subset copies under this name).",
+    "files": [
+      {
+        "original": "400Regular/IBMPlexSansArabic_400Regular.ttf",
+        "imported": "assets/fonts/IBMPlexSansArabic-Regular.ttf",
+        "weight": 400,
+        "sha256": "93ac94c4b3174176d410381b86c19891086a091c3c8da940ca65d85aa6a4f8a4"
+      },
+      {
+        "original": "700Bold/IBMPlexSansArabic_700Bold.ttf",
+        "imported": "assets/fonts/IBMPlexSansArabic-Bold.ttf",
+        "weight": 700,
+        "sha256": "44f73c1db689f2aac357cae39ef439d0705bd700b7d02e8d3f0079cda5a95e5f"
+      }
+    ]
+  }
+]

@@ -202,7 +202,7 @@ test("a version 2 workspace with imported media upgrades to the current version 
   assert.equal(
     (check.prepare("PRAGMA user_version").get() as { user_version: number })
       .user_version,
-    4,
+    5,
   );
   assert.equal(rows(root, "jobs"), 0);
   assert.equal(rows(root, "supervisor"), 1);
@@ -226,7 +226,7 @@ test("a version 1 workspace database upgrades step by step to the current versio
   assert.equal(
     (check.prepare("PRAGMA user_version").get() as { user_version: number })
       .user_version,
-    4,
+    5,
   );
   assert.equal(rows(root, "asset_objects"), 0);
   assert.equal(rows(root, "jobs"), 0);
@@ -463,5 +463,25 @@ test("imports started in the same tick still respect the concurrency cap", async
     "LIMIT_EXCEEDED",
     "LIMIT_EXCEEDED",
   ]);
+  store.close();
+});
+
+test("objects resolve only with a canonical media extension", async () => {
+  const { root, store, project } = await workspace();
+  const wav = path.join(root, "tone.wav");
+  ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", wav]);
+  const { asset } = await store.importAsset(
+    project.id,
+    "tone.wav",
+    await readFile(wav),
+  );
+  assert.ok(await store.readyObjectFile(project.id, asset));
+  await assert.rejects(
+    store.readyObjectFile(project.id, {
+      ...asset,
+      extension: "x/../../other/assets/name.mp4",
+    }),
+    (e: unknown) => e instanceof CommandError && e.code === "VALIDATION",
+  );
   store.close();
 });

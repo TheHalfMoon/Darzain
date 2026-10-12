@@ -72,7 +72,7 @@ export type StoreOptions = {
 export const SNAPSHOT_FORMAT = "yamakan.project/2";
 export const EDIT_VIEW_FORMAT = "yamakan.edit-view/1";
 const MAX_REVISION = 10000;
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 const WORKSPACE_SCOPE = "";
 
 // Asset objects are content-addressed files under a project; a version is a
@@ -135,6 +135,12 @@ INSERT INTO supervisor(id, generation) VALUES (1, 0);
 // produced, the revision it started from and the principal that wrote it;
 // the cursor binds undo/redo to the exact head they were computed for, and
 // only the writer of a step may undo or redo it.
+// Render plans (T7): a succeeded job names the plan it rendered, and its
+// attempt keeps the output receipt (plan hash, probed size, frames, audio).
+const SCHEMA_V5 = `
+ALTER TABLE jobs ADD COLUMN plan_hash TEXT CHECK(plan_hash IS NULL OR length(plan_hash) = 64);
+ALTER TABLE attempts ADD COLUMN receipt TEXT;
+`;
 const SCHEMA_V4 = `
 CREATE TABLE edit_history(
   project_id TEXT NOT NULL,
@@ -343,7 +349,7 @@ export class ProjectStore {
         "PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;",
       );
       // Versioned, transactional schema steps; each commits on its own.
-      const steps = [SCHEMA, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4];
+      const steps = [SCHEMA, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5];
       upgradedFrom = acceptable(db);
       for (let v = upgradedFrom; v < SCHEMA_VERSION; v++) {
         db.exec("BEGIN IMMEDIATE");
@@ -766,6 +772,24 @@ export class ProjectStore {
       .get(id, revision) as { snapshot_hash: string } | undefined;
     if (!row) throw new Error("Revision not found.");
     return this.#snapshot(row.snapshot_hash, id, revision);
+  }
+  // The canonical project at one revision with the hash of its stored
+  // snapshot: the inputs of a render plan.
+  revisionCanonical(
+    id: string,
+    revision: number,
+  ): { project: CanonicalProject; snapshotHash: string } {
+    Id.parse(id);
+    const row = this.#database
+      .prepare(
+        "SELECT snapshot_hash FROM revisions WHERE project_id = ? AND revision = ?",
+      )
+      .get(id, revision) as { snapshot_hash: string } | undefined;
+    if (!row) throw new Error("Revision not found.");
+    return {
+      project: this.#canonical(row.snapshot_hash, id, revision),
+      snapshotHash: row.snapshot_hash,
+    };
   }
   async load(id: string): Promise<Project> {
     Id.parse(id);
@@ -1549,6 +1573,22 @@ export class ProjectStore {
     const p = await this.load(id);
     const a = p.assets.find((a) => a.id === Id.parse(assetId));
     if (!a) throw new Error("Asset not found.");
+    return { file: await this.readyObjectFile(id, a), asset: a };
+  }
+  // The file of a published object, by its hash: the object row is ready and
+  // the file has the recorded size (bytes are re-hashed on import, restore
+  // and scrub, not on every read). Renders resolve their plan's assets this
+  // way, so a frozen revision renders even after the asset left the head.
+  async readyObjectFile(
+    id: string,
+    a: { hash: string; bytes: number; extension: string },
+  ) {
+    if (!/^[a-f0-9]{64}$/.test(a.hash))
+      throw new CommandError("VALIDATION", "Asset hash is invalid.");
+    // Only the canonical media extensions: a crafted extension could
+    // otherwise name a path outside this project.
+    if (!AssetSchema.shape.extension.safeParse(a.extension).success)
+      throw new CommandError("VALIDATION", "Asset extension is invalid.");
     const object = this.#database
       .prepare(
         "SELECT state FROM asset_objects WHERE project_id = ? AND digest = ?",
@@ -1561,7 +1601,7 @@ export class ProjectStore {
       const file = await this.file(id, ...parts);
       const info = await lstat(file).catch(() => null);
       if (object?.state === "ready" && info?.isFile() && info.size === a.bytes)
-        return { file, asset: a };
+        return file;
     }
     throw new CommandError(
       "RECOVERY_REQUIRED",

@@ -24,6 +24,34 @@ for (const file of [
   "notices/OpenCut-LICENSE",
 ])
   if (!existsSync(file)) throw new Error(`Missing notice: ${file}`);
+// Pinned fonts: unmodified files whose bytes match the ledger, each with its
+// license notice. Rendering verifies the same hashes before use.
+const fonts = JSON.parse(readFileSync("docs/provenance/fonts.json", "utf8"));
+let fontFiles = 0;
+for (const family of fonts) {
+  if (!existsSync(family.licenseFile))
+    throw new Error(`Missing font license: ${family.licenseFile}`);
+  for (const file of family.files) {
+    const hash = createHash("sha256")
+      .update(readFileSync(file.imported))
+      .digest("hex");
+    if (hash !== file.sha256) throw new Error(`Font changed: ${file.imported}`);
+    fontFiles++;
+  }
+}
+// The hashes the renderer verifies at load (core/render/fonts.ts) are the
+// ledger's hashes.
+const pinned = new Set(
+  readFileSync("core/render/fonts.ts", "utf8").match(/[a-f0-9]{64}/g) ?? [],
+);
+const ledgered = new Set(fonts.flatMap((f) => f.files.map((x) => x.sha256)));
+if (
+  pinned.size !== ledgered.size ||
+  [...pinned].some((hash) => !ledgered.has(hash))
+)
+  throw new Error(
+    "Font hashes in core/render/fonts.ts differ from the ledger.",
+  );
 const skip = new Set([
   ".git",
   "node_modules",
@@ -50,5 +78,5 @@ const violations = checkImports({
 if (violations.length)
   throw new Error(`Import guard failed:\n${violations.join("\n")}`);
 console.log(
-  `Verified ${ledger.length} pinned source records, required notices and import guard over ${files.length} files.`,
+  `Verified ${ledger.length} pinned source records, ${fontFiles} pinned font files, required notices and import guard over ${files.length} files.`,
 );

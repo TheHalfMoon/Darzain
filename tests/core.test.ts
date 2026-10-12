@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { ProjectStore } from "../core/store.ts";
 import { DatabaseSync } from "node:sqlite";
 import { ProjectSchema } from "../core/project.ts";
-import { renderProject } from "../core/render.ts";
+import { renderRevision } from "../core/render.ts";
 import { JobSupervisor } from "../core/jobs.ts";
 import { safePath } from "../core/paths.ts";
 import { CreativeAPI } from "../server/api.ts";
@@ -119,13 +119,16 @@ test("project import, scene, timeline, title, audio, render and reopen preserve 
   const saved = await store.save(p, p.revision);
   const jobId = crypto.randomUUID();
   let progress = 0;
-  const output = await renderProject(
+  const { output, plan } = await renderRevision(
     store,
-    saved,
+    saved.id,
+    saved.revision,
     ["exports", jobId, "attempt-1"],
     new AbortController().signal,
     (n) => (progress = n),
   );
+  assert.equal(plan.revision, saved.revision);
+  assert.ok(plan.titles, "the title is compiled into the plan");
   assert.equal(progress, 1);
   assert.match(output, /render\.partial\.mp4$/);
   const out = await readFile(output);
@@ -272,9 +275,10 @@ test("cancellation during rendering leaves no partial output", async () => {
   const saved = await store.save(project, 0),
     controller = new AbortController(),
     jobId = crypto.randomUUID();
-  const rendering = renderProject(
+  const rendering = renderRevision(
     store,
-    saved,
+    saved.id,
+    saved.revision,
     ["exports", jobId, "attempt-1"],
     controller.signal,
     () => {},

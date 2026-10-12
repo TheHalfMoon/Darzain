@@ -188,9 +188,11 @@
       "T1: prefer YAMAKAN_FFMPEG/YAMAKAN_FONT with DARZAIN_* compatibility fallback; product name in comments.",
       "T1 review: render threads and session job limit read the server resource policy; public FFmpeg errors are classified and path-free, with the stderr tail kept as the server-side error cause. Job error messages are redacted of the workspace root.",
       "T5: rendering runs through the owned worker (core/process) into a per-attempt staging folder with policy wall-clock and memory limits and an onCreated identity hook; returns the verified unpublished output; publication and job state moved to core/jobs.ts (the in-memory RenderQueue is removed); input protocols restricted to file. Inputs are restricted to the accepted container formats (MEDIA_FORMATS) as well.",
-      "T6: audio clips apply schema-bounded gain (volume) and linear fades (afade) in clip time before placement."
+      "T6: audio clips apply schema-bounded gain (volume) and linear fades (afade) in clip time before placement.",
+      "T7: renders only from a versioned render plan (core/render/plan.ts): filter values formatted from integer ticks, input files verified against the plan asset hashes, titles drawn by one ASS script through libass with the pinned, hash-verified fonts (the drawtext title path and host-font lookup are removed), a fit check refuses titles wider than the frame, and a probe receipt records the plan hash.",
+      "T7 review: each clip reads its own seeked input (-ss/-t), resolved by the plan asset hash and size; the title script must match the plan hash; one wall-clock limit covers the capability probe, fit check and render; the fit check reads margin bands of a quarter-size frame sampled once per title; audio is made 48 kHz stereo and placed by an exact sample delay; the receipt records the libass API version."
     ],
-    "importedSha256": "8a98e06cabec5c4645e66d14a322f17a41923cb124c775c5f6ec6e8dd022388c"
+    "importedSha256": "fde4b9d942b795d42380d3223fc196a62617122f4e268b5c1347f281aeb012c4"
   },
   {
     "source": "TheHalfMoon/Skelet",

@@ -23,7 +23,8 @@
     "mcp": "node mcp/main.ts",
     "migrate": "node cli/migrate.ts",
     "build:native": "cargo build --release --manifest-path native/procd/Cargo.toml",
-    "qualify:large-import": "node scripts/qualify-large-import.mjs"
+    "qualify:large-import": "node scripts/qualify-large-import.mjs",
+    "qualify:typography": "node scripts/qualify-typography.ts"
   },
   "dependencies": {
     "react": "18.3.1",
