@@ -26,10 +26,12 @@ export class YamakanError extends Error {
 }
 
 export type ClientOptions = {
-  // Omit in the browser UI: same-origin requests authenticate with the session cookie.
+  // Omit in the browser UI: requests go to the page's own origin.
   baseUrl?: string;
   // Local-client bearer credential read from the workspace token file.
   token?: string;
+  // Extra headers for each request (the browser UI's session header).
+  headers?: () => Record<string, string>;
   fetch?: typeof fetch;
 };
 
@@ -38,15 +40,18 @@ export class YamakanClient {
   readonly #base: string;
   readonly #token: string | undefined;
   readonly #fetch: typeof fetch;
+  readonly #extra: () => Record<string, string>;
   constructor(options: ClientOptions = {}) {
     this.#base = options.baseUrl?.replace(/\/$/, "") ?? "";
     this.#token = options.token;
+    this.#extra = options.headers ?? (() => ({}));
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
   }
   #headers(extra: Record<string, string> = {}) {
+    const headers = { ...this.#extra(), ...extra };
     return this.#token
-      ? { ...extra, Authorization: `Bearer ${this.#token}` }
-      : extra;
+      ? { ...headers, Authorization: `Bearer ${this.#token}` }
+      : headers;
   }
   async call<O extends Operation>(
     operation: O,

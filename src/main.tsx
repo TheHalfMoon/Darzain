@@ -32,7 +32,8 @@ import {
   splitClip,
   updateClips as applyClipUpdates,
 } from "./edit-ops.ts";
-import { YamakanClient } from "../sdk/client.ts";
+import { YamakanClient, YamakanError } from "../sdk/client.ts";
+import { mediaUrl, sessionHeaders, startSession } from "./session.ts";
 import type {
   Operation,
   OperationInput,
@@ -42,7 +43,7 @@ import "./donors/film-editor/editor.css";
 import "./style.css";
 // The UI is a same-origin client of the shared command registry; its session
 // cookie identifies the browser-ui principal.
-const client = new YamakanClient();
+const client = new YamakanClient({ headers: sessionHeaders });
 // A status line: a message key (re-translated when the language changes)
 // or text from elsewhere (service errors), shown as given.
 type Status =
@@ -83,6 +84,7 @@ function App() {
     [activeTrack, setActiveTrack] = useState<string | null>(null),
     [job, setJob] = useState<RenderJob | null>(null),
     [tools, setTools] = useState(false),
+    [catalog, setCatalog] = useState<string | null>(null),
     [downloadedDraft, setDownloadedDraft] = useState<Project | null>(null),
     [revisionHistory, setRevisionHistory] = useState<ProjectHistory | null>(
       null,
@@ -97,7 +99,14 @@ function App() {
   const refresh = async () =>
     setProjects(await call("yamakan.project.list", {}));
   useEffect(() => {
-    refresh().catch((e) => setMessage(e.message));
+    refresh().catch((e) =>
+      setMessage(
+        // No session: the page was opened without its launch link.
+        e instanceof YamakanError && e.code === "UNAUTHENTICATED"
+          ? msg("session.locked")
+          : e.message,
+      ),
+    );
   }, []);
   const run = async (fn: () => Promise<void>) => {
     if (busy) return;
@@ -436,6 +445,7 @@ function App() {
                     const r = await fetch(`/api/v1/projects/${p.id}/assets`, {
                       method: "POST",
                       headers: {
+                        ...sessionHeaders(),
                         "X-Asset-Name": encodeURIComponent(file.name),
                       },
                       body: file,
@@ -490,7 +500,9 @@ function App() {
                   >
                     {a.kind === "image" && (
                       <img
-                        src={`/api/v1/projects/${p.id}/assets/${a.id}`}
+                        src={mediaUrl(
+                          `/api/v1/projects/${p.id}/assets/${a.id}`,
+                        )}
                         alt=""
                       />
                     )}
@@ -590,11 +602,27 @@ function App() {
               <h1>{t("tools.title")}</h1>
               <p>{t("tools.intro")}</p>
               <pre>npm run cli -- yamakan.project.list {"{}"}</pre>
+              {/* Shown here: a new tab would hold no session. */}
               <p>
-                <a href="/api/v1/tools" target="_blank" rel="noreferrer">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    run(async () =>
+                      setCatalog(
+                        JSON.stringify(await client.catalog(), null, 2),
+                      ),
+                    )
+                  }
+                >
                   {t("tools.catalog")}
-                </a>
+                </button>
               </p>
+              {catalog && (
+                <pre className="catalog" dir="ltr">
+                  {catalog}
+                </pre>
+              )}
               <p>{t("tools.jobs")}</p>
             </section>
           ) : p && view ? (
@@ -911,7 +939,7 @@ function App() {
                       {job.state === "COMPLETED" && (
                         <a
                           className="download"
-                          href={`/api/v1/jobs/${job.id}/artifact`}
+                          href={mediaUrl(`/api/v1/jobs/${job.id}/artifact`)}
                         >
                           {t("job.download")}
                         </a>
@@ -1003,4 +1031,6 @@ function App() {
 // The page starts in the chosen language and direction before React draws.
 document.documentElement.lang = initialLang();
 document.documentElement.dir = direction(initialLang());
-createRoot(document.getElementById("root")!).render(<App />);
+void startSession().finally(() =>
+  createRoot(document.getElementById("root")!).render(<App />),
+);

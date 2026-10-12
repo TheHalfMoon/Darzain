@@ -1,3 +1,4 @@
+import { mediaUrl } from "./session.ts";
 import type { Project } from "../core/project.ts";
 import type {
   TimelineClip,
@@ -19,7 +20,7 @@ export function editorView(p: Project) {
     name: a.name,
     type: a.kind,
     source: "upload",
-    url: `/api/v1/projects/${p.id}/assets/${a.id}`,
+    url: mediaUrl(`/api/v1/projects/${p.id}/assets/${a.id}`),
     duration: a.durationFrames / 30,
   }));
   const clips: TimelineClip[] = p.clips.map((c) => ({

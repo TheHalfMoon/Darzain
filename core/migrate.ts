@@ -7,6 +7,7 @@
 // destination. Each verified revision keeps its original number; media bytes
 // are re-verified by hash. Projects that cannot be migrated are reported and
 // skipped, never adopted silently.
+import { restrictToOwner } from "./process/access.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import {
@@ -469,6 +470,8 @@ export async function migrateLegacyWorkspace(
     projects: [],
   };
   try {
+    // Private before any project data is written into it.
+    await restrictToOwner(staging, "dir");
     const lock = await acquireServiceLock(staging);
     const store = new ProjectStore(staging);
     try {

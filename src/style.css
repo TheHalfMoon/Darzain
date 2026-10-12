@@ -470,3 +470,8 @@ footer {
   align-items: flex-start;
   gap: 4px;
 }
+.tools pre.catalog {
+  max-height: 60vh;
+  overflow: auto;
+  text-align: start;
+}

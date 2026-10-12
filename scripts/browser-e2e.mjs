@@ -1,5 +1,6 @@
 import { chromium } from "playwright-core";
 import { execFileSync, fork } from "node:child_process";
+import { createServer } from "node:http";
 import { mkdirSync, writeFileSync, mkdtempSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -129,9 +130,10 @@ try {
       "msedge",
     headless: true,
   });
-  const page = await browser.newPage({
+  const context = await browser.newContext({
     viewport: { width: 1440, height: 1050 },
   });
+  const page = await context.newPage();
   await page.addInitScript(() => {
     const elements = [];
     Object.defineProperty(window, "__yamakanMedia", { value: elements });
@@ -151,7 +153,25 @@ try {
   });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto(url);
+  // Without the launch link the page grants nothing: a fresh browser
+  // context sees the locked notice and holds no session.
+  const stranger = await browser.newContext();
+  const strangerPage = await stranger.newPage();
+  await strangerPage.goto(url);
+  await strangerPage
+    .getByRole("status")
+    .filter({ hasText: "Open Yamakan with the link it printed" })
+    .waitFor();
+  assert.deepEqual(await stranger.cookies(), []);
+  await stranger.close();
+  // The launch link (from the owner-only launch file) starts the session;
+  // its secret is removed from the address bar before the editor starts.
+  const launchUrl = (
+    await readFile(join(root, "workspace", "launch"), "utf8")
+  ).trim();
+  await page.goto(launchUrl);
+  await page.waitForFunction(() => location.hash === "");
+  assert.equal(page.url(), `${url}/`);
   await page
     .getByLabel("Project name", { exact: true })
     .fill("Browser verified production");
@@ -203,6 +223,95 @@ try {
       ).json()
     ).result;
   const saved = await getProject();
+  // A page served from another loopback port, opened in the same browser
+  // (which holds a valid session cookie), can neither call the API nor
+  // load media: it is same-site but not same-origin.
+  const image = saved.assets.find((a) => a.kind === "image");
+  // The page's session (this tab's own storage; never a cookie).
+  const credentials = JSON.parse(
+    await page.evaluate(() => sessionStorage.getItem("yamakan.session")),
+  );
+  assert.deepEqual(await context.cookies(), [], "no cookie is ever set");
+  const probe = async ({ target, projectId, assetId, session, media }) => {
+    const api = await fetch(`${target}/api/v1/call`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Yamakan-Session": session,
+      },
+      body: JSON.stringify({
+        name: "yamakan.project.list",
+        arguments: {},
+      }),
+    }).then(
+      (r) => `status ${r.status}`,
+      () => "blocked",
+    );
+    const image = await new Promise((done) => {
+      const img = document.createElement("img");
+      img.onload = () => done("loaded");
+      img.onerror = () => done("refused");
+      img.src = `${target}/api/v1/projects/${projectId}/assets/${assetId}?media=${media}`;
+    });
+    return { api, media: image };
+  };
+  const probeArgs = {
+    target: url,
+    projectId,
+    assetId: image.id,
+    session: credentials.session,
+    media: credentials.media,
+  };
+  // Control: from the Yamakan page itself the same requests succeed.
+  assert.deepEqual(await page.evaluate(probe, probeArgs), {
+    api: "status 200",
+    media: "loaded",
+  });
+  // Every request the neighbour's server receives is recorded: none may
+  // carry Yamakan's session, media key or any cookie of Yamakan's.
+  const received = [];
+  const neighbour = createServer((req, res) => {
+    received.push(JSON.stringify({ url: req.url, headers: req.headers }));
+    res.writeHead(200, { "Content-Type": "text/html" });
+    res.end("<!doctype html><title>neighbour</title>");
+  });
+  await new Promise((done) => neighbour.listen(0, "127.0.0.1", done));
+  const neighbourUrl = `http://127.0.0.1:${neighbour.address().port}`;
+  try {
+    const other = await context.newPage();
+    await other.goto(`${neighbourUrl}/`);
+    // Even holding the real secrets, a page on another port is refused:
+    // the session header needs a preflight Yamakan never grants, and media
+    // reads from another port are same-site, not same-origin.
+    const attempt = await other.evaluate(probe, probeArgs);
+    assert.deepEqual(attempt, { api: "blocked", media: "refused" });
+    // The neighbour's own requests (a fetch and a navigation).
+    await other.evaluate((u) => fetch(`${u}/steal`), neighbourUrl);
+    await other.goto(`${neighbourUrl}/again`);
+    await other.close();
+    assert.ok(received.length >= 3, "the neighbour saw its own requests");
+    for (const request of received) {
+      assert.ok(!request.includes(credentials.session), request);
+      assert.ok(!request.includes(credentials.media), request);
+      assert.doesNotMatch(request, /yamakan/i, request);
+    }
+  } finally {
+    neighbour.close();
+  }
+  // The tool catalog is read with the page's session and shown in place
+  // (a new tab would hold no session).
+  await page.getByRole("button", { name: "Agent tools", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Show the versioned tool catalog",
+      exact: true,
+    })
+    .click();
+  await page
+    .locator("pre.catalog")
+    .filter({ hasText: "yamakan.project.create" })
+    .waitFor();
+  await page.getByRole("button", { name: "Production", exact: true }).click();
   const picture = saved.clips.filter((c) =>
     saved.assets.some((a) => a.id === c.assetId && a.kind === "image"),
   );
@@ -465,6 +574,21 @@ try {
     .waitFor();
   assert.equal((await getProject()).scenes[0].camera.shotScale, "close");
   await page.screenshot({ path: join(output, "arabic-interface.png") });
+  // Keyboard only, right to left: Tab reaches the Arabic backup button and
+  // Enter runs it.
+  let reached = false;
+  for (let i = 0; i < 200 && !reached; i++) {
+    await page.keyboard.press("Tab");
+    reached = await page.evaluate(
+      () => document.activeElement?.textContent === "إنشاء نسخة احتياطية الآن",
+    );
+  }
+  assert.ok(reached, "the backup button is reachable by keyboard");
+  await page.keyboard.press("Enter");
+  await page
+    .getByRole("status")
+    .filter({ hasText: "أُنشئت النسخة الاحتياطية." })
+    .waitFor({ timeout: 60000 });
   await page.reload();
   await page.waitForFunction(() => document.documentElement.dir === "rtl");
   await page.getByRole("button", { name: "English", exact: true }).click();
@@ -528,6 +652,10 @@ try {
       "reference preview frame (plan-compiled) with stale notice",
       "Arabic interface (RTL page, LTR timeline, remembered across reload)",
       "workspace backup and restore into a new folder (keyboard)",
+      "launch link required for a session; secret removed from the address bar",
+      "another loopback port cannot call the API or load media",
+      "keyboard-only Arabic (RTL) backup",
+      "tool catalog shown with the page session",
       "export",
       "download",
       "reload",

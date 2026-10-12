@@ -962,13 +962,22 @@ export class ProjectStore {
       this.#holds--;
     };
   }
-  // Copies the database online with SQLite's backup API through this
-  // connection, so the copy includes every write committed before it
-  // completes and nothing after.
-  // One step: a rollback on this connection restarts an incremental copy,
-  // and conflicting edits roll back often enough to stall one.
+  // Copies the database online with SQLite's backup API from a separate
+  // read-only connection, in one step: it reads one consistent snapshot of
+  // everything committed when the copy began (write-ahead log), while this
+  // connection keeps committing. The copy never runs on this connection,
+  // which writes from the main thread meanwhile.
   async backupDatabase(destination: string) {
-    await backup(this.#database, destination, { rate: -1 });
+    const source = new DatabaseSync(
+      await safePath(this.root, "workspace.sqlite"),
+      { readOnly: true },
+    );
+    try {
+      source.exec("PRAGMA busy_timeout = 5000");
+      await backup(source, destination, { rate: -1 });
+    } finally {
+      source.close();
+    }
   }
   // Bytes promised to in-flight imports on this volume.
   get reservedBytes() {

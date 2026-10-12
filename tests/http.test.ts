@@ -1,12 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fork, execFileSync } from "node:child_process";
-import { mkdtemp, readFile, access, rm } from "node:fs/promises";
+import { mkdtemp, readFile, access, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { once } from "node:events";
 import { mediaTools } from "../core/process/workers.ts";
+import {
+  describeAccess,
+  readableByOtherAccounts,
+} from "../core/process/access.ts";
 
 test("loopback API rejects unauthenticated and cross-site access; restart preserves edits", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-http-"));
@@ -88,52 +92,156 @@ test("loopback API rejects unauthenticated and cross-site access; restart preser
     assert.equal(unknown.status, 400);
     assert.equal((await unknown.json()).error.code, "VALIDATION");
 
-    // Browser session and local-client credentials are separate authentication paths.
+    // Browser session and local-client credentials are separate authentication
+    // paths. Opening the page grants nothing: the session comes only from the
+    // launch secret, exchanged by the Yamakan page itself.
     const page = await fetch(`${origin}/`);
-    const cookie = /yamakan=([a-f0-9]{64})/.exec(
-      page.headers.get("set-cookie") || "",
-    )?.[1];
-    assert.ok(cookie, "navigation issues a browser session cookie");
-    assert.notEqual(cookie, token, "browser and client credentials differ");
+    // (200 with a built interface, 404 without; never a cookie either way)
+    assert.equal(
+      page.headers.get("set-cookie"),
+      null,
+      "no cookie for a page load",
+    );
+    const launchUrl = (
+      await readFile(path.join(root, "launch"), "utf8")
+    ).trim();
+    const launch = /#launch=([a-f0-9]{64})$/.exec(launchUrl)?.[1];
+    assert.ok(launch, "the launch file holds the launch link");
+    assert.ok(launchUrl.startsWith(`${origin}/#launch=`));
+    const session = (secret: string, extra: Record<string, string> = {}) =>
+      fetch(`${origin}/api/v1/session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: origin,
+          ...extra,
+        },
+        body: JSON.stringify({ launch: secret }),
+      });
+    assert.equal((await session("0".repeat(64))).status, 401);
+    assert.equal(
+      (await session(token.trim())).status,
+      401,
+      "the client token is not a launch secret",
+    );
+    // Another loopback port (or any other origin) cannot exchange it.
+    assert.equal(
+      (await session(launch!, { Origin: "http://127.0.0.1:1" })).status,
+      403,
+    );
+    const noOrigin = await fetch(`${origin}/api/v1/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ launch }),
+    });
+    assert.equal(noOrigin.status, 403);
+    assert.equal(noOrigin.headers.get("set-cookie"), null);
+    const granted = await session(launch!);
+    assert.equal(granted.status, 200);
+    // No cookie: browsers would send it to every port of 127.0.0.1.
+    assert.equal(granted.headers.get("set-cookie"), null);
+    const { session: sessionKey, media } = await granted.json();
+    assert.match(sessionKey, /^[a-f0-9]{64}$/);
+    assert.match(media, /^[a-f0-9]{64}$/);
+    for (const other of [token.trim(), launch])
+      for (const key of [sessionKey, media]) assert.notEqual(key, other);
+    assert.notEqual(sessionKey, media);
+    // The client token, the launch link and the database are private to
+    // this account: another account of the machine is denied (Windows), or
+    // the modes exclude everyone else (POSIX).
+    const secrets = ["token", "launch", "workspace.sqlite"].map((name) =>
+      path.join(root, name),
+    );
+    if (process.platform === "win32") {
+      const acl = await describeAccess(root);
+      assert.equal(acl.protected, true);
+      assert.deepEqual(
+        acl.aces
+          .map((a) => a.sid)
+          .filter((sid) => !sid.startsWith("S-1-5-21-"))
+          .sort(),
+        ["S-1-5-18", "S-1-5-32-544"],
+      );
+      assert.equal(acl.aces.length, 3);
+      assert.ok(acl.owner.startsWith("S-1-5-21-"), "owned by this user");
+      for (const file of [root, ...secrets])
+        assert.equal(await readableByOtherAccounts(file), false, file);
+    } else {
+      assert.equal((await stat(root)).mode & 0o777, 0o700);
+      for (const file of secrets.slice(0, 2))
+        assert.equal((await stat(file)).mode & 0o777, 0o600, file);
+    }
     const envelope = JSON.stringify({
       apiVersion: 1,
       operation: "yamakan.project.list",
       requestId: "auth-check-1",
       parameters: {},
     });
-    const viaCookie = (extra: Record<string, string>) =>
+    const viaSession = (extra: Record<string, string>) =>
       fetch(`${origin}/api/v1/call`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Cookie: `yamakan=${cookie}`,
+          "X-Yamakan-Session": sessionKey,
           ...extra,
         },
         body: envelope,
       });
     assert.equal(
-      (await viaCookie({})).status,
+      (await viaSession({})).status,
       401,
-      "cookie mutation path requires a same-origin page request",
+      "a session state change requires the page's exact Origin",
     );
-    const fromPage = await viaCookie({ Origin: origin });
+    const fromPage = await viaSession({ Origin: origin });
     assert.equal(fromPage.status, 200);
     assert.equal((await fromPage.json()).requestId, "auth-check-1");
-    // Fetch Metadata alone never authorizes a cookie state change.
     assert.equal(
-      (await viaCookie({ "Sec-Fetch-Site": "same-origin" })).status,
+      (await viaSession({ "Sec-Fetch-Site": "same-origin" })).status,
       401,
     );
     const crossCredential = async (h: Record<string, string>) =>
       (await fetch(`${origin}/api/v1/tools`, { headers: h })).status;
-    assert.equal(await crossCredential({ Cookie: `yamakan=${cookie}` }), 200);
+    assert.equal(
+      await crossCredential({ "X-Yamakan-Session": sessionKey }),
+      200,
+    );
     assert.equal(
       await crossCredential({
-        Cookie: `yamakan=${cookie}`,
+        "X-Yamakan-Session": sessionKey,
         "Sec-Fetch-Site": "same-site",
       }),
       401,
       "another loopback port is same-site but not same-origin",
+    );
+    // A cookie is no credential at all now.
+    assert.equal(
+      await crossCredential({ Cookie: `yamakan=${sessionKey}` }),
+      401,
+    );
+    // The media key opens media reads only, from the page itself.
+    const mediaRead = async (key: string, pathname: string, extra = {}) =>
+      (await fetch(`${origin}${pathname}?media=${key}`, { headers: extra }))
+        .status;
+    const assetPath = `/api/v1/projects/${crypto.randomUUID()}/assets/${crypto.randomUUID()}`;
+    assert.notEqual(
+      await mediaRead(media, assetPath),
+      401,
+      "media key reads media",
+    );
+    assert.equal(await mediaRead("0".repeat(64), assetPath), 401);
+    assert.equal(
+      await mediaRead(sessionKey, assetPath),
+      401,
+      "the session is not a media key",
+    );
+    assert.equal(
+      await mediaRead(media, assetPath, { "Sec-Fetch-Site": "same-site" }),
+      401,
+    );
+    assert.equal(
+      await mediaRead(media, "/api/v1/tools"),
+      401,
+      "media key reads only media",
     );
     const badOrigin = await fetch(`${origin}/api/v1/tools`, {
       headers: { ...headers, Origin: "http://127.0.0.1:1" },
@@ -152,9 +260,12 @@ test("loopback API rejects unauthenticated and cross-site access; restart preser
     );
     assert.equal(malformedName.status, 400);
     assert.equal((await malformedName.json()).error.code, "VALIDATION");
-    assert.equal(await crossCredential({ Cookie: `yamakan=${token}` }), 401);
     assert.equal(
-      await crossCredential({ Authorization: `Bearer ${cookie}` }),
+      await crossCredential({ "X-Yamakan-Session": token.trim() }),
+      401,
+    );
+    assert.equal(
+      await crossCredential({ Authorization: `Bearer ${sessionKey}` }),
       401,
     );
     assert.equal(
@@ -164,6 +275,22 @@ test("loopback API rejects unauthenticated and cross-site access; restart preser
     const catalog = await (
       await fetch(`${origin}/api/v1/tools`, { headers })
     ).json();
+    // The local CLI authenticates with the owner-only token file.
+    const listed = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          fileURLToPath(new URL("../cli/main.ts", import.meta.url)),
+          "yamakan.project.list",
+          "{}",
+        ],
+        {
+          env: { ...process.env, YAMAKAN_URL: origin, YAMAKAN_WORKSPACE: root },
+          windowsHide: true,
+        },
+      ).toString(),
+    );
+    assert.ok(Array.isArray(listed));
     assert.equal(catalog.service, "yamakan");
     assert.match(catalog.resourcePolicy.hash, /^[a-f0-9]{64}$/);
     assert.ok(

@@ -14,6 +14,8 @@ const en = {
   "nav.tools": "Agent tools",
   "badge.local": "Local media · CPU rendering",
   "status.initial": "Create or open a project to begin.",
+  "session.locked":
+    "Open Yamakan with the link it printed when it started (also saved in the workspace's launch file). Opening the address alone does not sign you in.",
   "status.working": "Working…",
   "status.opened": "Opened {name}, revision {revision}.",
   "status.saved": "Saved revision {revision}.",
@@ -78,7 +80,7 @@ const en = {
   "tools.title": "Yamakan agent tools",
   "tools.intro":
     "The same validated project and render operations power the editor and local REST API.",
-  "tools.catalog": "Open the versioned tool catalog",
+  "tools.catalog": "Show the versioned tool catalog",
   "tools.jobs":
     "Jobs expose progress, cancellation, errors and verified video artifacts. Project paths and arbitrary commands are not accepted by the API.",
   "toolbar.unsaved": "Unsaved changes",
@@ -149,6 +151,8 @@ const ar: Record<MessageKey, string> = {
   "nav.tools": "أدوات الوكلاء",
   "badge.local": "وسائط محلية · تصيير بالمعالج",
   "status.initial": "أنشئ مشروعًا أو افتح مشروعًا للبدء.",
+  "session.locked":
+    "افتح يماكن بالرابط الذي طبعه عند تشغيله (وهو محفوظ أيضًا في ملف launch في مساحة العمل). فتح العنوان وحده لا يسجّل دخولك.",
   "status.working": "جارٍ العمل…",
   "status.opened": "فُتح {name}، المراجعة {revision}.",
   "status.saved": "حُفظت المراجعة {revision}.",
@@ -212,7 +216,7 @@ const ar: Record<MessageKey, string> = {
   "tools.title": "أدوات الوكلاء في يماكن",
   "tools.intro":
     "يعتمد المحرِّر وواجهة REST المحلية على عمليات المشروع والتصيير نفسها التي جرى التحقق منها.",
-  "tools.catalog": "فتح دليل الأدوات ذي الإصدارات",
+  "tools.catalog": "عرض دليل الأدوات ذي الإصدارات",
   "tools.jobs":
     "تعرض المهام التقدم والإلغاء والأخطاء وملفات الفيديو المتحقَّق منها. لا تقبل الواجهة مسارات المشاريع ولا الأوامر العشوائية.",
   "toolbar.unsaved": "تغييرات غير محفوظة",

@@ -36,6 +36,7 @@ import { initializeRoot, safePath } from "./paths.ts";
 import { CommandError } from "./command/errors.ts";
 import { RESOURCE_POLICY } from "./command/policy.ts";
 import { inspectWal } from "./wal.ts";
+import { restrictToOwner } from "./process/access.ts";
 
 export const BACKUP_FORMAT = "yamakan.backup/1";
 export const RESTORE_FORMAT = "yamakan.restore/1";
@@ -50,6 +51,7 @@ const MAX_MANIFEST_BYTES = 64 * 1024 * 1024;
 // secrets and locks that belong to one running service.
 const EXCLUDED = [
   "token",
+  "launch",
   "service.lock",
   "projects/*/exports",
   "projects/*/imports",
@@ -331,6 +333,8 @@ export function backupWorkspace(
         .replace(/\.\d{3}/, "")}-${randomBytes(4).toString("hex")}`;
       await assertSeparate(source.root, home);
       await mkdir(home, { recursive: true });
+      // Backups hold the whole workspace: private to this account too.
+      await restrictToOwner(home, "dir");
       const backups = await safePath(home, "backups");
       await mkdir(backups, { recursive: true });
       const target = await safePath(home, "backups", backupId);
@@ -510,6 +514,7 @@ async function restore(
   try {
     await initializeRoot(root);
     initialized = true;
+    await restrictToOwner(root, "dir");
     const database = path.join(root, "workspace.sqlite");
     if (
       (await copyVerified(path.join(backupDir, "workspace.sqlite"), database, {
