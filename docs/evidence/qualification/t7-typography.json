@@ -1,96 +1,249 @@
 {
   "qualification": "t7-typography",
-  "date": "2026-10-12T01:47:06.723Z",
-  "commit": "f8bd7e32e419c690dc3aa604d496cf00c00d70d4",
+  "date": "2026-10-12T02:16:24.907Z",
+  "commit": "be95f1c5edfa3ff81ea48d638f5aa4eac5cec114",
   "platform": "win32-x64",
   "ffmpeg": "ffmpeg version 8.1.1-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers\r",
   "libassApi": "0x1704000",
-  "planHash": "3036b120e213b5ff192b05c1c1c681662cee610e66ab18686ae9e19beea0fb9a",
-  "assSha256": "4139a892a4a3ff9baace0c6847e942bbbf65a962fdc901894bd60959d2aa4d1f",
-  "fonts": [
+  "renders": [
     {
-      "name": "IBMPlexSansArabic-Regular.ttf",
-      "sha256": "93ac94c4b3174176d410381b86c19891086a091c3c8da940ca65d85aa6a4f8a4"
+      "label": "landscape",
+      "width": 1280,
+      "height": 720,
+      "planHash": "4fa33ec8156133bf4d7a5232ffa6ce79392850181bedf6b605fdddb11292e8ab",
+      "assSha256": "3f64c60ab9c77a3d3eca0e3505adb995e938b238eeeda00647b2408bc0b56acf",
+      "fonts": [
+        {
+          "name": "IBMPlexSansArabic-Regular.ttf",
+          "sha256": "93ac94c4b3174176d410381b86c19891086a091c3c8da940ca65d85aa6a4f8a4"
+        },
+        {
+          "name": "IBMPlexSansArabic-Bold.ttf",
+          "sha256": "44f73c1db689f2aac357cae39ef439d0705bd700b7d02e8d3f0079cda5a95e5f"
+        }
+      ],
+      "output": {
+        "planHash": "4fa33ec8156133bf4d7a5232ffa6ce79392850181bedf6b605fdddb11292e8ab",
+        "width": 1280,
+        "height": 720,
+        "durationFrames": 360,
+        "hasAudio": false,
+        "libassApi": 24133632
+      },
+      "frames": [
+        {
+          "name": "punctuation",
+          "text": "مرحبًا، كيف حالك؟ «اقتباس» — نعم! (أقواس) ؛ نقطة.",
+          "atSeconds": 0.5,
+          "file": "docs/evidence/qualification/typography/landscape-01-punctuation.png",
+          "sha256": "2d10bbc30fe92e38402fa11416aeb1ac94dc444610469f5cfc02b5fab0243ae1"
+        },
+        {
+          "name": "bidi-isolates",
+          "text": "الإصدار ⁨Yamakan 2.0⁩ جاهز، والملف ⁦report-final.mp4⁩ محفوظ.",
+          "atSeconds": 1.5,
+          "file": "docs/evidence/qualification/typography/landscape-02-bidi-isolates.png",
+          "sha256": "05ce6366b40d8482f210fcc684bdd9fe3a9c53a395088f1382be02bd10276b61"
+        },
+        {
+          "name": "diacritics",
+          "text": "بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ — شَدَّة وتَنْوِينٌ وسُكُون.",
+          "atSeconds": 2.5,
+          "file": "docs/evidence/qualification/typography/landscape-03-diacritics.png",
+          "sha256": "38deb7e2e2f8eb082d706b7e00f75e209acc4b8e848667d8278624bdc745c07e"
+        },
+        {
+          "name": "arabic-indic-digits",
+          "text": "المشهد ١٢ اللقطة ٣٤٥ — ٢٠٢٦/١٠/١٢ — ۱۲۳ — 42%",
+          "atSeconds": 3.5,
+          "file": "docs/evidence/qualification/typography/landscape-04-arabic-indic-digits.png",
+          "sha256": "75787dc6eb84858b17018e6f479803475255deb378d266ffa6b73d706878c54b"
+        },
+        {
+          "name": "lam-alef",
+          "text": "لا لأ لإ لآ — سلام، الأمل، الإنتاج، لآلئ.",
+          "atSeconds": 4.5,
+          "file": "docs/evidence/qualification/typography/landscape-05-lam-alef.png",
+          "sha256": "3364def6759bd745a00c477a0c67d65677540bfce858b8544f67ad4c29dc776a"
+        },
+        {
+          "name": "mixed-lines",
+          "text": "Opening scene: الفصل الأول\nالفصل الأول: Opening scene",
+          "atSeconds": 5.5,
+          "file": "docs/evidence/qualification/typography/landscape-06-mixed-lines.png",
+          "sha256": "9484707f1bf8c36f04c893b857fa229790109d5018040f2c7ce8159ac89592ba"
+        },
+        {
+          "name": "line-wrap",
+          "text": "هذا عنوان طويل جدًا يجب أن يلتف تلقائيًا على عدة أسطر داخل إطار الفيديو دون أن يخرج عن حدوده أو يتداخل مع الحواف.",
+          "atSeconds": 6.5,
+          "file": "docs/evidence/qualification/typography/landscape-07-line-wrap.png",
+          "sha256": "fab560a14e4f3e26870afc66fd5da0849455a2b293e7b73f1e114b403e74bb3c"
+        },
+        {
+          "name": "long-word",
+          "text": "كلمةطويلةجدابدونمسافاتتختبرالقصعندحافةالإطارولاينبغيأنتختفي",
+          "atSeconds": 7.5,
+          "file": "docs/evidence/qualification/typography/landscape-08-long-word.png",
+          "sha256": "0468196abe6e9e4761617b3cab18145271fb2b01034c9b127728d9e31164fef0"
+        },
+        {
+          "name": "leading-digits",
+          "text": "١٢: «البداية» — 3.5 ثانية",
+          "atSeconds": 8.5,
+          "file": "docs/evidence/qualification/typography/landscape-09-leading-digits.png",
+          "sha256": "13a38eb0d0b819928f85d7200e951a3d4939de652faab4d46f7fb0543272ce6b"
+        },
+        {
+          "name": "literal-syntax",
+          "text": "النص {\\b1} و \\N و \\h و {} يظهر كما هو",
+          "atSeconds": 9.5,
+          "file": "docs/evidence/qualification/typography/landscape-10-literal-syntax.png",
+          "sha256": "ed34e43d451146eaabb95e9810f1178c38ffb4185701f53e1462a4322d8a0c6e"
+        },
+        {
+          "name": "tatweel-and-signs",
+          "text": "مـــرحبـــا — ٥٠٪ — ٣٫١٤ — ٢٬٥٠٠",
+          "atSeconds": 10.5,
+          "file": "docs/evidence/qualification/typography/landscape-11-tatweel-and-signs.png",
+          "sha256": "0716b019a4759606f824604c1d246f3ad92e16ec6bcbba285c2ef4d45931c962"
+        },
+        {
+          "name": "latin-only",
+          "text": "Final cut: Scene 4, take 12 (approved).",
+          "atSeconds": 11.5,
+          "file": "docs/evidence/qualification/typography/landscape-12-latin-only.png",
+          "sha256": "44358049c5a791a53065e517a520e06cfa83642a7dddab10e6563a08323ddc7a"
+        }
+      ]
     },
     {
-      "name": "IBMPlexSansArabic-Bold.ttf",
-      "sha256": "44f73c1db689f2aac357cae39ef439d0705bd700b7d02e8d3f0079cda5a95e5f"
+      "label": "portrait",
+      "width": 608,
+      "height": 1080,
+      "planHash": "e8ee10332c53d12e7a5bd0216a401970b633191d7684e5732015872c58a361ac",
+      "assSha256": "940627916adf312b8a623d4eafd1f2497ed38263a5b077157bc683046f6633a9",
+      "fonts": [
+        {
+          "name": "IBMPlexSansArabic-Regular.ttf",
+          "sha256": "93ac94c4b3174176d410381b86c19891086a091c3c8da940ca65d85aa6a4f8a4"
+        },
+        {
+          "name": "IBMPlexSansArabic-Bold.ttf",
+          "sha256": "44f73c1db689f2aac357cae39ef439d0705bd700b7d02e8d3f0079cda5a95e5f"
+        }
+      ],
+      "output": {
+        "planHash": "e8ee10332c53d12e7a5bd0216a401970b633191d7684e5732015872c58a361ac",
+        "width": 608,
+        "height": 1080,
+        "durationFrames": 330,
+        "hasAudio": false,
+        "libassApi": 24133632
+      },
+      "frames": [
+        {
+          "name": "punctuation",
+          "text": "مرحبًا، كيف حالك؟ «اقتباس» — نعم! (أقواس) ؛ نقطة.",
+          "atSeconds": 0.5,
+          "file": "docs/evidence/qualification/typography/portrait-01-punctuation.png",
+          "sha256": "546e71634db58cfa05b3572a40a70f0a8cac19bac1b4de1f02af08bb43f7ae32"
+        },
+        {
+          "name": "bidi-isolates",
+          "text": "الإصدار ⁨Yamakan 2.0⁩ جاهز، والملف ⁦report-final.mp4⁩ محفوظ.",
+          "atSeconds": 1.5,
+          "file": "docs/evidence/qualification/typography/portrait-02-bidi-isolates.png",
+          "sha256": "96ad1ab3fbcbd278866f809388c19d656023483e93906ec35fdbc06b982f4fb1"
+        },
+        {
+          "name": "diacritics",
+          "text": "بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ — شَدَّة وتَنْوِينٌ وسُكُون.",
+          "atSeconds": 2.5,
+          "file": "docs/evidence/qualification/typography/portrait-03-diacritics.png",
+          "sha256": "ee3f7fd31abe29b6701268d8cd7d43522819a341c60dd55fa125787c00fde6b8"
+        },
+        {
+          "name": "arabic-indic-digits",
+          "text": "المشهد ١٢ اللقطة ٣٤٥ — ٢٠٢٦/١٠/١٢ — ۱۲۳ — 42%",
+          "atSeconds": 3.5,
+          "file": "docs/evidence/qualification/typography/portrait-04-arabic-indic-digits.png",
+          "sha256": "8a439da37ffa7c6566d32976cc037626d010418c949ec19b6aeb1afba5b0428c"
+        },
+        {
+          "name": "lam-alef",
+          "text": "لا لأ لإ لآ — سلام، الأمل، الإنتاج، لآلئ.",
+          "atSeconds": 4.5,
+          "file": "docs/evidence/qualification/typography/portrait-05-lam-alef.png",
+          "sha256": "5026487dcdff4358de8b6b4a8836a778d452fb2289d5dad34a49c52db23c31f3"
+        },
+        {
+          "name": "mixed-lines",
+          "text": "Opening scene: الفصل الأول\nالفصل الأول: Opening scene",
+          "atSeconds": 5.5,
+          "file": "docs/evidence/qualification/typography/portrait-06-mixed-lines.png",
+          "sha256": "36760d549af8e6ddd61c66e274b10216e687a8f53173acf57517173557347912"
+        },
+        {
+          "name": "line-wrap",
+          "text": "هذا عنوان طويل جدًا يجب أن يلتف تلقائيًا على عدة أسطر داخل إطار الفيديو دون أن يخرج عن حدوده أو يتداخل مع الحواف.",
+          "atSeconds": 6.5,
+          "file": "docs/evidence/qualification/typography/portrait-07-line-wrap.png",
+          "sha256": "8f23fef5948c9f72d9f1847e3bb52adacee477183a0e22098be96e69cb218544"
+        },
+        {
+          "name": "leading-digits",
+          "text": "١٢: «البداية» — 3.5 ثانية",
+          "atSeconds": 7.5,
+          "file": "docs/evidence/qualification/typography/portrait-08-leading-digits.png",
+          "sha256": "4f308cfc81178df897d1869ae2175093db8155ed89e1ef4c9bea9cd0685a34c7"
+        },
+        {
+          "name": "literal-syntax",
+          "text": "النص {\\b1} و \\N و \\h و {} يظهر كما هو",
+          "atSeconds": 8.5,
+          "file": "docs/evidence/qualification/typography/portrait-09-literal-syntax.png",
+          "sha256": "1a8b6ecaf49a40f9f7ab08106137824104e72269852f49a837f585b0f98a54e0"
+        },
+        {
+          "name": "tatweel-and-signs",
+          "text": "مـــرحبـــا — ٥٠٪ — ٣٫١٤ — ٢٬٥٠٠",
+          "atSeconds": 9.5,
+          "file": "docs/evidence/qualification/typography/portrait-10-tatweel-and-signs.png",
+          "sha256": "ffa55aa93af10766d5817517d6df31d631dbd927a4b4bed8985005f25411b7c3"
+        },
+        {
+          "name": "latin-only",
+          "text": "Final cut: Scene 4, take 12 (approved).",
+          "atSeconds": 10.5,
+          "file": "docs/evidence/qualification/typography/portrait-11-latin-only.png",
+          "sha256": "c876f8fb419aab230fd3bd31985e784b9c657365ca832f673e429c1d8b916ea1"
+        }
+      ]
     }
   ],
-  "output": {
-    "planHash": "3036b120e213b5ff192b05c1c1c681662cee610e66ab18686ae9e19beea0fb9a",
-    "width": 1280,
-    "height": 720,
-    "durationFrames": 240,
-    "hasAudio": false
-  },
-  "frames": [
+  "clipping": [
     {
-      "name": "punctuation",
-      "text": "مرحبًا، كيف حالك؟ «اقتباس» — نعم! (أقواس) ؛ نقطة.",
-      "atSeconds": 0.5,
-      "file": "docs/evidence/qualification/typography/01-punctuation.png",
-      "sha256": "2d10bbc30fe92e38402fa11416aeb1ac94dc444610469f5cfc02b5fab0243ae1"
+      "label": "landscape",
+      "width": 1280,
+      "height": 720,
+      "text": "كلمةطويلةجدابدونمسافاتتختبرالقصعندحافةالإطارولاينبغيأنتختفيكلمةطويلةجدابدونمسافاتتختبرالقصعندحافةالإطارولاينبغيأنتختفي",
+      "outcome": "refused",
+      "message": "Title 1 does not fit the frame; shorten long words, add spaces so it can wrap, or use fewer lines."
     },
     {
-      "name": "bidi-isolates",
-      "text": "الإصدار ⁨Yamakan 2.0⁩ جاهز، والملف ⁦report-final.mp4⁩ محفوظ.",
-      "atSeconds": 1.5,
-      "file": "docs/evidence/qualification/typography/02-bidi-isolates.png",
-      "sha256": "05ce6366b40d8482f210fcc684bdd9fe3a9c53a395088f1382be02bd10276b61"
-    },
-    {
-      "name": "diacritics",
-      "text": "بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ — شَدَّة وتَنْوِينٌ وسُكُون.",
-      "atSeconds": 2.5,
-      "file": "docs/evidence/qualification/typography/03-diacritics.png",
-      "sha256": "38deb7e2e2f8eb082d706b7e00f75e209acc4b8e848667d8278624bdc745c07e"
-    },
-    {
-      "name": "arabic-indic-digits",
-      "text": "المشهد ١٢ اللقطة ٣٤٥ — ٢٠٢٦/١٠/١٢ — ۱۲۳ — 42%",
-      "atSeconds": 3.5,
-      "file": "docs/evidence/qualification/typography/04-arabic-indic-digits.png",
-      "sha256": "75787dc6eb84858b17018e6f479803475255deb378d266ffa6b73d706878c54b"
-    },
-    {
-      "name": "lam-alef",
-      "text": "لا لأ لإ لآ — سلام، الأمل، الإنتاج، لآلئ.",
-      "atSeconds": 4.5,
-      "file": "docs/evidence/qualification/typography/05-lam-alef.png",
-      "sha256": "3364def6759bd745a00c477a0c67d65677540bfce858b8544f67ad4c29dc776a"
-    },
-    {
-      "name": "mixed-lines",
-      "text": "Opening scene: الفصل الأول\nالفصل الأول: Opening scene",
-      "atSeconds": 5.5,
-      "file": "docs/evidence/qualification/typography/06-mixed-lines.png",
-      "sha256": "9484707f1bf8c36f04c893b857fa229790109d5018040f2c7ce8159ac89592ba"
-    },
-    {
-      "name": "line-wrap",
-      "text": "هذا عنوان طويل جدًا يجب أن يلتف تلقائيًا على عدة أسطر داخل إطار الفيديو دون أن يخرج عن حدوده أو يتداخل مع الحواف.",
-      "atSeconds": 6.5,
-      "file": "docs/evidence/qualification/typography/07-line-wrap.png",
-      "sha256": "fab560a14e4f3e26870afc66fd5da0849455a2b293e7b73f1e114b403e74bb3c"
-    },
-    {
-      "name": "long-word",
+      "label": "portrait",
+      "width": 608,
+      "height": 1080,
       "text": "كلمةطويلةجدابدونمسافاتتختبرالقصعندحافةالإطارولاينبغيأنتختفي",
-      "atSeconds": 7.5,
-      "file": "docs/evidence/qualification/typography/08-long-word.png",
-      "sha256": "0468196abe6e9e4761617b3cab18145271fb2b01034c9b127728d9e31164fef0"
+      "outcome": "refused",
+      "message": "Title 1 does not fit the frame; shorten long words, add spaces so it can wrap, or use fewer lines."
     }
   ],
-  "clipping": {
-    "text": "كلمةطويلةجدابدونمسافاتتختبرالقصعندحافةالإطارولاينبغيأنتختفيكلمةطويلةجدابدونمسافاتتختبرالقصعندحافةالإطارولاينبغيأنتختفي",
-    "outcome": "refused",
-    "message": "Title 1 is wider than the frame; shorten long words or add spaces so it can wrap."
-  },
-  "automatedChecks": "tests/typography.test.ts: no system-font fallback, escaping, line wrap and edge clearance for these fixtures",
+  "automatedChecks": "tests/typography.test.ts: no system-font fallback, escaping against controls, frame-exact cue boundaries, and the margin-band fit check for every fixture",
   "arabicReview": {
     "status": "pending",
     "reviewer": "Founder or a delegated Arabic reviewer",
-    "instructions": "Check shaping, joining, lam-alef ligatures, diacritic placement, punctuation mirroring and placement, digit shapes, isolate ordering, line order of mixed lines, wrap points and that nothing is clipped."
+    "instructions": "Check shaping, joining, lam-alef ligatures, tatweel, diacritic placement, punctuation mirroring and placement, digit shapes and separators, isolate ordering, line order of mixed lines, wrap points, and that nothing is clipped, on both frame shapes."
   }
 }
