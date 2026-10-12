@@ -1,0 +1,96 @@
+{
+  "qualification": "t7-typography",
+  "date": "2026-10-12T01:47:06.723Z",
+  "commit": "f8bd7e32e419c690dc3aa604d496cf00c00d70d4",
+  "platform": "win32-x64",
+  "ffmpeg": "ffmpeg version 8.1.1-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers\r",
+  "libassApi": "0x1704000",
+  "planHash": "3036b120e213b5ff192b05c1c1c681662cee610e66ab18686ae9e19beea0fb9a",
+  "assSha256": "4139a892a4a3ff9baace0c6847e942bbbf65a962fdc901894bd60959d2aa4d1f",
+  "fonts": [
+    {
+      "name": "IBMPlexSansArabic-Regular.ttf",
+      "sha256": "93ac94c4b3174176d410381b86c19891086a091c3c8da940ca65d85aa6a4f8a4"
+    },
+    {
+      "name": "IBMPlexSansArabic-Bold.ttf",
+      "sha256": "44f73c1db689f2aac357cae39ef439d0705bd700b7d02e8d3f0079cda5a95e5f"
+    }
+  ],
+  "output": {
+    "planHash": "3036b120e213b5ff192b05c1c1c681662cee610e66ab18686ae9e19beea0fb9a",
+    "width": 1280,
+    "height": 720,
+    "durationFrames": 240,
+    "hasAudio": false
+  },
+  "frames": [
+    {
+      "name": "punctuation",
+      "text": "مرحبًا، كيف حالك؟ «اقتباس» — نعم! (أقواس) ؛ نقطة.",
+      "atSeconds": 0.5,
+      "file": "docs/evidence/qualification/typography/01-punctuation.png",
+      "sha256": "2d10bbc30fe92e38402fa11416aeb1ac94dc444610469f5cfc02b5fab0243ae1"
+    },
+    {
+      "name": "bidi-isolates",
+      "text": "الإصدار ⁨Yamakan 2.0⁩ جاهز، والملف ⁦report-final.mp4⁩ محفوظ.",
+      "atSeconds": 1.5,
+      "file": "docs/evidence/qualification/typography/02-bidi-isolates.png",
+      "sha256": "05ce6366b40d8482f210fcc684bdd9fe3a9c53a395088f1382be02bd10276b61"
+    },
+    {
+      "name": "diacritics",
+      "text": "بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ — شَدَّة وتَنْوِينٌ وسُكُون.",
+      "atSeconds": 2.5,
+      "file": "docs/evidence/qualification/typography/03-diacritics.png",
+      "sha256": "38deb7e2e2f8eb082d706b7e00f75e209acc4b8e848667d8278624bdc745c07e"
+    },
+    {
+      "name": "arabic-indic-digits",
+      "text": "المشهد ١٢ اللقطة ٣٤٥ — ٢٠٢٦/١٠/١٢ — ۱۲۳ — 42%",
+      "atSeconds": 3.5,
+      "file": "docs/evidence/qualification/typography/04-arabic-indic-digits.png",
+      "sha256": "75787dc6eb84858b17018e6f479803475255deb378d266ffa6b73d706878c54b"
+    },
+    {
+      "name": "lam-alef",
+      "text": "لا لأ لإ لآ — سلام، الأمل، الإنتاج، لآلئ.",
+      "atSeconds": 4.5,
+      "file": "docs/evidence/qualification/typography/05-lam-alef.png",
+      "sha256": "3364def6759bd745a00c477a0c67d65677540bfce858b8544f67ad4c29dc776a"
+    },
+    {
+      "name": "mixed-lines",
+      "text": "Opening scene: الفصل الأول\nالفصل الأول: Opening scene",
+      "atSeconds": 5.5,
+      "file": "docs/evidence/qualification/typography/06-mixed-lines.png",
+      "sha256": "9484707f1bf8c36f04c893b857fa229790109d5018040f2c7ce8159ac89592ba"
+    },
+    {
+      "name": "line-wrap",
+      "text": "هذا عنوان طويل جدًا يجب أن يلتف تلقائيًا على عدة أسطر داخل إطار الفيديو دون أن يخرج عن حدوده أو يتداخل مع الحواف.",
+      "atSeconds": 6.5,
+      "file": "docs/evidence/qualification/typography/07-line-wrap.png",
+      "sha256": "fab560a14e4f3e26870afc66fd5da0849455a2b293e7b73f1e114b403e74bb3c"
+    },
+    {
+      "name": "long-word",
+      "text": "كلمةطويلةجدابدونمسافاتتختبرالقصعندحافةالإطارولاينبغيأنتختفي",
+      "atSeconds": 7.5,
+      "file": "docs/evidence/qualification/typography/08-long-word.png",
+      "sha256": "0468196abe6e9e4761617b3cab18145271fb2b01034c9b127728d9e31164fef0"
+    }
+  ],
+  "clipping": {
+    "text": "كلمةطويلةجدابدونمسافاتتختبرالقصعندحافةالإطارولاينبغيأنتختفيكلمةطويلةجدابدونمسافاتتختبرالقصعندحافةالإطارولاينبغيأنتختفي",
+    "outcome": "refused",
+    "message": "Title 1 is wider than the frame; shorten long words or add spaces so it can wrap."
+  },
+  "automatedChecks": "tests/typography.test.ts: no system-font fallback, escaping, line wrap and edge clearance for these fixtures",
+  "arabicReview": {
+    "status": "pending",
+    "reviewer": "Founder or a delegated Arabic reviewer",
+    "instructions": "Check shaping, joining, lam-alef ligatures, diacritic placement, punctuation mirroring and placement, digit shapes, isolate ordering, line order of mixed lines, wrap points and that nothing is clipped."
+  }
+}
