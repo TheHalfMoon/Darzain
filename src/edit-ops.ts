@@ -80,8 +80,10 @@ export function updateClips(p: Project, updates: TimelineClip[]): Project {
         trackId: c.trackId,
         startFrame: Math.max(0, Math.round(c.start * 30)),
         durationFrames,
+        // Titles and still images have no source offset (as in the reducer).
         sourceFrame:
-          old.title !== null
+          old.title !== null ||
+          p.assets.find((a) => a.id === old.assetId)?.kind === "image"
             ? 0
             : Math.max(0, Math.round((c.sourceIn || 0) * 30)),
         ...(old.fadeInFrames !== undefined || old.fadeOutFrames !== undefined

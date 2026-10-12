@@ -94,6 +94,6 @@ Updated: 2026-10-12. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 
 **Next executable task:** T7 render plan and typography (versioned plan compiler, ASS/libass titles with pinned OFL Arabic/Latin fonts) after T6 merges.
 
-**Recorded for T9 from T6 reviews:** undo/redo write full snapshots and consume the 10,000-revision budget (compaction or head re-pointing); edit history is pruned only by MAX_REVISION; track overlap is enforced by reducers, not by canonical validation (needs a migration decision for existing projects); a request retried across the snapshot format change (`/1`→`/2`) gets IDEMPOTENCY_MISMATCH.
+**Recorded for T9 from T6 reviews:** undo/redo write full snapshots and consume the 10,000-revision budget (compaction or head re-pointing); edit history is pruned only by MAX_REVISION; track overlap is enforced by reducers, not by canonical validation (needs a migration decision for existing projects); a request retried across the snapshot format change (`/1`→`/2`) gets IDEMPOTENCY_MISMATCH. Undo binds to the principal, and the CLI and all MCP agents share `local-client` (per-agent identities come with grants).
 
 **Recorded for T9 from T5 reviews:** GC for crash-window orphans and hidden retained originals; a retry/discard command for `reconciliationRequired` jobs; attempt reason codes instead of error text; conversion space in the import reservation.

@@ -62,6 +62,8 @@ export type StoreOptions = {
   snapshotBytes?: number;
   // Test seam: can only shorten the 60 s grace added to every upload deadline.
   uploadGraceMs?: number;
+  // Test seam: the free bytes a commit sees (default: the volume's, statfs).
+  freeBytes?: () => number;
 };
 
 // Snapshots hold canonical project bytes (core/canonical.ts). Snapshots that
@@ -534,18 +536,6 @@ export class ProjectStore {
   }
 
   #commit(c: Commit): Project {
-    // Every revision writes a snapshot of up to snapshotBytes; the import
-    // reserve stays free, so a stream of small edits cannot fill the disk.
-    const space = statfsSync(this.root);
-    if (
-      Number(space.bavail) * Number(space.bsize) <
-      RESOURCE_POLICY.enforced.diskReserveBytes +
-        RESOURCE_POLICY.enforced.snapshotBytes
-    )
-      throw new CommandError(
-        "LIMIT_EXCEEDED",
-        "Insufficient free disk space to commit a revision.",
-      );
     const db = this.#database;
     const scope =
       c.operation === "project.create" ? WORKSPACE_SCOPE : c.projectId;
@@ -587,6 +577,27 @@ export class ProjectStore {
           );
         }
       }
+      // A new revision writes a snapshot of up to snapshotBytes, and the
+      // import reserve stays free, so a stream of small edits cannot fill the
+      // disk. Replays (above) need no space; restore, the recovery path,
+      // needs only room for its snapshot.
+      const free = this.#options.freeBytes
+        ? this.#options.freeBytes()
+        : (() => {
+            const space = statfsSync(this.root);
+            return Number(space.bavail) * Number(space.bsize);
+          })();
+      if (
+        free <
+        RESOURCE_POLICY.enforced.snapshotBytes +
+          (c.operation === "project.restore"
+            ? 0
+            : RESOURCE_POLICY.enforced.diskReserveBytes)
+      )
+        throw new CommandError(
+          "LIMIT_EXCEEDED",
+          "Insufficient free disk space to commit a revision.",
+        );
       const head = this.#head(c.projectId);
       if (c.operation === "project.create" ? head : !head)
         throw new CommandError(

@@ -9,6 +9,7 @@ import { JobSupervisor } from "../core/jobs.ts";
 import { execute, Scopes } from "../core/command/registry.ts";
 import { CommandError } from "../core/command/errors.ts";
 import { mediaTools } from "../core/process/workers.ts";
+import { RESOURCE_POLICY } from "../core/command/policy.ts";
 import type { Operation } from "../core/timeline/operations.ts";
 import {
   FRAME_TICKS,
@@ -985,5 +986,133 @@ test("scene removal takes its shots; moves keep track kinds; redo ends at anothe
   );
   p = await store.exportProject(project.id);
   assert.equal(p.name, "Renamed");
+  store.close();
+});
+
+test("low disk refuses new revisions but still replays a committed request; restore needs only its snapshot", async () => {
+  const { root, store, project, call } = await workspace();
+  const [picture] = project.tracks.map((t) => t.id);
+  const op = {
+    type: "clip.add" as const,
+    clipId: ids.title,
+    trackId: picture,
+    assetId: null,
+    title: "Kept",
+    startTicks: 0,
+    durationTicks: 10 * F,
+    sourceStartTicks: 0,
+  };
+  const request = {
+    projectId: project.id,
+    expectedRevision: project.revision,
+    operations: [op],
+  };
+  const committed = await call("yamakan.project.applyBatch", request, "disk-1");
+  store.close();
+  let free = 0;
+  const low = new ProjectStore(root, { freeBytes: () => free });
+  await low.initialize();
+  const ctx = {
+    store: low,
+    queue: new JobSupervisor(low),
+    principal: { id: "local-client" as const, scopes: new Set(Scopes) },
+  };
+  const lowCall = (
+    operation: string,
+    parameters: unknown,
+    requestId?: string,
+  ) =>
+    execute({ ...ctx, requestId }, operation, parameters).then(
+      (r) => r.result as any,
+    );
+  // The retry of the committed request returns its original result.
+  assert.equal(
+    (await lowCall("yamakan.project.applyBatch", request, "disk-1")).revision,
+    committed.revision,
+  );
+  await assert.rejects(
+    lowCall("yamakan.project.applyBatch", {
+      projectId: project.id,
+      expectedRevision: committed.revision,
+      operations: [{ type: "clip.setTitle", clipId: ids.title, title: "New" }],
+    }),
+    (e: unknown) => e instanceof CommandError && e.code === "LIMIT_EXCEEDED",
+  );
+  // With room for one snapshot but not the import reserve, only restore runs.
+  free = RESOURCE_POLICY.enforced.snapshotBytes;
+  const history = await low.history(project.id);
+  await assert.rejects(
+    lowCall("yamakan.project.undo", {
+      projectId: project.id,
+      expectedRevision: committed.revision,
+    }),
+    (e: unknown) => e instanceof CommandError && e.code === "LIMIT_EXCEEDED",
+  );
+  const restored = await low.restore(
+    project.id,
+    project.revision,
+    history.headFingerprint,
+  );
+  assert.equal(restored.revision, committed.revision + 1);
+  assert.equal(restored.clips.length, 0);
+  low.close();
+});
+
+test("the editor's drag-trim of a still image matches the reducer", async () => {
+  const { root, store, project } = await workspace();
+  const png = path.join(root, "still.png");
+  execFileSync(
+    mediaTools().ffmpeg,
+    [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=blue:s=64x36:d=1",
+      "-frames:v",
+      "1",
+      png,
+    ],
+    { windowsHide: true },
+  );
+  const image = (
+    await store.importAsset(project.id, "still.png", await readFile(png))
+  ).asset;
+  let view = await store.load(project.id);
+  const picture = view.tracks[0].id;
+  view = applyLocal(view, [
+    {
+      type: "clip.add",
+      clipId: ids.title,
+      trackId: picture,
+      assetId: image.id,
+      title: null,
+      startTicks: 30 * F,
+      durationTicks: 30 * F,
+      sourceStartTicks: 0,
+    },
+  ]);
+  // Left-trim from 30 to 45 frames, as the timeline reports it (sourceIn 0.5 s).
+  const viaEditor = updateClips(view, [
+    {
+      id: ids.title,
+      mediaId: image.id,
+      trackId: picture,
+      start: 1.5,
+      end: 2,
+      duration: 0.5,
+      speed: 1,
+      sourceIn: 0.5,
+      effect: null,
+    },
+  ]);
+  const viaReducer = applyLocal(view, [
+    { type: "clip.trim", clipId: ids.title, startTicks: 45 * F },
+  ]);
+  assert.deepEqual(viaEditor, viaReducer);
+  assert.equal(viaEditor.clips[0].sourceFrame, 0);
   store.close();
 });
