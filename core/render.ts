@@ -1,11 +1,17 @@
-import { writeFile, mkdir, unlink, copyFile, access } from "node:fs/promises";
+import { writeFile, mkdir, unlink } from "node:fs/promises";
 import path from "node:path";
-import { ProjectSchema } from "./project.ts";
-import type { Project } from "./project.ts";
 import { ProjectStore } from "./store.ts";
 import { MEDIA_FORMATS, probe } from "./media.ts";
 import { RESOURCE_POLICY } from "./command/policy.ts";
+import { CommandError } from "./command/errors.ts";
+import { FLICKS_PER_SECOND } from "./time.ts";
 import { mediaTools, workers } from "./process/workers.ts";
+import { compilePlan } from "./render/plan.ts";
+import type { RenderPlan } from "./render/plan.ts";
+import { titleFonts } from "./render/fonts.ts";
+import type { PinnedFont } from "./render/fonts.ts";
+import { compileTitles } from "./render/ass.ts";
+import { titleCapability } from "./render/capability.ts";
 export type RenderJob = {
   id: string;
   projectId: string;
@@ -14,60 +20,143 @@ export type RenderJob = {
   progress: number;
   error: string | null;
   artifact: string | null;
+  // The render plan a completed export drew (contract: async results carry
+  // their planHash); null for other jobs and before completion.
+  planHash: string | null;
 };
+
+// Seconds as an exact-enough decimal string from integer flicks (truncated
+// to the nanosecond): the only way time enters the filtergraph.
+export function seconds(ticks: number): string {
+  if (!Number.isSafeInteger(ticks) || ticks < 0)
+    throw new CommandError("VALIDATION", "Render time is out of range.");
+  const ns = (BigInt(ticks) * 1_000_000_000n) / BigInt(FLICKS_PER_SECOND);
+  const whole = ns / 1_000_000_000n;
+  const frac = (ns % 1_000_000_000n).toString().padStart(9, "0");
+  return `${whole}.${frac}`;
+}
+
+// libass breaks lines only at spaces, so an unbreakable run wider than the
+// frame would be cut off at its edges. Each title is drawn alone for one
+// frame by the same libass and fonts, and only the frame's outermost pixel
+// columns are read back: ink there means the title does not fit, and the
+// render is refused rather than silently clipped.
+async function assertTitlesFit(
+  dir: string,
+  plan: RenderPlan,
+  fonts: PinnedFont[],
+  signal: AbortSignal,
+) {
+  const { width, height } = plan.profile;
+  const frame = FLICKS_PER_SECOND / 30;
+  const cues = plan.titles!.cues.map((cue, i) => ({
+    ...cue,
+    startTicks: i * frame,
+    endTicks: (i + 1) * frame,
+  }));
+  await writeFile(
+    path.join(dir, "measure.ass"),
+    compileTitles(cues, width, height, fonts).ass,
+    { flag: "wx" },
+  );
+  const chunks: Buffer[] = [];
+  const result = await workers().run({
+    executable: mediaTools().ffmpeg,
+    args: [
+      "-hide_banner",
+      "-nostdin",
+      "-f",
+      "lavfi",
+      "-i",
+      `color=c=black:s=${width}x${height}:r=30:d=${seconds(cues.length * frame)}`,
+      "-filter_complex",
+      "[0:v]ass=measure.ass:fontsdir=fonts,format=gray,split[a][b];[a]crop=1:ih:0:0[l];[b]crop=1:ih:iw-1:0[r];[l][r]hstack[edges]",
+      "-map",
+      "[edges]",
+      "-frames:v",
+      String(cues.length),
+      "-f",
+      "rawvideo",
+      "-",
+    ],
+    cwd: dir,
+    memoryBytes: RESOURCE_POLICY.enforced.renderMemoryBytes,
+    signal,
+    stderrLimit: 8000,
+    onStdout: (chunk) => chunks.push(chunk),
+  });
+  if (signal.aborted) throw new Error("Cancelled.");
+  const edges = Buffer.concat(chunks);
+  const perFrame = 2 * height;
+  if (result.code !== 0 || edges.length !== perFrame * cues.length)
+    throw new Error("Title layout could not be checked.", {
+      cause: result.stderr,
+    });
+  for (let i = 0; i < cues.length; i++) {
+    const columns = edges.subarray(i * perFrame, (i + 1) * perFrame);
+    if (columns.some((value) => value > 96))
+      throw new CommandError(
+        "VALIDATION",
+        `Title ${i + 1} is wider than the frame; shorten long words or add spaces so it can wrap.`,
+      );
+  }
+}
+
+export type RenderReceipt = {
+  planHash: string;
+  width: number;
+  height: number;
+  durationFrames: number;
+  hasAudio: boolean;
+};
+
 // Adapted from the donor's buildTimelineCommand: ordered overlays, source trimming,
 // normalized timestamps, scale-to-fit, and a deterministic black canvas. Yamakan adds
-// explicit audio mixing, safe title text files, cancellation and verified atomic output.
+// explicit audio mixing, cancellation and verified atomic output. T7: the
+// filtergraph is compiled only from a render plan (core/render/plan.ts):
+// numbers formatted from integer ticks, asset files verified against the
+// plan's hashes, and titles drawn by one ASS script with the pinned fonts.
 // Renders into a project-relative staging folder through an owned FFmpeg
-// worker and returns the verified, unpublished output file. Publication and
-// the terminal job state belong to the job supervisor (core/jobs.ts).
-export async function renderProject(
+// worker and returns the verified, unpublished output file and its receipt.
+// Publication and the terminal job state belong to the job supervisor.
+export async function renderPlan(
   store: ProjectStore,
-  p: Project,
+  plan: RenderPlan,
+  ass: string | null,
   staging: string[],
   signal: AbortSignal,
   onProgress: (value: number) => void,
   onCreated?: (pid: number) => void | Promise<void>,
-) {
-  ProjectSchema.parse(p);
-  const active = p.clips.filter((c) => {
-    const track = p.tracks.find((t) => t.id === c.trackId)!;
-    return (
-      !track.muted &&
-      (!p.tracks.some((t) => t.kind === track.kind && t.solo) || track.solo)
-    );
-  });
-  if (
-    !active.some(
-      (c) => p.tracks.find((t) => t.id === c.trackId)?.kind === "video",
-    )
-  )
-    throw new Error("Timeline has no active picture or title.");
-  const duration =
-    Math.max(...active.map((c) => c.startFrame + c.durationFrames)) / p.fps;
-  const dir = await store.file(p.id, ...staging);
+): Promise<{ output: string; receipt: RenderReceipt }> {
+  const { profile } = plan;
+  const rate = `${profile.fps.num}/${profile.fps.den}`;
+  const total = seconds(plan.durationTicks);
+  const dir = await store.file(plan.projectId, ...staging);
   await mkdir(dir, { recursive: true });
-  if (active.some((c) => c.title !== null)) {
-    const fonts = [
-      process.env.YAMAKAN_FONT,
-      process.env.DARZAIN_FONT,
-      process.env.WINDIR ? `${process.env.WINDIR}/Fonts/arial.ttf` : null,
-      "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-      "/System/Library/Fonts/Supplemental/Arial.ttf",
-    ].filter((x): x is string => Boolean(x));
-    let font: string | undefined;
-    for (const candidate of fonts) {
-      try {
-        await access(candidate);
-        font = candidate;
-        break;
-      } catch {}
-    }
-    if (!font)
-      throw new Error(
-        "No local title font found. Configure YAMAKAN_FONT to a readable TTF font.",
+  if (plan.titles) {
+    if (ass === null)
+      throw new CommandError(
+        "VALIDATION",
+        "The plan's title script is missing.",
       );
-    await copyFile(font, `${dir}/font.ttf`);
+    await titleCapability();
+    // The pinned font files, verified, are the only fonts libass is given.
+    const fonts = await titleFonts();
+    if (
+      plan.fonts.length !== fonts.length ||
+      plan.fonts.some((f, i) => f.sha256 !== fonts[i].sha256)
+    )
+      throw new CommandError(
+        "RECOVERY_REQUIRED",
+        "The plan was compiled with different title fonts.",
+      );
+    await mkdir(path.join(dir, "fonts"));
+    for (const font of fonts)
+      await writeFile(path.join(dir, "fonts", font.name), font.bytes, {
+        flag: "wx",
+      });
+    await writeFile(path.join(dir, "titles.ass"), ass, { flag: "wx" });
+    await assertTitlesFit(dir, plan, fonts, signal);
   }
   const args = [
     "-hide_banner",
@@ -78,80 +167,96 @@ export async function renderProject(
     "-filter_complex_threads",
     "1",
   ];
-  const filters = [
-    `color=c=black:s=${p.width}x${p.height}:r=30:d=${duration},format=yuv420p[base]`,
-  ];
-  let visual = "base",
-    input = 0;
-  const audio: string[] = [];
-  const ordered = [...active].sort(
-    (a, b) =>
-      p.tracks.findIndex((t) => t.id === a.trackId) -
-        p.tracks.findIndex((t) => t.id === b.trackId) ||
-      a.startFrame - b.startFrame ||
-      a.id.localeCompare(b.id),
-  );
-  for (const c of ordered) {
-    const start = c.startFrame / 30,
-      end = (c.startFrame + c.durationFrames) / 30,
-      len = c.durationFrames / 30;
-    if (c.title !== null) {
-      const textfile = `title-${c.id}.txt`;
-      await writeFile(`${dir}/${textfile}`, c.title, { flag: "wx" });
-      const next = `v${input++}`;
-      filters.push(
-        `[${visual}]drawtext=fontfile='font.ttf':textfile='${textfile}':expansion=none:fontsize=${Math.round(p.height / 15)}:fontcolor=white:x=(w-text_w)/2:y=h-text_h-40:box=1:boxcolor=black@0.65:boxborderw=12:enable='gte(t,${start})*lt(t,${end})'[${next}]`,
+  const inputs = new Map<string, number>();
+  const input = async (
+    assetId: string,
+    sha256: string,
+    still: boolean,
+    len: string,
+  ) => {
+    const key = still ? `${assetId}:${len}` : assetId;
+    const known = inputs.get(key);
+    if (known !== undefined) return known;
+    const { file, asset } = await store.assetFile(plan.projectId, assetId);
+    if (asset.hash !== sha256)
+      throw new CommandError(
+        "RECOVERY_REQUIRED",
+        "An asset no longer matches the render plan.",
       );
-      visual = next;
-      continue;
-    }
-    const { file, asset } = await store.assetFile(p.id, c.assetId!);
-    const index = args.filter((x) => x === "-i").length;
     args.push(
       "-protocol_whitelist",
       "file",
       "-format_whitelist",
       MEDIA_FORMATS,
     );
-    if (asset.kind === "image") args.push("-loop", "1", "-t", String(len));
+    if (still) args.push("-loop", "1", "-t", len);
     args.push("-i", file);
-    if (asset.kind === "audio") {
-      const label = `a${input++}`;
-      // Gain and linear fades are numeric project values (schema-bounded),
-      // applied in the clip's own time before it is placed on the timeline.
-      const shaping = [
-        c.gainDb ? `volume=${c.gainDb}dB` : null,
-        c.fadeInFrames ? `afade=t=in:st=0:d=${c.fadeInFrames / 30}` : null,
-        c.fadeOutFrames
-          ? `afade=t=out:st=${len - c.fadeOutFrames / 30}:d=${c.fadeOutFrames / 30}`
-          : null,
-      ].filter(Boolean);
-      filters.push(
-        `[${index}:a]atrim=start=${c.sourceFrame / 30}:duration=${len},asetpts=PTS-STARTPTS,${shaping.map((f) => `${f},`).join("")}adelay=${Math.round(start * 1000)}:all=1[${label}]`,
-      );
-      audio.push(label);
-    } else {
-      const clip = `c${input}`,
-        next = `v${input++}`;
-      const trim =
-        asset.kind === "image"
-          ? `trim=duration=${len}`
-          : `trim=start=${c.sourceFrame / 30}:duration=${len}`;
-      filters.push(
-        `[${index}:v]${trim},setpts=PTS-STARTPTS+${start}/TB,fps=30,scale=${p.width}:${p.height}:force_original_aspect_ratio=decrease,setsar=1[${clip}]`,
-      );
-      filters.push(
-        `[${visual}][${clip}]overlay=x=(W-w)/2:y=(H-h)/2:enable='gte(t,${start})*lt(t,${end})':eof_action=pass[${next}]`,
-      );
-      visual = next;
-    }
+    const index = inputs.size;
+    inputs.set(key, index);
+    return index;
+  };
+  const filters = [
+    `color=c=black:s=${profile.width}x${profile.height}:r=${rate}:d=${total},format=yuv420p[base]`,
+  ];
+  let visual = "base";
+  let n = 0;
+  for (const layer of plan.layers) {
+    const start = seconds(layer.startTicks);
+    const end = seconds(layer.startTicks + layer.durationTicks);
+    const len = seconds(layer.durationTicks);
+    const still = layer.kind === "image";
+    const index = await input(layer.assetId, layer.assetSha256, still, len);
+    const clip = `c${n}`,
+      next = `v${n++}`;
+    const trim = still
+      ? `trim=duration=${len}`
+      : `trim=start=${seconds(layer.sourceStartTicks)}:duration=${len}`;
+    filters.push(
+      `[${index}:v]${trim},setpts=PTS-STARTPTS+${start}/TB,fps=${rate},scale=${profile.width}:${profile.height}:force_original_aspect_ratio=decrease,setsar=1[${clip}]`,
+      `[${visual}][${clip}]overlay=x=(W-w)/2:y=(H-h)/2:enable='gte(t,${start})*lt(t,${end})':eof_action=pass[${next}]`,
+    );
+    visual = next;
+  }
+  const audio: string[] = [];
+  for (const a of plan.audio) {
+    const len = seconds(a.durationTicks);
+    const index = await input(a.assetId, a.assetSha256, false, len);
+    const label = `a${n++}`;
+    // Gain and linear fades are plan numbers, applied in the clip's own time
+    // before it is placed on the timeline.
+    const shaping = [
+      a.gainDb ? `volume=${a.gainDb}dB` : null,
+      a.fadeInTicks ? `afade=t=in:st=0:d=${seconds(a.fadeInTicks)}` : null,
+      a.fadeOutTicks
+        ? `afade=t=out:st=${seconds(a.durationTicks - a.fadeOutTicks)}:d=${seconds(a.fadeOutTicks)}`
+        : null,
+    ].filter(Boolean);
+    const delayMs = (BigInt(a.startTicks) * 1000n) / BigInt(FLICKS_PER_SECOND);
+    filters.push(
+      `[${index}:a]atrim=start=${seconds(a.sourceStartTicks)}:duration=${len},asetpts=PTS-STARTPTS,${shaping.map((f) => `${f},`).join("")}aresample=${profile.sampleRate},adelay=${delayMs}:all=1[${label}]`,
+    );
+    audio.push(label);
+  }
+  if (plan.titles) {
+    filters.push(`[${visual}]ass=titles.ass:fontsdir=fonts[titled]`);
+    visual = "titled";
   }
   if (audio.length)
     filters.push(
-      `${audio.map((a) => `[${a}]`).join("")}amix=inputs=${audio.length}:normalize=0,atrim=duration=${duration},alimiter=limit=0.95[audio]`,
+      `${audio.map((a) => `[${a}]`).join("")}amix=inputs=${audio.length}:normalize=0,atrim=duration=${total},alimiter=limit=0.95[audio]`,
     );
   args.push("-filter_complex", filters.join(";"), "-map", `[${visual}]`);
-  if (audio.length) args.push("-map", "[audio]", "-c:a", "aac", "-b:a", "192k");
+  if (audio.length)
+    args.push(
+      "-map",
+      "[audio]",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "192k",
+      "-ar",
+      String(profile.sampleRate),
+    );
   args.push(
     "-c:v",
     "libx264",
@@ -162,11 +267,11 @@ export async function renderProject(
     "-crf",
     "20",
     "-pix_fmt",
-    "yuv420p",
+    profile.pixelFormat,
     "-r",
-    "30",
+    rate,
     "-t",
-    String(duration),
+    total,
     "-movflags",
     "+faststart",
     "-progress",
@@ -182,6 +287,7 @@ export async function renderProject(
     timedOut = true;
     controller.abort();
   }, RESOURCE_POLICY.enforced.renderWallSeconds * 1000);
+  const duration = Number(total);
   let progress = "";
   try {
     if (signal.aborted) throw new Error("Cancelled.");
@@ -214,16 +320,26 @@ export async function renderProject(
         { cause: result.stderr },
       );
     const probed = await probe(output);
+    const expectedFrames = Math.round(duration * 30);
     if (
       !probed.hasVideo ||
-      probed.width !== p.width ||
-      probed.height !== p.height ||
-      Math.abs(probed.durationFrames - duration * 30) > 2 ||
-      (audio.length && !probed.hasAudio)
+      probed.width !== profile.width ||
+      probed.height !== profile.height ||
+      Math.abs(probed.durationFrames - expectedFrames) > 2 ||
+      (audio.length > 0 && !probed.hasAudio)
     )
       throw new Error("Rendered output failed verification.");
     onProgress(1);
-    return output;
+    return {
+      output,
+      receipt: {
+        planHash: plan.planHash,
+        width: probed.width,
+        height: probed.height,
+        durationFrames: probed.durationFrames,
+        hasAudio: probed.hasAudio,
+      },
+    };
   } catch (e) {
     await unlink(output).catch(() => {});
     throw e;
@@ -231,4 +347,32 @@ export async function renderProject(
     clearTimeout(timer);
     signal.removeEventListener("abort", abort);
   }
+}
+
+// Compiles the render plan of a stored revision and renders it: the one
+// export path (jobs) and, in T8, reference preview.
+export async function renderRevision(
+  store: ProjectStore,
+  projectId: string,
+  revision: number,
+  staging: string[],
+  signal: AbortSignal,
+  onProgress: (value: number) => void,
+  onCreated?: (pid: number) => void | Promise<void>,
+) {
+  const { project, snapshotHash } = store.revisionCanonical(
+    projectId,
+    revision,
+  );
+  const { plan, ass } = compilePlan(project, snapshotHash, await titleFonts());
+  const rendered = await renderPlan(
+    store,
+    plan,
+    ass,
+    staging,
+    signal,
+    onProgress,
+    onCreated,
+  );
+  return { plan, ...rendered };
 }

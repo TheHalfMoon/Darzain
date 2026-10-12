@@ -24,7 +24,7 @@ import { AssetSchema } from "./project.ts";
 import type { Asset } from "./project.ts";
 import { MEDIA_FORMATS, probe } from "./media.ts";
 import { mediaTools, workers } from "./process/workers.ts";
-import { renderProject } from "./render.ts";
+import { renderRevision } from "./render.ts";
 import type { RenderJob } from "./render.ts";
 import { CommandError, toCommandError } from "./command/errors.ts";
 import { RESOURCE_POLICY } from "./command/policy.ts";
@@ -58,6 +58,7 @@ type Row = {
   progress: number;
   error: string | null;
   artifact: string | null;
+  plan_hash?: string | null;
 };
 
 // The only payload this build executes; anything else is quarantined.
@@ -170,6 +171,7 @@ export class JobSupervisor {
       progress: this.#progress.get(row.job_id) ?? row.progress,
       error: row.error,
       artifact: row.artifact,
+      planHash: row.plan_hash ?? null,
     };
   }
   #row(db: DatabaseSync, jobId: string) {
@@ -442,6 +444,7 @@ export class JobSupervisor {
     jobId: string,
     attempt: number,
     artifact: string,
+    receipt?: { planHash: string },
   ) {
     const current = (
       db.prepare("SELECT generation FROM supervisor WHERE id = 1").get() as {
@@ -460,13 +463,13 @@ export class JobSupervisor {
       );
     const moved = db
       .prepare(
-        "UPDATE jobs SET state = 'succeeded', artifact = ?, progress = 1, error = NULL WHERE job_id = ? AND state = 'validating' AND cancel_requested = 0",
+        "UPDATE jobs SET state = 'succeeded', artifact = ?, plan_hash = ?, progress = 1, error = NULL WHERE job_id = ? AND state = 'validating' AND cancel_requested = 0",
       )
-      .run(artifact, jobId);
+      .run(artifact, receipt?.planHash ?? null, jobId);
     if (moved.changes !== 1) throw new Error("Cancelled.");
     db.prepare(
-      "UPDATE attempts SET state = 'succeeded' WHERE job_id = ? AND attempt_no = ?",
-    ).run(jobId, attempt);
+      "UPDATE attempts SET state = 'succeeded', receipt = ? WHERE job_id = ? AND attempt_no = ?",
+    ).run(receipt ? JSON.stringify(receipt) : null, jobId, attempt);
   }
 
   async #execute(row: Row, attempt: number) {
@@ -563,13 +566,12 @@ export class JobSupervisor {
     output: { published: string | null },
   ) {
     const jobId = row.job_id;
-    const project = await this.store.loadRevision(
+    // The plan is compiled from the frozen revision's stored snapshot; the
+    // render draws only what the plan says.
+    const { output: partial, receipt } = await renderRevision(
+      this.store,
       row.project_id,
       row.frozen_revision,
-    );
-    const partial = await renderProject(
-      this.store,
-      project,
       ["exports", jobId, `attempt-${attempt}`],
       signal,
       (value) => this.#progress.set(jobId, value),
@@ -594,6 +596,7 @@ export class JobSupervisor {
         jobId,
         attempt,
         `exports/${jobId}/render-${attempt}.mp4`,
+        receipt,
       ),
     );
     output.published = null;

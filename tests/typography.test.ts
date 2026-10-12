@@ -7,8 +7,18 @@ import path from "node:path";
 import { mediaTools } from "../core/process/workers.ts";
 import { compileTitles, escapeAssText, assTime } from "../core/render/ass.ts";
 import { titleFonts, missingGlyphs } from "../core/render/fonts.ts";
+import { renderRevision } from "../core/render.ts";
+import { ProjectStore } from "../core/store.ts";
+import {
+  OVERLONG_TITLE,
+  TYPOGRAPHY_FIXTURES,
+} from "../scripts/typography-fixtures.ts";
 import { CommandError } from "../core/command/errors.ts";
-import { titleCapability } from "../core/render/capability.ts";
+import {
+  libassApi,
+  titleCapability,
+  titlesSupported,
+} from "../core/render/capability.ts";
 
 const W = 640;
 const H = 360;
@@ -182,4 +192,87 @@ test("rendered: Arabic and mixed text use only the pinned font", async () => {
 test("the title capability probe finds libass 0.17 or newer", async () => {
   const { libassApi } = await titleCapability();
   assert.ok(libassApi >= 0x01700000, libassApi.toString(16));
+});
+
+test("the probe fails closed on an old, missing or unreadable libass version", () => {
+  assert.equal(
+    libassApi("[Parsed_ass_0] libass API version: 0x1704000"),
+    0x1704000,
+  );
+  assert.equal(
+    titlesSupported(libassApi("libass API version: 0x1704000")),
+    true,
+  );
+  assert.equal(
+    titlesSupported(libassApi("libass API version: 0x1600000")),
+    false,
+  );
+  assert.equal(
+    titlesSupported(libassApi("no ass filter in this build")),
+    false,
+  );
+  assert.equal(titlesSupported(libassApi("libass API version: 0xzz")), false);
+});
+
+test("every reviewer fixture renders with the pinned font and stays inside the frame", async () => {
+  fontsCache ??= await titleFonts();
+  for (const fixture of TYPOGRAPHY_FIXTURES) {
+    const { pixels, log } = await render(
+      compileTitles(cue(fixture.text), W, H, fontsCache).ass,
+    );
+    assert.doesNotMatch(
+      log,
+      /not found, selecting one more font/,
+      fixture.name,
+    );
+    assert.ok(ink(pixels).count > 100, `${fixture.name} is drawn`);
+    for (let y = 0; y < H; y++)
+      assert.ok(
+        pixels[y * W] < 96 && pixels[y * W + W - 1] < 96,
+        `${fixture.name} reaches a frame edge`,
+      );
+  }
+});
+
+test("an export refuses a title wider than the frame instead of clipping it", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "yamakan-type-"));
+  const store = new ProjectStore(root);
+  await store.initialize();
+  const created = await store.create("Overlong");
+  const withTitle = (title: string) =>
+    store.save(
+      {
+        ...created,
+        width: 1280,
+        height: 720,
+        clips: [
+          {
+            id: crypto.randomUUID(),
+            trackId: created.tracks[0].id,
+            assetId: null,
+            startFrame: 0,
+            durationFrames: 30,
+            sourceFrame: 0,
+            title,
+          },
+        ],
+      },
+      created.revision,
+    );
+  const saved = await withTitle(OVERLONG_TITLE);
+  await assert.rejects(
+    renderRevision(
+      store,
+      saved.id,
+      saved.revision,
+      ["exports", "o"],
+      new AbortController().signal,
+      () => {},
+    ),
+    (e: unknown) =>
+      e instanceof CommandError &&
+      e.code === "VALIDATION" &&
+      /wider than the frame/.test(e.message),
+  );
+  store.close();
 });

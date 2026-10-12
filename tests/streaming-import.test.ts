@@ -202,7 +202,7 @@ test("a version 2 workspace with imported media upgrades to the current version 
   assert.equal(
     (check.prepare("PRAGMA user_version").get() as { user_version: number })
       .user_version,
-    4,
+    5,
   );
   assert.equal(rows(root, "jobs"), 0);
   assert.equal(rows(root, "supervisor"), 1);
@@ -226,7 +226,7 @@ test("a version 1 workspace database upgrades step by step to the current versio
   assert.equal(
     (check.prepare("PRAGMA user_version").get() as { user_version: number })
       .user_version,
-    4,
+    5,
   );
   assert.equal(rows(root, "asset_objects"), 0);
   assert.equal(rows(root, "jobs"), 0);

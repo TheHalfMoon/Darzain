@@ -12,6 +12,16 @@ import { mediaTools, workers } from "../process/workers.ts";
 
 const MIN_LIBASS_API = 0x01700000;
 
+// The libass API version FFmpeg reports in its log, or 0 when absent.
+export function libassApi(log: string): number {
+  const match = /libass API version: 0x([0-9a-f]{1,8})\b/i.exec(log);
+  return match ? parseInt(match[1], 16) : 0;
+}
+// Titles render only with the qualified libass (automatic base direction).
+export function titlesSupported(api: number) {
+  return api >= MIN_LIBASS_API;
+}
+
 export type TitleCapability = { libassApi: number };
 
 let probed: Promise<TitleCapability> | null = null;
@@ -57,16 +67,13 @@ async function probeTitles(): Promise<TitleCapability> {
         if (log.length < 64_000) log += chunk.toString("utf8");
       },
     });
-    const match = /libass API version: 0x([0-9a-f]+)/i.exec(
-      log || result.stderr,
-    );
-    const libassApi = match ? parseInt(match[1], 16) : 0;
-    if (result.code !== 0 || libassApi < MIN_LIBASS_API)
+    const api = libassApi(log || result.stderr);
+    if (result.code !== 0 || !titlesSupported(api))
       throw new CommandError(
         "CAPABILITY_UNAVAILABLE",
         "Titles need FFmpeg with libass 0.17 or newer (automatic text direction and complex shaping).",
       );
-    return { libassApi };
+    return { libassApi: api };
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }

@@ -71,39 +71,56 @@ export function missingGlyphs(font: Buffer, text: string): string[] {
   return missing;
 }
 
-const coverageCache = new WeakMap<Buffer, (code: number) => boolean>();
+type Metrics = {
+  glyph: (code: number) => number;
+  advance: (glyph: number) => number;
+  unitsPerEm: number;
+};
+const metricsCache = new WeakMap<Buffer, Metrics>();
 
-// Parses the font's Unicode cmap (format 12 preferred, else format 4) into a
-// membership test. Only the parts needed for coverage are read.
-export function coverage(font: Buffer): (code: number) => boolean {
-  const cached = coverageCache.get(font);
-  if (cached) return cached;
-  const fail = (): never => {
-    throw new CommandError(
-      "CAPABILITY_UNAVAILABLE",
-      "A pinned title font has an unreadable character map.",
-    );
-  };
-  if (font.length < 12) fail();
-  const tables = font.readUInt16BE(4);
-  let cmap = -1;
-  for (let i = 0; i < tables; i++) {
+const unreadable = (): never => {
+  throw new CommandError(
+    "CAPABILITY_UNAVAILABLE",
+    "A pinned title font has an unreadable table.",
+  );
+};
+
+// Offsets of the font's tables by tag.
+function tables(font: Buffer) {
+  if (font.length < 12) unreadable();
+  const count = font.readUInt16BE(4);
+  const found = new Map<string, number>();
+  for (let i = 0; i < count; i++) {
     const at = 12 + i * 16;
-    if (at + 16 > font.length) fail();
-    if (font.toString("latin1", at, at + 4) === "cmap")
-      cmap = font.readUInt32BE(at + 8);
+    if (at + 16 > font.length) unreadable();
+    found.set(font.toString("latin1", at, at + 4), font.readUInt32BE(at + 8));
   }
-  if (cmap < 0 || cmap + 4 > font.length) fail();
+  return found;
+}
+
+// Parses what title fitting needs: the Unicode cmap (format 12 preferred,
+// else format 4) as code point → glyph id (0 when missing), and horizontal
+// advances from hmtx in font units.
+export function metrics(font: Buffer): Metrics {
+  const cached = metricsCache.get(font);
+  if (cached) return cached;
+  const t = tables(font);
+  const cmap = t.get("cmap") ?? unreadable();
+  const head = t.get("head") ?? unreadable();
+  const hhea = t.get("hhea") ?? unreadable();
+  const hmtx = t.get("hmtx") ?? unreadable();
+  if (cmap + 4 > font.length || head + 20 > font.length) unreadable();
+  if (hhea + 36 > font.length) unreadable();
   const subtables = font.readUInt16BE(cmap + 2);
   let format4 = -1;
   let format12 = -1;
   for (let i = 0; i < subtables; i++) {
     const at = cmap + 4 + i * 8;
-    if (at + 8 > font.length) fail();
+    if (at + 8 > font.length) unreadable();
     const platform = font.readUInt16BE(at);
     const encoding = font.readUInt16BE(at + 2);
     const offset = cmap + font.readUInt32BE(at + 4);
-    if (offset + 2 > font.length) fail();
+    if (offset + 2 > font.length) unreadable();
     const format = font.readUInt16BE(offset);
     const unicode =
       platform === 0 || (platform === 3 && [1, 10].includes(encoding));
@@ -111,49 +128,60 @@ export function coverage(font: Buffer): (code: number) => boolean {
     if (format === 12) format12 = offset;
     else if (format === 4) format4 = offset;
   }
-  let test: (code: number) => boolean;
+  let glyph: (code: number) => number;
   if (format12 >= 0) {
     const groups = font.readUInt32BE(format12 + 12);
     const ranges: [number, number, number][] = [];
     for (let g = 0; g < groups; g++) {
       const at = format12 + 16 + g * 12;
-      if (at + 12 > font.length) fail();
+      if (at + 12 > font.length) unreadable();
       ranges.push([
         font.readUInt32BE(at),
         font.readUInt32BE(at + 4),
         font.readUInt32BE(at + 8),
       ]);
     }
-    test = (code) =>
-      ranges.some(
-        ([start, end, glyph]) =>
-          code >= start && code <= end && glyph + (code - start) !== 0,
-      );
+    glyph = (code) => {
+      const range = ranges.find(([start, end]) => code >= start && code <= end);
+      return range ? range[2] + (code - range[0]) : 0;
+    };
   } else if (format4 >= 0) {
     const segX2 = font.readUInt16BE(format4 + 6);
     const ends = format4 + 14;
     const starts = ends + segX2 + 2;
     const deltas = starts + segX2;
     const offsets = deltas + segX2;
-    if (offsets + segX2 > font.length) fail();
-    test = (code) => {
-      if (code > 0xffff) return false;
+    if (offsets + segX2 > font.length) unreadable();
+    glyph = (code) => {
+      if (code > 0xffff) return 0;
       for (let i = 0; i < segX2; i += 2) {
-        const end = font.readUInt16BE(ends + i);
-        if (code > end) continue;
+        if (code > font.readUInt16BE(ends + i)) continue;
         const start = font.readUInt16BE(starts + i);
-        if (code < start) return false;
+        if (code < start) return 0;
         const delta = font.readUInt16BE(deltas + i);
         const rangeOffset = font.readUInt16BE(offsets + i);
-        if (rangeOffset === 0) return ((code + delta) & 0xffff) !== 0;
+        if (rangeOffset === 0) return (code + delta) & 0xffff;
         const at = offsets + i + rangeOffset + (code - start) * 2;
-        if (at + 2 > font.length) return false;
-        const glyph = font.readUInt16BE(at);
-        return glyph !== 0 && ((glyph + delta) & 0xffff) !== 0;
+        if (at + 2 > font.length) return 0;
+        const id = font.readUInt16BE(at);
+        return id === 0 ? 0 : (id + delta) & 0xffff;
       }
-      return false;
+      return 0;
     };
-  } else return fail();
-  coverageCache.set(font, test);
-  return test;
+  } else return unreadable();
+  const unitsPerEm = font.readUInt16BE(head + 18);
+  const longMetrics = font.readUInt16BE(hhea + 34);
+  if (!unitsPerEm || !longMetrics || hmtx + longMetrics * 4 > font.length)
+    unreadable();
+  const advance = (id: number) =>
+    font.readUInt16BE(hmtx + Math.min(id, longMetrics - 1) * 4);
+  const parsed = { glyph, advance, unitsPerEm };
+  metricsCache.set(font, parsed);
+  return parsed;
+}
+
+// Whether the font has a glyph for a code point.
+export function coverage(font: Buffer): (code: number) => boolean {
+  const { glyph } = metrics(font);
+  return (code) => glyph(code) !== 0;
 }

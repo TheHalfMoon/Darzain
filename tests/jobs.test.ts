@@ -12,7 +12,7 @@ import type { SupervisorOptions } from "../core/jobs.ts";
 import { CommandError } from "../core/command/errors.ts";
 import { workers } from "../core/process/workers.ts";
 
-async function workspace(frames = 30) {
+async function workspace(frames = 30, width = 320) {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-jobs-"));
   const store = new ProjectStore(root);
   await store.initialize();
@@ -20,7 +20,7 @@ async function workspace(frames = 30) {
   const project = await store.save(
     {
       ...created,
-      width: 320,
+      width,
       height: 180,
       clips: [
         {
@@ -74,7 +74,8 @@ const alive = (pid: number) => {
   }
 };
 // Running or suspended FFmpeg processes whose command line carries the
-// marker (a title clip's id appears in the filter graph's text file name).
+// marker: the canvas size in the filtergraph ("s=<width>x180:"), unique per
+// test through an unusual even width.
 function ffmpegWith(marker: string) {
   const out = spawnSync(
     "powershell",
@@ -375,8 +376,9 @@ test(
   "killing the process owner mid-render ends FFmpeg; the job fails without an artifact and the next one completes",
   { skip: process.platform !== "win32" },
   async () => {
-    const { store, project } = await workspace(18000);
-    const marker = project.clips[0].id;
+    const width = 2 * (200 + Math.floor(Math.random() * 400));
+    const { store, project } = await workspace(18000, width);
+    const marker = `s=${width}x180:`;
     const supervisor = new JobSupervisor(store);
     await supervisor.start();
     const job = await supervisor.submit(project.id, "owner-killed");
@@ -419,8 +421,9 @@ test(
   "an owner that dies between creating FFmpeg and resuming it leaves no suspended FFmpeg",
   { skip: process.platform !== "win32" },
   async () => {
-    const { store, project } = await workspace();
-    const marker = project.clips[0].id;
+    const width = 2 * (200 + Math.floor(Math.random() * 400));
+    const { store, project } = await workspace(30, width);
+    const marker = `s=${width}x180:`;
     // The fault applies to the next owner started.
     const running = workers().ownerPid;
     if (running) {
@@ -514,5 +517,56 @@ test("a supervisor from an older generation stops claiming and refuses new work;
     [generation()],
   );
   await newer.close();
+  store.close();
+});
+
+test("a completed export names its render plan and keeps a probe receipt", async () => {
+  const { store, project } = await workspace();
+  const supervisor = new JobSupervisor(store);
+  await supervisor.start();
+  const job = await supervisor.submit(project.id, "receipt");
+  const done = await settled(supervisor, job.id);
+  assert.equal(done.state, "COMPLETED", done.error ?? "");
+  assert.match(done.planHash ?? "", /^[a-f0-9]{64}$/);
+  const { receipt } = store.read((db) =>
+    db
+      .prepare(
+        "SELECT receipt FROM attempts WHERE job_id = ? AND state = 'succeeded'",
+      )
+      .get(job.id),
+  ) as { receipt: string };
+  assert.deepEqual(JSON.parse(receipt), {
+    planHash: done.planHash,
+    width: 320,
+    height: 180,
+    durationFrames: 30,
+    hasAudio: false,
+  });
+  await supervisor.close();
+  store.close();
+});
+
+test("running out of space while publishing an export publishes nothing", async () => {
+  const { store, project } = await workspace();
+  const supervisor = new JobSupervisor(store, {
+    fault: (point) => {
+      if (point === "before-publish")
+        throw Object.assign(new Error("ENOSPC: no space left on device"), {
+          code: "ENOSPC",
+        });
+    },
+  });
+  await supervisor.start();
+  const job = await supervisor.submit(project.id, "enospc");
+  const done = await settled(supervisor, job.id);
+  assert.equal(done.state, "FAILED");
+  assert.equal(done.artifact, null);
+  assert.equal(done.planHash, null);
+  assert.equal(
+    await exists(await store.file(project.id, "exports", job.id)),
+    false,
+    "no output, staging or job folder remains",
+  );
+  await supervisor.close();
   store.close();
 });
