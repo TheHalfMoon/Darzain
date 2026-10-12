@@ -1,10 +1,12 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import {
+  copyFile,
   mkdir,
   mkdtemp,
   readFile,
   readdir,
+  rm,
   stat,
   utimes,
   writeFile,
@@ -18,9 +20,12 @@ import { ProjectStore } from "../core/store.ts";
 import {
   backupWorkspace,
   diagnoseWorkspace,
+  healthy,
+  offlineSource,
   restoreFromHome,
   restoreWorkspace,
 } from "../core/recovery.ts";
+import { inspectWal } from "../core/wal.ts";
 import { CreativeAPI } from "../server/api.ts";
 import { toCommandError } from "../core/command/errors.ts";
 
@@ -32,8 +37,14 @@ const ffmpeg = process.env.DARZAIN_FFMPEG || "ffmpeg";
 const sha256 = (bytes: Buffer) =>
   createHash("sha256").update(bytes).digest("hex");
 
+// Every test folder is removed when the file's tests finish.
+const bases: string[] = [];
+after(() =>
+  Promise.all(bases.map((b) => rm(b, { recursive: true, force: true }))),
+);
 async function workspace() {
   const base = await mkdtemp(path.join(tmpdir(), "yamakan-backup-"));
+  bases.push(base);
   const root = path.join(base, "workspace");
   const store = new ProjectStore(root);
   await store.initialize();
@@ -321,9 +332,11 @@ test("diagnosis reports a corrupt database and missing media without changing th
   const missing = objectPath(root, project.id, asset.asset.hash);
   const kept = await readFile(missing);
   await writeFile(`${missing}.moved`, kept);
-  const { rm } = await import("node:fs/promises");
   await rm(missing);
+  const untouched = await tree(root);
   const report = await diagnoseWorkspace(root, { verifyObjects: true });
+  assert.deepEqual(await tree(root), untouched);
+  assert.equal(healthy(report), false);
   assert.deepEqual(report.database.integrity, ["ok"]);
   assert.equal(report.projects.length, 1);
   assert.deepEqual(
@@ -402,5 +415,134 @@ test("backup commands choose their folders; incomplete backups are listed but ca
     inside.call("yamakan.workspace.backup", {}),
     code("VALIDATION"),
   );
+  store.close();
+});
+
+test("a damaged write-ahead log is diagnosed and refused, and stays as found; a torn last frame is not damage", async () => {
+  const { base, root, store, project } = await workspace();
+  for (let i = 0; i < 12; i++) {
+    const head = await store.load(project.id);
+    await store.save({ ...head, name: `Revision ${i}` }, head.revision);
+  }
+  const head = (await store.load(project.id)).revision;
+  // A crash image: the database and its log as they are while open.
+  const crashed = path.join(base, "crashed");
+  await mkdir(crashed);
+  for (const name of ["workspace.sqlite", "workspace.sqlite-wal"])
+    await copyFile(path.join(root, name), path.join(crashed, name));
+  store.close();
+  const wal = path.join(crashed, "workspace.sqlite-wal");
+  const healthyLog = await inspectWal(wal);
+  assert.equal(healthyLog?.damaged, false);
+  assert.ok((healthyLog?.validCommits ?? 0) >= 12);
+
+  // A torn final write is what a crash leaves; it opens normally.
+  const torn = path.join(base, "torn");
+  await mkdir(torn);
+  await copyFile(
+    path.join(crashed, "workspace.sqlite"),
+    path.join(torn, "workspace.sqlite"),
+  );
+  const tornLog = Buffer.from(await readFile(wal));
+  tornLog.fill(0x11, tornLog.length - 64);
+  await writeFile(path.join(torn, "workspace.sqlite-wal"), tornLog);
+  assert.equal(
+    (await inspectWal(path.join(torn, "workspace.sqlite-wal")))?.damaged,
+    false,
+  );
+
+  // Damage in the middle: SQLite would silently drop later commits.
+  const log = Buffer.from(await readFile(wal));
+  log.fill(0x5a, Math.floor(log.length / 2), Math.floor(log.length / 2) + 2000);
+  await writeFile(wal, log);
+  const before = await tree(crashed);
+  const report = await diagnoseWorkspace(crashed);
+  assert.equal(report.database.wal?.damaged, true);
+  assert.ok((report.database.wal?.lostCommits ?? 0) > 0);
+  assert.ok(
+    report.projects[0].revision < head,
+    "the database alone shows an older head",
+  );
+  assert.equal(healthy(report), false);
+  await assert.rejects(new ProjectStore(crashed).initialize(), {
+    code: "RECOVERY_REQUIRED",
+  });
+  await assert.rejects(offlineSource(crashed), { code: "RECOVERY_REQUIRED" });
+  assert.deepEqual(await tree(crashed), before, "the log is left as found");
+});
+
+test("malformed object rows are recorded, quarantined on restore and reported by diagnosis", async () => {
+  const { base, root, home, store, project } = await workspace();
+  await store.importAsset(project.id, "ok.png", await png(base, "navy"));
+  store.close();
+  const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
+  db.prepare(
+    "INSERT INTO asset_objects(project_id, digest, byte_length, state, generation) VALUES (?, ?, 10, 'ready', 1)",
+  ).run("../evil", "AB".repeat(32));
+  db.close();
+  const report = await diagnoseWorkspace(root);
+  assert.deepEqual(
+    report.objects.invalid.map((o) => o.projectId),
+    ["../evil"],
+  );
+  // The offline backup reads the database as it is and records the row.
+  const source = await offlineSource(root);
+  let made;
+  try {
+    made = await backupWorkspace(source, home);
+  } finally {
+    await source.close();
+  }
+  assert.equal(made.damaged, 1);
+  const restored = await restoreFromHome(home, made.backupId);
+  assert.deepEqual(
+    restored.quarantined.map((q) => [q.projectId, q.reason]),
+    [["../evil", "invalid"]],
+  );
+  assert.equal(restored.objectsVerified, 1);
+  // Nothing was written outside the restored root.
+  await assert.rejects(stat(path.join(home, "restored", "evil")));
+});
+
+test("restores are refused without disk space, run one at a time and never nest in the workspace", async () => {
+  const { base, root, home, store } = await workspace();
+  const made = await backupWorkspace(store, home);
+  const backupDir = path.join(home, "backups", made.backupId);
+  // Space other work has promised counts against the restore.
+  const target = path.join(base, "no-space");
+  await assert.rejects(
+    restoreWorkspace(backupDir, target, {
+      reservedBytes: Number.MAX_SAFE_INTEGER,
+    }),
+    { code: "LIMIT_EXCEEDED" },
+  );
+  await assert.rejects(stat(target));
+  // Concurrent restores: one runs, the other is told to retry.
+  const results = await Promise.allSettled([
+    restoreFromHome(home, made.backupId),
+    restoreFromHome(home, made.backupId),
+  ]);
+  assert.deepEqual(results.map((r) => r.status).sort(), [
+    "fulfilled",
+    "rejected",
+  ]);
+  const refused = results.find(
+    (r) => r.status === "rejected",
+  ) as PromiseRejectedResult;
+  assert.equal(refused.reason.code, "BUSY");
+  assert.deepEqual(await readdir(path.join(home, "restored")), [
+    `${made.backupId}-1`,
+  ]);
+  // A folder whose name begins with two dots is still inside the workspace.
+  await assert.rejects(backupWorkspace(store, path.join(root, "..rec")), {
+    code: "VALIDATION",
+  });
+  await assert.rejects(stat(path.join(root, "..rec")));
+  // A restore into a folder inside its own backup is refused and leaves
+  // nothing behind.
+  await assert.rejects(restoreWorkspace(backupDir, path.join(backupDir, "x")), {
+    code: "VALIDATION",
+  });
+  await assert.rejects(stat(path.join(backupDir, "x")));
   store.close();
 });

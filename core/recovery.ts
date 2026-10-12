@@ -5,6 +5,11 @@
 // Restore never writes into an existing workspace: it builds a new root,
 // verifies every byte against the manifest and the content addresses, and
 // quarantines what it cannot verify instead of failing the whole restore.
+//
+// The manifest and the database copy sit in the same folder, so the
+// manifest's hashes detect corruption, truncation and partial copies, not
+// deliberate tampering; the restore receipt names the manifest's hash for
+// an out-of-band check.
 import { createReadStream } from "node:fs";
 import {
   copyFile,
@@ -18,23 +23,27 @@ import {
   rename,
   rm,
   statfs,
+  unlink,
   writeFile,
 } from "node:fs/promises";
 import { createHash, randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, backup } from "node:sqlite";
 import { z } from "zod";
 import { Id } from "./project.ts";
 import { initializeRoot, safePath } from "./paths.ts";
 import { CommandError } from "./command/errors.ts";
 import { RESOURCE_POLICY } from "./command/policy.ts";
-import type { ProjectStore } from "./store.ts";
+import { inspectWal } from "./wal.ts";
 
 export const BACKUP_FORMAT = "yamakan.backup/1";
 export const RESTORE_FORMAT = "yamakan.restore/1";
 const Digest = z.string().regex(/^[0-9a-f]{64}$/);
 export const BackupId = z.string().regex(/^\d{8}T\d{6}Z-[0-9a-f]{8}$/);
+// Restores kept per backup; older restored folders are the user's to remove.
+const MAX_RESTORES_PER_BACKUP = 20;
+const MAX_MANIFEST_BYTES = 64 * 1024 * 1024;
 
 // What a backup leaves out, stated in every manifest: derived files that
 // are rebuilt from the database (exports, previews), in-flight staging, and
@@ -47,11 +56,14 @@ const EXCLUDED = [
   "projects/*/cache",
 ];
 
+// Damaged entries name database rows as found, which may be malformed; they
+// are data only and never become paths.
+const Reported = z.string().max(200);
 const ManifestSchema = z
   .object({
     format: z.literal(BACKUP_FORMAT),
     backupId: BackupId,
-    createdAt: z.string().max(40),
+    createdAt: z.iso.datetime(),
     schemaVersion: z.number().int().positive(),
     database: z
       .object({ sha256: Digest, bytes: z.number().int().positive() })
@@ -77,9 +89,9 @@ const ManifestSchema = z
     damaged: z.array(
       z
         .object({
-          projectId: Id,
-          digest: Digest,
-          reason: z.enum(["missing", "mismatch"]),
+          projectId: Reported,
+          digest: Reported,
+          reason: z.enum(["missing", "mismatch", "invalid"]),
         })
         .strict(),
     ),
@@ -87,9 +99,19 @@ const ManifestSchema = z
   })
   .strict();
 export type BackupManifest = z.infer<typeof ManifestSchema>;
+type Damage = BackupManifest["damaged"][number];
 
 type Head = { projectId: string; revision: number; snapshotHash: string };
 type ObjectRow = { projectId: string; digest: string; bytes: number };
+
+// What a backup reads from: the running store, or an offline workspace.
+export type BackupSource = {
+  readonly root: string;
+  // Bytes other work has promised on the same volume (in-flight imports).
+  readonly reservedBytes: number;
+  backupDatabase(destination: string): Promise<void>;
+  holdObjects(): () => void;
+};
 
 // The canonical place of an object below a root; every part is validated,
 // so a manifest or database row cannot name another path.
@@ -106,13 +128,15 @@ const isInside = (parent: string, child: string) => {
   const relative = path.relative(parent, child);
   return (
     relative === "" ||
-    (!relative.startsWith("..") && !path.isAbsolute(relative))
+    (relative !== ".." &&
+      !relative.startsWith(`..${path.sep}`) &&
+      !path.isAbsolute(relative))
   );
 };
 // Neither folder may contain the other: a backup inside the workspace
 // would copy itself, and a workspace inside the backups would be backed up
 // with them.
-async function separate(root: string, other: string) {
+export async function assertSeparate(root: string, other: string) {
   const real = (p: string) => realpath(p).catch(() => path.resolve(p));
   // Windows paths compare without case; POSIX paths with it.
   const fold = (p: string) =>
@@ -131,6 +155,31 @@ const sha256File = async (file: string) => {
   for await (const chunk of createReadStream(file)) hash.update(chunk);
   return hash.digest("hex");
 };
+const sizeOf = async (file: string) =>
+  (await lstat(file).catch(() => null))?.size ?? 0;
+const freeBytes = async (dir: string) => {
+  const space = await statfs(dir);
+  return Number(space.bavail) * Number(space.bsize);
+};
+// The nearest folder that exists (a restore target may not yet).
+async function existingAncestor(p: string) {
+  for (let dir = path.resolve(p); ; dir = path.dirname(dir)) {
+    if ((await lstat(dir).catch(() => null))?.isDirectory()) return dir;
+    if (path.dirname(dir) === dir) return dir;
+  }
+}
+// Space for `bytes` more, keeping the policy's reserve and what other work
+// on the volume has already promised.
+async function requireSpace(dir: string, bytes: number, reserved = 0) {
+  if (
+    (await freeBytes(dir)) <
+    bytes + reserved + RESOURCE_POLICY.enforced.diskReserveBytes
+  )
+    throw new CommandError(
+      "LIMIT_EXCEEDED",
+      "Not enough free disk space for this recovery operation.",
+    );
+}
 
 // Copies a file to `target` through a private partial file, hashing as it
 // goes; the target appears (by rename) only if the bytes match.
@@ -181,6 +230,9 @@ function integrity(db: DatabaseSync) {
     ? null
     : rows.map((r) => r.integrity_check);
 }
+const userVersion = (db: DatabaseSync) =>
+  (db.prepare("PRAGMA user_version").get() as { user_version: number })
+    .user_version;
 function heads(db: DatabaseSync): Head[] {
   return (
     db
@@ -211,6 +263,9 @@ function readyObjects(db: DatabaseSync): ObjectRow[] {
     bytes: r.byte_length,
   }));
 }
+// A row whose project id or digest cannot name an object path.
+const malformed = (o: { projectId: string; digest: string }) =>
+  !Id.safeParse(o.projectId).success || !Digest.safeParse(o.digest).success;
 
 // The file holding an object in a live workspace: the content-addressed
 // path, or the pre-v2 `assets/<hash>.<extension>` layout.
@@ -224,120 +279,136 @@ async function sourceObject(root: string, projectId: string, digest: string) {
   return canonical;
 }
 
-const freeBytes = async (dir: string) => {
-  const space = await statfs(dir);
-  return Number(space.bavail) * Number(space.bsize);
-};
-
 export function defaultRecoveryHome(root: string) {
   return path.join(path.dirname(root), `${path.basename(root)}-recovery`);
 }
 
-let backingUp = false;
+// One recovery operation (backup or restore) at a time per process: each
+// may write as much as the workspace holds.
+let running = false;
+async function exclusive<T>(work: () => Promise<T>) {
+  if (running)
+    throw new CommandError(
+      "BUSY",
+      "A backup or restore is already running; retry when it finishes.",
+    );
+  running = true;
+  try {
+    return await work();
+  } finally {
+    running = false;
+  }
+}
 
-// Backs up a running workspace into `<home>/backups/<id>`. Edits, imports
-// and jobs continue meanwhile; the backup is the state at the moment its
-// database copy completed.
-export async function backupWorkspace(
-  store: ProjectStore,
+// Backs up a workspace into `<home>/backups/<id>`. With a running store,
+// edits, imports and jobs continue meanwhile; the backup is the state at
+// the moment its database copy completed.
+export function backupWorkspace(
+  source: BackupSource,
   home: string,
   options: { now?: Date } = {},
 ) {
-  if (backingUp)
-    throw new CommandError("BUSY", "A backup is already running; retry.");
-  backingUp = true;
-  const release = store.holdObjects();
-  let dir: string | null = null;
-  try {
-    const now = options.now ?? new Date();
-    const backupId = `${now
-      .toISOString()
-      .replace(/[-:]/g, "")
-      .replace(/\.\d{3}/, "")}-${randomBytes(4).toString("hex")}`;
-    await separate(store.root, home);
-    const backups = path.join(home, "backups");
-    await mkdir(backups, { recursive: true });
-    dir = path.join(backups, backupId);
-    await mkdir(dir);
-    const database = path.join(dir, "workspace.sqlite");
-    await store.backupDatabase(database);
-    const copy = new DatabaseSync(database);
-    let schemaVersion: number, projects: Head[], objects: ObjectRow[];
+  return exclusive(async () => {
+    const release = source.holdObjects();
+    let dir: string | null = null;
     try {
-      // The copy is a standalone file: no write-ahead log beside it.
-      copy.exec("PRAGMA journal_mode = DELETE");
-      const problems = integrity(copy);
-      if (problems)
-        throw new CommandError(
-          "RECOVERY_REQUIRED",
-          `The database copy failed its integrity check: ${problems[0]}`,
+      const now = options.now ?? new Date();
+      const backupId = `${now
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .replace(/\.\d{3}/, "")}-${randomBytes(4).toString("hex")}`;
+      await assertSeparate(source.root, home);
+      await mkdir(home, { recursive: true });
+      const backups = await safePath(home, "backups");
+      await mkdir(backups, { recursive: true });
+      const target = await safePath(home, "backups", backupId);
+      // The database copy is at most the database plus its log.
+      const live = path.join(source.root, "workspace.sqlite");
+      await requireSpace(
+        backups,
+        (await sizeOf(live)) + (await sizeOf(`${live}-wal`)),
+        source.reservedBytes,
+      );
+      await mkdir(target);
+      dir = target;
+      const database = path.join(dir, "workspace.sqlite");
+      await source.backupDatabase(database);
+      const copy = new DatabaseSync(database);
+      let schemaVersion: number, projects: Head[], objects: ObjectRow[];
+      try {
+        // The copy is a standalone file: no write-ahead log beside it.
+        copy.exec("PRAGMA journal_mode = DELETE");
+        const problems = integrity(copy);
+        if (problems)
+          throw new CommandError(
+            "RECOVERY_REQUIRED",
+            `The database copy failed its integrity check: ${problems[0]}`,
+          );
+        schemaVersion = userVersion(copy);
+        projects = heads(copy);
+        objects = readyObjects(copy);
+      } finally {
+        copy.close();
+      }
+      await requireSpace(
+        dir,
+        objects.reduce((n, o) => n + o.bytes, 0),
+        source.reservedBytes,
+      );
+      const copied: ObjectRow[] = [];
+      const damaged: Damage[] = [];
+      for (const object of objects) {
+        if (malformed(object)) {
+          damaged.push({ ...reported(object), reason: "invalid" });
+          continue;
+        }
+        const result = await copyVerified(
+          await sourceObject(source.root, object.projectId, object.digest),
+          await safePath(dir, ...objectParts(object.projectId, object.digest)),
+          { sha256: object.digest, bytes: object.bytes },
         );
-      schemaVersion = (
-        copy.prepare("PRAGMA user_version").get() as { user_version: number }
-      ).user_version;
-      projects = heads(copy);
-      objects = readyObjects(copy);
+        if (result === "ok") copied.push(object);
+        else damaged.push({ ...reported(object), reason: result });
+      }
+      const manifest: BackupManifest = {
+        format: BACKUP_FORMAT,
+        backupId,
+        createdAt: now.toISOString(),
+        schemaVersion,
+        database: {
+          sha256: await sha256File(database),
+          bytes: (await lstat(database)).size,
+        },
+        projects,
+        objects: copied,
+        damaged,
+        excluded: EXCLUDED,
+      };
+      // Written last and atomically: its presence marks a complete backup.
+      const partial = path.join(dir, "backup.json.partial");
+      const handle = await open(partial, "wx", 0o600);
+      try {
+        await handle.writeFile(JSON.stringify(manifest, null, 2));
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+      await rename(partial, path.join(dir, "backup.json"));
+      return summary(manifest);
+    } catch (e) {
+      // Only the folder this backup created is removed.
+      if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {});
+      throw e;
     } finally {
-      copy.close();
+      release();
     }
-    const needed =
-      objects.reduce((n, o) => n + o.bytes, 0) +
-      RESOURCE_POLICY.enforced.diskReserveBytes;
-    if ((await freeBytes(dir)) < needed)
-      throw new CommandError(
-        "LIMIT_EXCEEDED",
-        "Not enough free disk space for this backup.",
-      );
-    const copied: ObjectRow[] = [];
-    const damaged: BackupManifest["damaged"] = [];
-    for (const object of objects) {
-      const result = await copyVerified(
-        await sourceObject(store.root, object.projectId, object.digest),
-        await safePath(dir, ...objectParts(object.projectId, object.digest)),
-        { sha256: object.digest, bytes: object.bytes },
-      );
-      if (result === "ok") copied.push(object);
-      else
-        damaged.push({
-          projectId: object.projectId,
-          digest: object.digest,
-          reason: result,
-        });
-    }
-    const manifest: BackupManifest = {
-      format: BACKUP_FORMAT,
-      backupId,
-      createdAt: now.toISOString(),
-      schemaVersion,
-      database: {
-        sha256: await sha256File(database),
-        bytes: (await lstat(database)).size,
-      },
-      projects,
-      objects: copied,
-      damaged,
-      excluded: EXCLUDED,
-    };
-    // Written last and atomically: its presence marks a complete backup.
-    const partial = path.join(dir, "backup.json.partial");
-    const handle = await open(partial, "wx", 0o600);
-    try {
-      await handle.writeFile(JSON.stringify(manifest, null, 2));
-      await handle.sync();
-    } finally {
-      await handle.close();
-    }
-    await rename(partial, path.join(dir, "backup.json"));
-    return summary(manifest);
-  } catch (e) {
-    // Only the folder this backup created is removed.
-    if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {});
-    throw e;
-  } finally {
-    release();
-    backingUp = false;
-  }
+  });
 }
+
+const reported = (o: { projectId: string; digest: string }) => ({
+  projectId: String(o.projectId).slice(0, 200),
+  digest: String(o.digest).slice(0, 200),
+});
 
 const summary = (m: BackupManifest) => ({
   backupId: m.backupId,
@@ -350,22 +421,25 @@ const summary = (m: BackupManifest) => ({
 });
 
 async function readManifest(dir: string) {
-  return ManifestSchema.parse(
-    JSON.parse(await readFile(path.join(dir, "backup.json"), "utf8")),
-  );
+  const file = path.join(dir, "backup.json");
+  const info = await lstat(file);
+  if (!info.isFile() || info.size > MAX_MANIFEST_BYTES)
+    throw new Error("backup.json is not a regular file of bounded size.");
+  return ManifestSchema.parse(JSON.parse(await readFile(file, "utf8")));
 }
 
 // Backups in a recovery home, newest first. A folder without a valid
 // manifest is listed as incomplete and cannot be restored.
 export async function listBackups(home: string) {
-  const backups = path.join(home, "backups");
   const result: (
     ReturnType<typeof summary> | { backupId: string; complete: false }
   )[] = [];
+  const backups = await safePath(home, "backups").catch(() => null);
+  if (!backups) return result;
   for (const name of await readdir(backups).catch(() => [] as string[])) {
     if (!BackupId.safeParse(name).success) continue;
     try {
-      const manifest = await readManifest(path.join(backups, name));
+      const manifest = await readManifest(await safePath(backups, name));
       if (manifest.backupId !== name) throw new Error("Mismatched backup id.");
       result.push(summary(manifest));
     } catch {
@@ -377,7 +451,19 @@ export async function listBackups(home: string) {
 
 // Restores a backup into a new, empty root and returns the restore receipt
 // (also written as `restore.json` in the new root).
-export async function restoreWorkspace(backupDir: string, newRoot: string) {
+export function restoreWorkspace(
+  backupDir: string,
+  newRoot: string,
+  options: { reservedBytes?: number } = {},
+) {
+  return exclusive(() => restore(backupDir, newRoot, options));
+}
+
+async function restore(
+  backupDir: string,
+  newRoot: string,
+  options: { reservedBytes?: number },
+) {
   let manifest: BackupManifest;
   try {
     manifest = await readManifest(backupDir);
@@ -388,18 +474,30 @@ export async function restoreWorkspace(backupDir: string, newRoot: string) {
     );
   }
   const root = path.resolve(newRoot);
-  const existing = await readdir(root).catch((e: NodeJS.ErrnoException) => {
-    if (e.code === "ENOENT") return [] as string[];
-    throw e;
-  });
-  if (existing.length > 0)
-    throw new CommandError(
-      "VALIDATION",
-      "Restore destination must be a new, empty folder.",
-    );
-  await initializeRoot(root);
-  await separate(root, backupDir);
+  let existed = true;
   try {
+    if ((await readdir(root)).length > 0)
+      throw new CommandError(
+        "VALIDATION",
+        "Restore destination must be a new, empty folder.",
+      );
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    existed = false;
+  }
+  // Checked before anything is created.
+  await assertSeparate(root, backupDir);
+  const total =
+    manifest.database.bytes + manifest.objects.reduce((n, o) => n + o.bytes, 0);
+  await requireSpace(
+    await existingAncestor(root),
+    total,
+    options.reservedBytes,
+  );
+  let initialized = false;
+  try {
+    await initializeRoot(root);
+    initialized = true;
     const database = path.join(root, "workspace.sqlite");
     if (
       (await copyVerified(path.join(backupDir, "workspace.sqlite"), database, {
@@ -411,39 +509,61 @@ export async function restoreWorkspace(backupDir: string, newRoot: string) {
         "RECOVERY_REQUIRED",
         "The backup's database does not match its manifest.",
       );
-    const quarantined: BackupManifest["damaged"] = [...manifest.damaged];
-    let verified = 0;
-    for (const object of manifest.objects) {
-      const parts = objectParts(object.projectId, object.digest);
-      const result = await copyVerified(
-        await safePath(backupDir, ...parts),
-        await safePath(root, ...parts),
-        { sha256: object.digest, bytes: object.bytes },
-      );
-      if (result === "ok") verified++;
-      else
-        quarantined.push({
-          projectId: object.projectId,
-          digest: object.digest,
-          reason: result,
-        });
-    }
-    const db = new DatabaseSync(database);
     let restored: Head[];
+    let ready: ObjectRow[];
+    const check = new DatabaseSync(database, { readOnly: true });
     try {
-      const problems = integrity(db);
+      const problems = integrity(check);
       if (problems)
         throw new CommandError(
           "RECOVERY_REQUIRED",
           `The restored database failed its integrity check: ${problems[0]}`,
         );
-      restored = heads(db);
+      if (userVersion(check) !== manifest.schemaVersion)
+        throw new CommandError(
+          "RECOVERY_REQUIRED",
+          "The restored database's version does not match the backup manifest.",
+        );
+      restored = heads(check);
       if (JSON.stringify(restored) !== JSON.stringify(manifest.projects))
         throw new CommandError(
           "RECOVERY_REQUIRED",
           "The restored project heads do not match the backup manifest.",
         );
-      // What could not be verified is kept registered but never served.
+      ready = readyObjects(check);
+    } finally {
+      check.close();
+    }
+    // Every object the database registers as ready must be verified here;
+    // anything else (recorded as damaged, absent from the manifest, altered
+    // in the backup, or malformed) is quarantined.
+    const listed = new Map(
+      manifest.objects.map((o) => [`${o.projectId}/${o.digest}`, o]),
+    );
+    const recorded = new Map(
+      manifest.damaged.map((d) => [`${d.projectId}/${d.digest}`, d.reason]),
+    );
+    const quarantined: { projectId: string; digest: string; reason: string }[] =
+      [];
+    let verified = 0;
+    for (const row of ready) {
+      const key = `${row.projectId}/${row.digest}`;
+      const entry = listed.get(key);
+      let result: string = recorded.get(key) ?? "unlisted";
+      if (entry && !malformed(row) && entry.bytes === row.bytes) {
+        const parts = objectParts(row.projectId, row.digest);
+        result = await copyVerified(
+          await safePath(backupDir, ...parts),
+          await safePath(root, ...parts),
+          { sha256: row.digest, bytes: row.bytes },
+        );
+      }
+      if (result === "ok") verified++;
+      else quarantined.push({ ...reported(row), reason: result });
+    }
+    // What could not be verified is kept registered but never served.
+    const db = new DatabaseSync(database);
+    try {
       const quarantine = db.prepare(
         "UPDATE asset_objects SET state = 'quarantined' WHERE project_id = ? AND digest = ?",
       );
@@ -474,39 +594,90 @@ export async function restoreWorkspace(backupDir: string, newRoot: string) {
     await rename(partial, path.join(root, "restore.json"));
     return { root, ...receipt };
   } catch (e) {
-    // The destination was empty (or absent) and everything in it is ours.
-    await rm(root, { recursive: true, force: true }).catch(() => {});
+    // Only what this restore made is removed: the folder if it created it,
+    // otherwise (the folder was empty) its contents.
+    if (!existed)
+      await rm(root, { recursive: true, force: true }).catch(() => {});
+    else if (initialized)
+      for (const name of await readdir(root).catch(() => [] as string[]))
+        await rm(path.join(root, name), { recursive: true, force: true }).catch(
+          () => {},
+        );
     throw e;
   }
 }
 
 // Restores a backup of a recovery home into a fresh folder of that home.
-export async function restoreFromHome(home: string, backupId: string) {
+export async function restoreFromHome(
+  home: string,
+  backupId: string,
+  options: { reservedBytes?: number } = {},
+) {
   const id = BackupId.parse(backupId);
-  const dir = path.join(home, "backups", id);
+  const dir = await safePath(home, "backups", id);
   if (!(await lstat(dir).catch(() => null))?.isDirectory())
     throw new CommandError("NOT_FOUND", "Backup not found.");
-  const restored = path.join(home, "restored");
+  const restored = await safePath(home, "restored");
   await mkdir(restored, { recursive: true });
-  for (let n = 1; n < 1000; n++) {
-    const target = path.join(restored, `${id}-${n}`);
-    try {
-      await mkdir(target);
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === "EEXIST") continue;
-      throw e;
-    }
-    return restoreWorkspace(dir, target);
+  for (let n = 1; n <= MAX_RESTORES_PER_BACKUP; n++) {
+    const target = await safePath(home, "restored", `${id}-${n}`);
+    if (await lstat(target).catch(() => null)) continue;
+    // A failed restore removes the folder it created.
+    return restoreWorkspace(dir, target, options);
   }
-  throw new CommandError("LIMIT_EXCEEDED", "Too many restores of this backup.");
+  throw new CommandError(
+    "LIMIT_EXCEEDED",
+    `This backup has been restored ${MAX_RESTORES_PER_BACKUP} times; remove older restored folders first.`,
+  );
 }
 
-// Reads a workspace without changing it: the database (and its write-ahead
-// log) are examined as copies in a temporary folder, and objects are read
-// in place. Suitable for a workspace the service refuses to open.
+// An offline workspace as a backup source (no service may be running: the
+// caller holds the service lock). The database is read through a read-only
+// connection and never upgraded; a damaged write-ahead log is refused.
+export async function offlineSource(root: string) {
+  const file = await safePath(root, "workspace.sqlite");
+  if (!(await lstat(file).catch(() => null))?.isFile())
+    throw new CommandError(
+      "NOT_FOUND",
+      "No workspace database in this folder.",
+    );
+  if ((await inspectWal(`${file}-wal`))?.damaged)
+    throw new CommandError(
+      "RECOVERY_REQUIRED",
+      "The workspace's write-ahead log is damaged; diagnose it before backing up.",
+    );
+  const sides = [`${file}-wal`, `${file}-shm`];
+  const present = await Promise.all(
+    sides.map((p) =>
+      lstat(p).then(
+        () => true,
+        () => false,
+      ),
+    ),
+  );
+  const db = new DatabaseSync(file, { readOnly: true });
+  return {
+    root,
+    reservedBytes: 0,
+    backupDatabase: (destination: string) =>
+      backup(db, destination, { rate: -1 }).then(() => {}),
+    holdObjects: () => () => {},
+    // Closes the connection and removes only side files it created.
+    async close() {
+      db.close();
+      for (const [i, side] of sides.entries())
+        if (!present[i]) await unlink(side).catch(() => {});
+    },
+  };
+}
+
+// Reads a workspace without changing it: the write-ahead log is inspected
+// in place (read only), the database and its log are examined as copies in
+// a scratch folder, and objects are read in place. Suitable for a workspace
+// the service refuses to open.
 export async function diagnoseWorkspace(
   root: string,
-  options: { verifyObjects?: boolean } = {},
+  options: { verifyObjects?: boolean; scratch?: string } = {},
 ) {
   const file = await safePath(root, "workspace.sqlite");
   const size = async (p: string) =>
@@ -516,6 +687,7 @@ export async function diagnoseWorkspace(
       bytes: await size(file),
       walBytes: await size(`${file}-wal`),
       shmBytes: await size(`${file}-shm`),
+      wal: await inspectWal(`${file}-wal`),
       schemaVersion: null as number | null,
       integrity: null as string[] | null,
       error: null as string | null,
@@ -526,6 +698,7 @@ export async function diagnoseWorkspace(
       quarantined: 0,
       missing: [] as ObjectRow[],
       mismatched: [] as ObjectRow[],
+      invalid: [] as ObjectRow[],
       verified: 0,
     },
     unregisteredFiles: 0,
@@ -534,7 +707,16 @@ export async function diagnoseWorkspace(
     report.database.error = "workspace.sqlite is missing.";
     return report;
   }
-  const scratch = await mkdtemp(path.join(tmpdir(), "yamakan-diagnose-"));
+  const scratchParent = options.scratch ?? tmpdir();
+  if (
+    (await freeBytes(scratchParent)) <
+    report.database.bytes + (report.database.walBytes ?? 0) + 64 * 1024 * 1024
+  )
+    throw new CommandError(
+      "LIMIT_EXCEEDED",
+      "Not enough free space in the scratch folder to examine a copy of the database; choose another with --scratch.",
+    );
+  const scratch = await mkdtemp(path.join(scratchParent, "yamakan-diagnose-"));
   try {
     const copy = path.join(scratch, "workspace.sqlite");
     await copyFile(file, copy);
@@ -549,9 +731,7 @@ export async function diagnoseWorkspace(
     }[] = [];
     try {
       db = new DatabaseSync(copy);
-      report.database.schemaVersion = (
-        db.prepare("PRAGMA user_version").get() as { user_version: number }
-      ).user_version;
+      report.database.schemaVersion = userVersion(db);
       report.database.integrity = integrity(db) ?? ["ok"];
       report.projects = heads(db);
       rows = db
@@ -574,6 +754,10 @@ export async function diagnoseWorkspace(
         digest: row.digest,
         bytes: row.byte_length,
       };
+      if (malformed(object)) {
+        report.objects.invalid.push(object);
+        continue;
+      }
       const source = await sourceObject(root, row.project_id, row.digest);
       const info = await lstat(source).catch(() => null);
       if (!info?.isFile()) report.objects.missing.push(object);
@@ -604,3 +788,12 @@ export async function diagnoseWorkspace(
   }
   return report;
 }
+
+// Whether a diagnosis found nothing wrong.
+export const healthy = (r: Awaited<ReturnType<typeof diagnoseWorkspace>>) =>
+  !r.database.error &&
+  !r.database.wal?.damaged &&
+  r.database.integrity?.[0] === "ok" &&
+  r.objects.missing.length === 0 &&
+  r.objects.mismatched.length === 0 &&
+  r.objects.invalid.length === 0;

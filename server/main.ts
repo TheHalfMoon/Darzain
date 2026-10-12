@@ -22,7 +22,7 @@ import { acquireServiceLock } from "../core/service-lock.ts";
 import { isLegacyWorkspace } from "../core/migrate.ts";
 import { closeWorkers } from "../core/process/workers.ts";
 import { closePreviews, preview } from "../core/render/preview.ts";
-import { defaultRecoveryHome } from "../core/recovery.ts";
+import { assertSeparate, defaultRecoveryHome } from "../core/recovery.ts";
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -60,6 +60,14 @@ const clientToken = randomBytes(32).toString("hex");
 await writeFile(await safePath(root, "token"), clientToken, { mode: 0o600 });
 // Backups and restored workspaces live outside the workspace folder.
 const recoveryHome = path.resolve(env("RECOVERY") || defaultRecoveryHome(root));
+try {
+  await assertSeparate(root, recoveryHome);
+} catch (e) {
+  console.error(
+    `The recovery folder must be outside the workspace: ${(e as Error).message}`,
+  );
+  process.exit(1);
+}
 const api = new CreativeAPI(store, { recoveryHome });
 // Durable jobs: reconcile any interrupted attempts and resume queued work.
 await api.queue.start();
@@ -126,7 +134,10 @@ const server = createServer(async (req, res) => {
       requestId,
       error: {
         code: error.code,
+        // The recovery folder first: by default it begins with the
+        // workspace path.
         message: error.message
+          .replaceAll(recoveryHome, "[recovery]")
           .replaceAll(root, "[workspace]")
           .replaceAll(projectRoot, "[application]"),
         retryable: error.retryable,

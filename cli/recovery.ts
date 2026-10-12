@@ -1,54 +1,63 @@
 // Offline recovery commands. They work on folders directly, without the
 // service:
-//   diagnose <workspace> [--verify-objects]  read-only report
+//   diagnose <workspace> [--verify-objects] [--scratch <folder>]
+//                                            read-only report
 //   restore <backup folder> <new empty folder>
 //   backup <workspace> [recovery folder]      only while no service runs
 // A running service backs up and restores through its own commands
 // (yamakan.workspace.backup / .restore), which choose the folders.
+import { lstat } from "node:fs/promises";
 import path from "node:path";
-import { ProjectStore } from "../core/store.ts";
 import { acquireServiceLock } from "../core/service-lock.ts";
 import {
   backupWorkspace,
   defaultRecoveryHome,
   diagnoseWorkspace,
+  healthy,
+  offlineSource,
   restoreWorkspace,
 } from "../core/recovery.ts";
 import { CommandError } from "../core/command/errors.ts";
 
 const [command, ...args] = process.argv.slice(2);
 const usage =
-  "Usage: npm run recovery -- diagnose <workspace> [--verify-objects] | restore <backup> <new folder> | backup <workspace> [recovery folder]";
+  "Usage: npm run recovery -- diagnose <workspace> [--verify-objects] [--scratch <folder>] | restore <backup> <new folder> | backup <workspace> [recovery folder]";
 const print = (value: unknown) => console.log(JSON.stringify(value, null, 2));
 try {
   if (command === "diagnose" && args[0]) {
+    const scratch = args.indexOf("--scratch");
     const report = await diagnoseWorkspace(path.resolve(args[0]), {
       verifyObjects: args.includes("--verify-objects"),
+      scratch: scratch > 0 ? path.resolve(args[scratch + 1]) : undefined,
     });
     print(report);
-    const healthy =
-      !report.database.error &&
-      report.database.integrity?.[0] === "ok" &&
-      report.objects.missing.length === 0 &&
-      report.objects.mismatched.length === 0;
-    if (!healthy) process.exitCode = 2;
+    if (!healthy(report)) process.exitCode = 2;
   } else if (command === "restore" && args[0] && args[1]) {
     print(await restoreWorkspace(path.resolve(args[0]), path.resolve(args[1])));
   } else if (command === "backup" && args[0]) {
     const root = path.resolve(args[0]);
-    // The service lock proves no service is writing this workspace.
-    const lock = await acquireServiceLock(root);
-    const store = new ProjectStore(root);
-    try {
-      await store.initialize();
-      print(
-        await backupWorkspace(
-          store,
-          path.resolve(args[1] ?? defaultRecoveryHome(root)),
-        ),
+    // A mistyped folder gets no lock file.
+    if (!(await lstat(path.join(root, "workspace.sqlite")).catch(() => null)))
+      throw new CommandError(
+        "NOT_FOUND",
+        "No workspace database in this folder.",
       );
+    // The service lock proves no service is writing this workspace. The
+    // database is read as it is: never created, upgraded or repaired.
+    const lock = await acquireServiceLock(root);
+    try {
+      const source = await offlineSource(root);
+      try {
+        print(
+          await backupWorkspace(
+            source,
+            path.resolve(args[1] ?? defaultRecoveryHome(root)),
+          ),
+        );
+      } finally {
+        await source.close();
+      }
     } finally {
-      store.close();
       lock.release();
     }
   } else {

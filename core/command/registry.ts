@@ -211,7 +211,10 @@ export const commands = {
     summary:
       "Restore a backup into a new workspace folder (the current workspace is not changed).",
     input: z.object({ backupId: BackupId }).strict(),
-    run: (ctx, a) => restoreFromHome(home(ctx), a.backupId),
+    run: (ctx, a) =>
+      restoreFromHome(home(ctx), a.backupId, {
+        reservedBytes: ctx.store.reservedBytes,
+      }),
   }),
   "yamakan.workspace.collectGarbage": define({
     scope: "project:recover",
