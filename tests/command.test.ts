@@ -1,7 +1,7 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { z } from "zod";
@@ -22,6 +22,15 @@ import { ProjectStore } from "../core/store.ts";
 import { JobSupervisor } from "../core/jobs.ts";
 // @ts-expect-error The guard is a plain .mjs module without declarations.
 import { checkImports } from "../scripts/import-guard.mjs";
+
+// Every test folder is removed when the file's tests finish, after the
+// stores and queues opened in it close (Windows cannot delete them open).
+const bases: string[] = [];
+const handles: { close(): unknown }[] = [];
+after(async () => {
+  for (const handle of handles.reverse()) await handle.close();
+  await Promise.all(bases.map((b) => rm(b, { recursive: true, force: true })));
+});
 
 const principal = (...scopes: Scope[]): Principal => ({
   id: "local-client",
@@ -98,9 +107,12 @@ test("operations resolve canonical and legacy names only", () => {
 
 test("scopes are enforced before input validation and execution", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-scope-"));
+  bases.push(root);
   const store = new ProjectStore(root);
+  handles.push(store);
   await store.initialize();
   const queue = new JobSupervisor(store);
+  handles.push(queue);
   const readOnly = { store, queue, principal: principal("project:read") };
   await assert.rejects(
     execute(readOnly, "yamakan.project.create", { name: "Denied" }),

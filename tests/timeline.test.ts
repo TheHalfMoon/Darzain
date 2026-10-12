@@ -1,7 +1,7 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { ProjectStore } from "../core/store.ts";
@@ -29,9 +29,19 @@ const ids = {
   extra: "66666666-6666-4666-8666-666666666666",
 };
 
+// Every test folder is removed when the file's tests finish, after the
+// stores and queues opened in it close (Windows cannot delete them open).
+const bases: string[] = [];
+const handles: { close(): unknown }[] = [];
+after(async () => {
+  for (const handle of handles.reverse()) await handle.close();
+  await Promise.all(bases.map((b) => rm(b, { recursive: true, force: true })));
+});
 async function workspace() {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-timeline-"));
+  bases.push(root);
   const store = new ProjectStore(root);
+  handles.push(store);
   await store.initialize();
   const project = await store.create("Timeline");
   const wav = path.join(root, "tone.wav");
@@ -56,6 +66,7 @@ async function workspace() {
     await readFile(wav),
   );
   const queue = new JobSupervisor(store);
+  handles.push(queue);
   const ctx = {
     store,
     queue,
@@ -1011,10 +1022,13 @@ test("low disk refuses new revisions but still replays a committed request; rest
   store.close();
   let free = 0;
   const low = new ProjectStore(root, { freeBytes: () => free });
+  handles.push(low);
   await low.initialize();
+  const lowQueue = new JobSupervisor(low);
+  handles.push(lowQueue);
   const ctx = {
     store: low,
-    queue: new JobSupervisor(low),
+    queue: lowQueue,
     principal: { id: "local-client" as const, scopes: new Set(Scopes) },
   };
   const lowCall = (

@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -24,10 +24,20 @@ const W = 640;
 const H = 360;
 const SECOND = 705_600_000;
 
+// Tests remove their own folders; these catch what a failed test leaves,
+// after its store closes (Windows cannot delete an open database).
+const bases: string[] = [];
+const handles: { close(): unknown }[] = [];
+after(async () => {
+  for (const handle of handles.reverse()) await handle.close();
+  await Promise.all(bases.map((b) => rm(b, { recursive: true, force: true })));
+});
+
 // Renders `ass` over a black frame with only the pinned fonts available, and
 // returns the grayscale pixels plus libass's log.
 async function render(ass: string) {
   const dir = await mkdtemp(path.join(tmpdir(), "yamakan-type-"));
+  bases.push(dir);
   await mkdir(path.join(dir, "fonts"));
   for (const font of await titleFonts())
     await writeFile(path.join(dir, "fonts", font.name), font.bytes);
@@ -235,7 +245,9 @@ test("every reviewer fixture renders with the pinned font and stays inside the f
 
 test("an export refuses a title wider than the frame instead of clipping it", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-type-"));
+  bases.push(root);
   const store = new ProjectStore(root);
+  handles.push(store);
   await store.initialize();
   const created = await store.create("Overlong");
   const withTitle = (title: string) =>
@@ -281,6 +293,7 @@ test("an export refuses a title wider than the frame instead of clipping it", as
 // (inclusive) as grayscale pixels.
 async function frames(ass: string, from: number, to: number) {
   const dir = await mkdtemp(path.join(tmpdir(), "yamakan-type-"));
+  bases.push(dir);
   try {
     await mkdir(path.join(dir, "fonts"));
     for (const font of await titleFonts())
@@ -348,7 +361,9 @@ test("rendered: back-to-back titles change on the exact frame, including frame 1
 
 test("titles that overflow by glyph gaps or by line count are refused", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-type-"));
+  bases.push(root);
   const store = new ProjectStore(root);
+  handles.push(store);
   try {
     await store.initialize();
     const created = await store.create("Overflow");
@@ -396,7 +411,9 @@ test("titles that overflow by glyph gaps or by line count are refused", async ()
 
 test("one large still used by two clips renders (each clip reads its own input)", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-type-"));
+  bases.push(root);
   const store = new ProjectStore(root);
+  handles.push(store);
   try {
     await store.initialize();
     const created = await store.create("Shared still");

@@ -1,6 +1,6 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -9,12 +9,23 @@ import { fromEditView } from "../core/canonical.ts";
 import { canonicalJson, sha256Hex } from "../core/donors/ninerr/canonical.ts";
 import { CommandError } from "../core/command/errors.ts";
 
+// Every test folder is removed when the file's tests finish, after the
+// databases a failed test left open close (Windows cannot delete them open).
+const bases: string[] = [];
+const handles: { close(): void }[] = [];
+after(() => {
+  for (const handle of handles.reverse()) handle.close();
+  return Promise.all(bases.map((b) => rm(b, { recursive: true, force: true })));
+});
 async function workspace() {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-canon-"));
+  bases.push(root);
   const store = new ProjectStore(root);
+  handles.push(store);
   await store.initialize();
   const project = await store.create("Canonical");
   const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
+  handles.push({ close: () => db.isOpen && db.close() });
   // Simulates a snapshot written by another build, as a new head revision.
   const plant = (format: string, value: unknown, revision: number) => {
     const bytes = Buffer.from(canonicalJson(value), "utf8");

@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { fork } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
@@ -41,9 +41,19 @@ async function kill(c: ChildProcess) {
   c.kill("SIGKILL");
   await exited;
 }
+// Every test folder is removed when the file's tests finish, after the
+// stores opened in it close (Windows cannot delete them open).
+const bases: string[] = [];
+const handles: { close(): unknown }[] = [];
+after(async () => {
+  for (const handle of handles.reverse()) await handle.close();
+  await Promise.all(bases.map((b) => rm(b, { recursive: true, force: true })));
+});
 async function workspace() {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-db-"));
+  bases.push(root);
   const store = new ProjectStore(root);
+  handles.push(store);
   await store.initialize();
   const project = await store.create("Original");
   return { root, store, project };
@@ -217,6 +227,7 @@ test("request replay is checked before the revision and rejects reused IDs with 
 
 test("the service lock is exclusive, and the OS releases it when its owner is killed", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-lock-"));
+  bases.push(root);
   const holder = spawnChild("lock", root);
   try {
     assert.deepEqual(await nextMessage(holder), { locked: true });
@@ -240,6 +251,7 @@ test("reopen needs only the database; snapshots and history live in SQLite", asy
   store.close();
   await rm(path.join(root, "projects", project.id), { recursive: true });
   const reopened = new ProjectStore(root);
+  handles.push(reopened);
   await reopened.initialize();
   assert.deepEqual(await reopened.load(project.id), one);
   const history = await reopened.history(project.id);
@@ -272,7 +284,9 @@ test("reopen needs only the database; snapshots and history live in SQLite", asy
 
 test("snapshots over the byte limit are refused and commit nothing", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-limit-"));
+  bases.push(root);
   const store = new ProjectStore(root, { snapshotBytes: 300 });
+  handles.push(store);
   await store.initialize();
   await assert.rejects(
     store.create("A name long enough to exceed a 300 byte snapshot limit"),
@@ -301,6 +315,7 @@ test("a newer or foreign database is refused and left byte-identical", async () 
   assert.ok(!existsSync(`${file}-wal`), "no WAL was created");
 
   const foreign = await mkdtemp(path.join(tmpdir(), "yamakan-foreign-"));
+  bases.push(foreign);
   const other = new DatabaseSync(path.join(foreign, "workspace.sqlite"));
   other.exec("CREATE TABLE notes(text TEXT)");
   other.close();
@@ -312,6 +327,7 @@ test("a newer or foreign database is refused and left byte-identical", async () 
 
 test("a damaged lock file is set aside and the lock is acquired", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-lockfile-"));
+  bases.push(root);
   await writeFile(path.join(root, "service.lock"), "x".repeat(4096));
   const lock = await acquireServiceLock(root);
   lock.release();
@@ -387,6 +403,7 @@ test("explicit restore replaces a damaged head and preserves the damaged evidenc
 
 test("refusing a WAL-mode foreign database leaves the folder exactly as found", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-walforeign-"));
+  bases.push(root);
   const file = path.join(root, "workspace.sqlite");
   const other = new DatabaseSync(file);
   other.exec("PRAGMA journal_mode = WAL; CREATE TABLE notes(text TEXT)");

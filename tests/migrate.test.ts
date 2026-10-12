@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, fork, spawnSync } from "node:child_process";
 import { once } from "node:events";
@@ -11,6 +11,7 @@ import {
   writeFile,
   mkdir,
   readdir,
+  rm,
   symlink,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -27,8 +28,17 @@ import { CommandError } from "../core/command/errors.ts";
 const ffmpeg =
   process.env.YAMAKAN_FFMPEG || process.env.DARZAIN_FFMPEG || "ffmpeg";
 
+// Every test folder is removed when the file's tests finish, after the
+// stores and databases opened in it close (Windows cannot delete them open).
+const bases: string[] = [];
+const handles: { close(): unknown }[] = [];
+after(async () => {
+  for (const handle of handles.reverse()) await handle.close();
+  await Promise.all(bases.map((b) => rm(b, { recursive: true, force: true })));
+});
 async function legacyWorkspace() {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-legacy-"));
+  bases.push(root);
   const legacy = new LegacyProjectStore(path.join(root, "src"));
   await legacy.initialize();
   const wav = path.join(root, "tone.wav");
@@ -113,6 +123,7 @@ test("legacy workspace migrates into a new root with history, media and an uncha
   assert.match(skippedB.reason!, /head cannot be verified/);
 
   const store = new ProjectStore(destination);
+  handles.push(store);
   await store.initialize();
   assert.deepEqual(
     await store.load(a.id),
@@ -191,7 +202,9 @@ test("migration refuses unsafe or ambiguous source and destination roots", async
   assert.deepEqual(await readdir(nonEmpty), ["keep.txt"]);
   // A new-format workspace is not a legacy one.
   const modern = await mkdtemp(path.join(tmpdir(), "yamakan-modern-"));
+  bases.push(modern);
   const store = new ProjectStore(modern);
+  handles.push(store);
   await store.initialize();
   await store.create("Modern");
   store.close();
@@ -295,6 +308,7 @@ test("a legacy root that an earlier build opened in place still migrates", async
   // The T2 server created workspace.sqlite inside the legacy root.
   // The earlier build also created a project that exists only in its database.
   const opened = new ProjectStore(source);
+  handles.push(opened);
   await opened.initialize();
   const dbOnly = await opened.create("Created by the earlier build");
   const imported = await opened.importAsset(
@@ -322,6 +336,7 @@ test("a legacy root that an earlier build opened in place still migrates", async
     ["migrated", [0, 1, 2], 1],
   );
   const store = new ProjectStore(destination);
+  handles.push(store);
   await store.initialize();
   assert.deepEqual(await store.load(dbOnly.id), edited);
   await store.assetFile(dbOnly.id, imported.asset.id);
@@ -378,10 +393,12 @@ test("destinations that alias into the source by junction or short name are refu
 test("database projects with a newer-format revision are never downgraded", async () => {
   const { root, source } = await legacyWorkspace();
   const opened = new ProjectStore(source);
+  handles.push(opened);
   await opened.initialize();
   const project = await opened.create("Touched by a newer build");
   opened.close();
   const db = new DatabaseSync(path.join(source, "workspace.sqlite"));
+  handles.push({ close: () => db.isOpen && db.close() });
   const row = db
     .prepare(
       "SELECT s.bytes FROM snapshots s JOIN projects p ON p.snapshot_hash = s.hash WHERE p.project_id = ?",

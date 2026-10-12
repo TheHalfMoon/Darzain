@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
@@ -6,6 +6,7 @@ import {
   open,
   readFile,
   readdir,
+  rm,
   truncate,
   writeFile,
 } from "node:fs/promises";
@@ -28,9 +29,19 @@ const ffmpeg = (args: string[]) =>
     },
   );
 
+// Every test folder is removed when the file's tests finish, after the
+// stores opened in it close (Windows cannot delete them open).
+const bases: string[] = [];
+const handles: { close(): unknown }[] = [];
+after(async () => {
+  for (const handle of handles.reverse()) await handle.close();
+  await Promise.all(bases.map((b) => rm(b, { recursive: true, force: true })));
+});
 async function workspace(options = {}) {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-stream-"));
+  bases.push(root);
   const store = new ProjectStore(root, options);
+  handles.push(store);
   await store.initialize();
   const project = await store.create("Streaming");
   return { root, store, project };
@@ -197,6 +208,7 @@ test("a version 2 workspace with imported media upgrades to the current version 
   );
   db.close();
   const reopened = new ProjectStore(root);
+  handles.push(reopened);
   await reopened.initialize();
   const check = new DatabaseSync(path.join(root, "workspace.sqlite"));
   assert.equal(
@@ -221,6 +233,7 @@ test("a version 1 workspace database upgrades step by step to the current versio
   );
   db.close();
   const reopened = new ProjectStore(root);
+  handles.push(reopened);
   await reopened.initialize();
   const check = new DatabaseSync(path.join(root, "workspace.sqlite"));
   assert.equal(
@@ -282,6 +295,7 @@ test("a damaged stored object is refused rather than served", async () => {
 
 test("playlist and concat files cannot reach other files or the network", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-playlist-"));
+  bases.push(root);
   const target = path.join(root, "secret.wav");
   ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", target]);
   const playlists = {
@@ -345,6 +359,7 @@ test("upgrading to schema v2 registers existing assets (ready, or quarantined if
   );
   db.close();
   const reopened = new ProjectStore(root);
+  handles.push(reopened);
   await reopened.initialize();
   assert.equal(reopened.assetVersion(good.asset.id)!.state, "ready");
   assert.equal(reopened.assetVersion(bad.asset.id)!.state, "quarantined");
@@ -435,6 +450,7 @@ test("an interrupted v2 backfill resumes on the next start", async () => {
   );
   db.close();
   const reopened = new ProjectStore(root);
+  handles.push(reopened);
   await reopened.initialize();
   assert.equal(reopened.assetVersion(asset.id)!.state, "ready");
   assert.equal(rows(root, "pending_work"), 0);
