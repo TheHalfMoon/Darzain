@@ -210,9 +210,12 @@ export async function renderPlan(
     );
   const total = seconds(window.durationTicks);
   const dir = await store.file(plan.projectId, ...staging);
-  // What the worker writes, and the copy the service keeps of it.
+  // The worker may write only its own subfolder (it could change that
+  // folder's permissions); the service keeps its copy one level up, in a
+  // folder the worker could never write.
+  const work = path.join(dir, "worker");
   const written = path.join(
-    dir,
+    work,
     window.output === "png" ? "frame.partial.png" : "render.partial.mp4",
   );
   const output = path.join(
@@ -235,7 +238,7 @@ export async function renderPlan(
     new Error(timedOut ? "Render time limit exceeded." : "Cancelled.");
   try {
     if (signal.aborted) throw new Error("Cancelled.");
-    await mkdir(dir, { recursive: true });
+    await mkdir(work, { recursive: true });
     let libassApi: number | null = null;
     if (plan.titles) {
       if (
@@ -407,7 +410,7 @@ export async function renderPlan(
         "1",
         "-progress",
         "pipe:1",
-        "frame.partial.png",
+        "worker/frame.partial.png",
       );
     else {
       if (audio.length)
@@ -440,7 +443,7 @@ export async function renderPlan(
         "+faststart",
         "-progress",
         "pipe:1",
-        "render.partial.mp4",
+        "worker/render.partial.mp4",
       );
     }
     const duration = Number(total);
@@ -451,7 +454,7 @@ export async function renderPlan(
       args,
       cwd: dir,
       // The render's own folder is the only place it may write.
-      writable: [dir],
+      writable: [work],
       memoryBytes: RESOURCE_POLICY.enforced.renderMemoryBytes,
       signal: controller.signal,
       onCreated,

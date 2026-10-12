@@ -79,6 +79,8 @@ const DACL_SECURITY_INFORMATION: u32 = 0x0000_0004;
 const FILE_ALL_ACCESS: u32 = 0x001F_01FF;
 const TOKEN_USER_CLASS: i32 = 1;
 const ERROR_ACCESS_DENIED: u32 = 5;
+const UNPROTECTED_DACL_SECURITY_INFORMATION: u32 = 0x2000_0000;
+const PROGRESS_INVOKE_NEVER: i32 = 1;
 
 #[repr(C)]
 struct SecurityAttributes {
@@ -251,6 +253,19 @@ extern "system" {
         group: *mut c_void,
         dacl: *mut c_void,
         sacl: *mut c_void,
+    ) -> u32;
+    fn TreeResetNamedSecurityInfoW(
+        name: *mut u16,
+        kind: i32,
+        info: u32,
+        owner: *mut c_void,
+        group: *mut c_void,
+        dacl: *mut c_void,
+        sacl: *mut c_void,
+        keep_explicit: Bool,
+        progress: *mut c_void,
+        invoke: i32,
+        args: *mut c_void,
     ) -> u32;
     fn CreateProcessAsUserW(
         token: Handle,
@@ -474,9 +489,9 @@ fn grant_owner_full(dir: &str) -> Result<(), String> {
             if needed > 65_532 {
                 return Err("the folder's access list is too large".into());
             }
-            let mut acl = vec![0u64; needed.div_ceil(8) + 1];
+            let mut acl = vec![0u64; needed.div_ceil(8)];
             let acl_ptr = acl.as_mut_ptr() as *mut c_void;
-            if InitializeAcl(acl_ptr, (acl.len() * 8) as u32, ACL_REVISION) == 0 {
+            if InitializeAcl(acl_ptr, ((acl.len() * 8) as u32).min(65_532), ACL_REVISION) == 0 {
                 return Err(last_error("InitializeAcl"));
             }
             // Explicit denies keep their place first (canonical order), then
@@ -584,9 +599,47 @@ fn labels() -> &'static Mutex<HashMap<String, (String, usize)>> {
     LABELS.get_or_init(Default::default)
 }
 
+// One key per folder however it is spelled (case, trailing separators).
+fn label_key(dir: &str) -> String {
+    dir.trim_end_matches(['\\', '/']).to_lowercase()
+}
+
+// Back to plain inheritance from the parent for the folder and everything
+// below it: any access entry the worker added (it may change its own
+// folder's DACL) is removed, as is the owner grant labelling may have added.
+fn reset_access(dir: &str) {
+    let mut empty = vec![0u64; 2];
+    if unsafe { InitializeAcl(empty.as_mut_ptr() as *mut c_void, 16, ACL_REVISION) } == 0 {
+        return;
+    }
+    let mut name = wide(dir);
+    unsafe {
+        TreeResetNamedSecurityInfoW(
+            name.as_mut_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION | UNPROTECTED_DACL_SECURITY_INFORMATION,
+            null_mut(),
+            null_mut(),
+            empty.as_mut_ptr() as *mut c_void,
+            null_mut(),
+            0,
+            null_mut(),
+            PROGRESS_INVOKE_NEVER,
+            null_mut(),
+        );
+    }
+}
+
+// Restores a folder after its last worker: the default label first (that
+// needs WRITE_OWNER, which the access reset may remove), then its access.
+fn restore_folder(dir: &str) {
+    let _ = set_label(dir, false);
+    reset_access(dir);
+}
+
 fn hold_label(dir: &str) -> Result<(), String> {
     let mut held = labels().lock().unwrap();
-    let key = dir.to_lowercase();
+    let key = label_key(dir);
     if let Some(entry) = held.get_mut(&key) {
         entry.1 += 1;
         return Ok(());
@@ -598,7 +651,7 @@ fn hold_label(dir: &str) -> Result<(), String> {
 
 fn release_label(dir: &str) {
     let mut held = labels().lock().unwrap();
-    let key = dir.to_lowercase();
+    let key = label_key(dir);
     let last = match held.get_mut(&key) {
         Some(entry) => {
             entry.1 -= 1;
@@ -608,14 +661,14 @@ fn release_label(dir: &str) {
     };
     if last {
         held.remove(&key);
-        let _ = set_label(dir, false);
+        restore_folder(dir);
     }
 }
 
 fn release_all_labels() {
     let mut held = labels().lock().unwrap();
     for (_, (dir, _)) in held.drain() {
-        let _ = set_label(&dir, false);
+        restore_folder(&dir);
     }
 }
 

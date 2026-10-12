@@ -24,7 +24,7 @@ import { AssetSchema } from "./project.ts";
 import type { Asset } from "./project.ts";
 import { MEDIA_FORMATS, probe } from "./media.ts";
 import { mediaTools, workers } from "./process/workers.ts";
-import { renderRevision } from "./render.ts";
+import { keepMainStream, renderRevision } from "./render.ts";
 import type { RenderJob } from "./render.ts";
 import { CommandError, toCommandError } from "./command/errors.ts";
 import { RESOURCE_POLICY } from "./command/policy.ts";
@@ -622,7 +622,10 @@ export class JobSupervisor {
       jobId,
       `attempt-${attempt}`,
     );
-    await mkdir(dir, { recursive: true });
+    // The worker writes only its own subfolder; the service keeps its copy
+    // in the attempt folder, which the worker could never write.
+    const work = path.join(dir, "worker");
+    await mkdir(work, { recursive: true });
     const seconds = Math.max(1, asset.durationFrames / 30);
     let progress = "";
     if (signal.aborted) throw new Error("Cancelled.");
@@ -699,11 +702,10 @@ export class JobSupervisor {
           String(outputCap),
           "-progress",
           "pipe:1",
-          "derivative.mp4",
+          "worker/derivative.mp4",
         ],
         cwd: dir,
-        // The conversion's own folder is the only place it may write.
-        writable: [dir],
+        writable: [work],
         memoryBytes: RESOURCE_POLICY.enforced.renderMemoryBytes,
         signal: controller.signal,
         stderrLimit: 8000,
@@ -733,7 +735,9 @@ export class JobSupervisor {
         `FFmpeg failed to convert the source (exit ${result.code}).`,
         { cause: result.stderr },
       );
+    // Probed and imported from the service's own copy of the main stream.
     const file = path.join(dir, "derivative.mp4");
+    await keepMainStream(path.join(work, "derivative.mp4"), file);
     const probed = await probe(file);
     if (
       !probed.hasVideo ||

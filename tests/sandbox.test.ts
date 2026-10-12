@@ -246,3 +246,55 @@ test(
     assert.equal(await readableByOtherAccounts(kept), false);
   },
 );
+
+test(
+  "a worker that opens its own folder to everyone leaves nothing readable by other accounts",
+  { skip: !windows && "Windows access control" },
+  async () => {
+    const { restrictToOwner, readableByOtherAccounts } =
+      await import("../core/process/access.ts");
+    const { keepMainStream } = await import("../core/render.ts");
+    const dir = await folder();
+    await restrictToOwner(dir, "dir");
+    const work = path.join(dir, "worker");
+    await mkdir(work);
+    const powershell = path.join(
+      process.env.SystemRoot || "C:\\Windows",
+      "System32",
+      "WindowsPowerShell",
+      "v1.0",
+      "powershell.exe",
+    );
+    const written = path.join(work, "render.partial.mp4");
+    // What a compromised worker can do: write its output, then grant
+    // Everyone full control of its folder, inherited by everything in it.
+    const script = [
+      "$ErrorActionPreference = 'Stop'",
+      `Set-Content -LiteralPath '${written}' -Value 'video bytes'`,
+      `$acl = Get-Acl -LiteralPath '${work}'`,
+      "$rule = New-Object System.Security.AccessControl.FileSystemAccessRule('Everyone','FullControl','ContainerInherit,ObjectInherit','None','Allow')",
+      "$acl.AddAccessRule($rule)",
+      `Set-Acl -LiteralPath '${work}' -AclObject $acl`,
+    ].join("; ");
+    const owner = new ProcessOwner([powershell]);
+    try {
+      const result = await owner.run({
+        executable: powershell,
+        args: ["-NoProfile", "-NonInteractive", "-Command", script],
+        cwd: dir,
+        writable: [work],
+        stderrLimit: 8000,
+      });
+      assert.equal(result.code, 0, result.stderr);
+    } finally {
+      owner.close();
+    }
+    // procd reset the folder to plain inheritance when the worker exited.
+    assert.equal(await readableByOtherAccounts(work), false);
+    assert.equal(await readableByOtherAccounts(written), false);
+    // The service's copy is made outside the worker's folder.
+    const kept = path.join(dir, "render.mp4");
+    await keepMainStream(written, kept);
+    assert.equal(await readableByOtherAccounts(kept), false);
+  },
+);

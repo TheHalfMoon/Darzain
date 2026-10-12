@@ -133,7 +133,7 @@ test("project import, scene, timeline, title, audio, render and reopen preserve 
   // The service's copy of what the worker wrote; the worker's file is gone.
   assert.match(output, /render\.mp4$/);
   await assert.rejects(
-    access(output.replace(/render\.mp4$/, "render.partial.mp4")),
+    access(path.join(path.dirname(output), "worker", "render.partial.mp4")),
   );
   const out = await readFile(output);
   assert.ok(out.length > 1000);
@@ -298,6 +298,7 @@ test("cancellation during rendering leaves no partial output", async () => {
         "exports",
         jobId,
         "attempt-1",
+        "worker",
         "render.partial.mp4",
       ),
     ),
