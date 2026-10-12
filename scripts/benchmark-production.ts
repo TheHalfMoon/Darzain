@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir, cpus, totalmem } from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -166,3 +166,5 @@ await writeFile(
   JSON.stringify(receipt, null, 2),
 );
 console.log(receipt);
+store.close();
+await rm(root, { recursive: true, force: true });

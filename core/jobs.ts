@@ -507,9 +507,7 @@ export class JobSupervisor {
         output.published = null;
       }
       await this.#cleanup(row.project_id, jobId, attempt);
-      await rmdir(
-        await this.store.file(row.project_id, "exports", jobId),
-      ).catch(() => {});
+      await this.#removeEmptyJobFolder(row.project_id, jobId);
       const cancelled = this.store.read(
         (db) => this.#row(db, jobId)?.cancel_requested === 1,
       );
@@ -536,9 +534,7 @@ export class JobSupervisor {
       this.#progress.delete(jobId);
       await this.#cleanup(row.project_id, jobId, attempt);
       // Removed only when empty: an export's artifact keeps its folder.
-      await rmdir(
-        await this.store.file(row.project_id, "exports", jobId),
-      ).catch(() => {});
+      await this.#removeEmptyJobFolder(row.project_id, jobId);
       await this.#release(jobId);
     }
   }
@@ -919,6 +915,24 @@ export class JobSupervisor {
     if (this.#generation && generation !== this.#generation)
       this.#superseded = true;
     this.#current();
+  }
+  // Removes an emptied job folder unless a newer service run owns the
+  // queue: that run may be creating its own attempt folder inside it.
+  async #removeEmptyJobFolder(projectId: string, jobId: string) {
+    const owned = this.store.read(
+      (db) =>
+        (
+          db
+            .prepare("SELECT generation FROM supervisor WHERE id = 1")
+            .get() as {
+            generation: number;
+          }
+        ).generation === this.#generation,
+    );
+    if (owned)
+      await rmdir(await this.store.file(projectId, "exports", jobId)).catch(
+        () => {},
+      );
   }
   #current() {
     if (this.#superseded)
