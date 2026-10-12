@@ -93,7 +93,7 @@ test("loopback API rejects unauthenticated and cross-site access; restart preser
     // paths. Opening the page grants nothing: the session comes only from the
     // launch secret, exchanged by the Yamakan page itself.
     const page = await fetch(`${origin}/`);
-    assert.equal(page.status, 200);
+    // (200 with a built interface, 404 without; never a cookie either way)
     assert.equal(
       page.headers.get("set-cookie"),
       null,
