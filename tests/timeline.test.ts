@@ -424,3 +424,66 @@ test("audio gain and fades are rendered, not dropped", async () => {
   await queue.close();
   store.close();
 });
+
+test("splitting a clip inside a shot keeps the shot's order; removing it leaves the shot", async () => {
+  const { store, project, call } = await workspace();
+  const [picture] = project.tracks.map((t) => t.id);
+  const title = (clipId: string, startTicks: number) => ({
+    type: "clip.add" as const,
+    clipId,
+    trackId: picture,
+    assetId: null,
+    title: "Shot",
+    startTicks,
+    durationTicks: 30 * F,
+    sourceStartTicks: 0,
+  });
+  await call("yamakan.project.applyBatch", {
+    projectId: project.id,
+    expectedRevision: project.revision,
+    operations: [
+      { type: "scene.add", sceneId: ids.scene, name: "Opening" },
+      title(ids.title, 0),
+      title(ids.extra, 30 * F),
+      {
+        type: "shot.add",
+        sceneId: ids.scene,
+        shotId: ids.shot,
+        name: "Wide",
+        clipIds: [ids.title, ids.extra],
+      },
+      {
+        type: "clip.split",
+        clipId: ids.title,
+        atTicks: 10 * F,
+        newClipId: ids.title2,
+      },
+    ],
+  });
+  let p = await store.exportProject(project.id);
+  // The second half sits directly after the clip it came from, before the
+  // shot's later clip.
+  assert.deepEqual(p.scenes[0].shots[0].clipIds, [
+    ids.title,
+    ids.title2,
+    ids.extra,
+  ]);
+  const halves = [ids.title, ids.title2].map((id) =>
+    p.clips.find((c) => c.id === id)!,
+  );
+  assert.deepEqual(
+    halves.map((c) => [c.startTicks, c.durationTicks]),
+    [
+      [0, 10 * F],
+      [10 * F, 20 * F],
+    ],
+  );
+  await call("yamakan.project.applyBatch", {
+    projectId: project.id,
+    expectedRevision: p.revision,
+    operations: [{ type: "clip.remove", clipId: ids.title }],
+  });
+  p = await store.exportProject(project.id);
+  assert.deepEqual(p.scenes[0].shots[0].clipIds, [ids.title2, ids.extra]);
+  store.close();
+});
