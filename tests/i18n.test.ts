@@ -4,6 +4,8 @@ import {
   MESSAGES,
   direction,
   formatNumber,
+  formatPercent,
+  formatSeconds,
   placeholders,
   translate,
 } from "../src/i18n.ts";
@@ -32,7 +34,7 @@ test("Arabic messages are written in Arabic (apart from names and formats)", () 
 test("placeholders are filled, numbers use the language's digits, and Arabic is right to left", () => {
   assert.equal(
     translate("en", "status.opened", { name: "Film", revision: 12 }),
-    "Opened Film, revision 12.",
+    `Opened ${String.fromCharCode(0x2068)}Film${String.fromCharCode(0x2069)}, revision 12.`,
   );
   assert.equal(
     translate("ar", "projects.revision", { revision: 12 }),
@@ -44,4 +46,36 @@ test("placeholders are filled, numbers use the language's digits, and Arabic is 
   assert.equal(translate("en", "status.saved"), "Saved revision {revision}.");
   assert.equal(direction("ar"), "rtl");
   assert.equal(direction("en"), "ltr");
+});
+
+test("inserted names are isolated so they cannot reorder the sentence; unknown keys fall back", () => {
+  const FSI = String.fromCharCode(0x2068);
+  const PDI = String.fromCharCode(0x2069);
+  const opened = translate("ar", "status.opened", {
+    name: "Film (v2)!",
+    revision: 3,
+  });
+  assert.ok(opened.includes(`${FSI}Film (v2)!${PDI}`), opened);
+  assert.ok(
+    opened.includes("٣"),
+    "numbers are not isolated, and use Arabic digits",
+  );
+  // A name carrying a right-to-left override stays inside its isolate.
+  const spoof = translate("en", "import.done", {
+    name: `clip${String.fromCharCode(0x202e)}gnp.mp4`,
+  });
+  assert.ok(
+    spoof.startsWith(`Imported ${FSI}clip`) && spoof.includes(`mp4${PDI}.`),
+  );
+  // A state the service adds later does not crash the interface.
+  assert.equal(translate("ar", "job.PAUSED" as never), "job.PAUSED");
+});
+
+test("durations keep two decimals and percentages use the language's sign", () => {
+  assert.equal(formatSeconds("en", 1.5), "1.50");
+  assert.equal(formatSeconds("en", 1234.5), "1234.50", "no grouping");
+  assert.equal(formatSeconds("ar", 1.5), "١٫٥٠");
+  assert.equal(formatPercent("en", 0.5), "50%");
+  // ICU adds an Arabic letter mark after the sign for correct direction.
+  assert.ok(formatPercent("ar", 0.5).startsWith("٥٠٪"));
 });

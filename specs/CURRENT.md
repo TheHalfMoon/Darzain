@@ -24,7 +24,8 @@ Updated: 2026-10-12. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 
 - `src/i18n.ts`: English and Arabic interface messages with placeholders, a test that both languages define every message with the same placeholders, and Arabic-Indic digits for numbers in Arabic.
 - The page follows the language: `<html lang dir>` is `ar`/`rtl` for Arabic; the timeline keeps left-to-right time (`dir="ltr"`); layout CSS uses logical properties. The choice is remembered (local storage, optional) and defaults to the browser language. Title text is shaped by libass at render time, independent of the interface language.
-- Not localized yet: messages from the service (errors are English), strings inside the donor timeline component, the browser's own file picker, and messages already shown before switching language.
+- Names and other inserted text are wrapped in directional isolates (and user text uses `dir="auto"`), so a Latin name cannot reorder an Arabic sentence and bidi controls stay contained. Status messages re-translate when the language changes. Stored defaults (scene, track names) stay canonical English, as the core creates them; only what the interface shows is translated.
+- Not localized yet: messages from the service (errors are English), strings inside the donor timeline component, and the browser's own file picker.
 - Evidence: `docs/evidence/qualification/t8b-arabic-interface.png` (from the browser E2E); **native Arabic review of the interface strings is pending** (founder or delegate), as for the T7 typography frames.
 
 ## T8a surface (merged)

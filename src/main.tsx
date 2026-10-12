@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ProjectSchema } from "../core/project.ts";
 import { RESOURCE_POLICY } from "../core/command/policy.ts";
@@ -22,6 +22,8 @@ import {
   saveLang,
   translate,
   formatNumber,
+  formatPercent,
+  formatSeconds,
 } from "./i18n.ts";
 import type { Lang, MessageKey } from "./i18n.ts";
 import {
@@ -36,6 +38,14 @@ import "./style.css";
 // The UI is a same-origin client of the shared command registry; its session
 // cookie identifies the browser-ui principal.
 const client = new YamakanClient();
+// A status line: a message key (re-translated when the language changes)
+// or text from elsewhere (service errors), shown as given.
+type Status =
+  string | { key: MessageKey; vars?: Record<string, string | number> };
+const msg = (key: MessageKey, vars?: Record<string, string | number>) => ({
+  key,
+  vars,
+});
 const call = <O extends Operation>(
   operation: O,
   parameters: OperationInput<O>,
@@ -46,22 +56,20 @@ function App() {
   const [lang, setLang] = useState<Lang>(initialLang);
   const t = (key: MessageKey, vars?: Record<string, string | number>) =>
     translate(lang, key, vars);
-  useEffect(() => {
+  // Applied before paint, so an Arabic page never shows left to right
+  // first; the choice is stored only when the user makes it.
+  useLayoutEffect(() => {
     document.documentElement.lang = lang;
     document.documentElement.dir = direction(lang);
-    saveLang(lang);
   }, [lang]);
   const [history, setHistory] = useState<ReturnType<
       typeof createHistoryState<Project>
     > | null>(null),
     [projects, setProjects] = useState<any[]>([]),
-    [message, setMessage] = useState(() =>
-      translate(initialLang(), "status.initial"),
-    ),
+    [message, setMessage] = useState<Status>(msg("status.initial")),
     [busy, setBusy] = useState(false),
-    [name, setName] = useState(() =>
-      translate(initialLang(), "projects.defaultName"),
-    ),
+    // null until edited: the default name follows the interface language.
+    [name, setName] = useState<string | null>(null),
     [title, setTitle] = useState(""),
     [selected, setSelected] = useState<string | null>(null),
     [playhead, setPlayhead] = useState(0),
@@ -109,7 +117,7 @@ function App() {
   const accept = (project: Project) => {
     setHistory(createHistoryState(ProjectSchema.parse(project)));
     setMessage(
-      t("status.opened", { name: project.name, revision: project.revision }),
+      msg("status.opened", { name: project.name, revision: project.revision }),
     );
     setSelected(null);
     setPlayhead(0);
@@ -125,7 +133,7 @@ function App() {
     });
     accept(saved);
     await refresh();
-    setMessage(t("status.saved", { revision: saved.revision }));
+    setMessage(msg("status.saved", { revision: saved.revision }));
     return saved as Project;
   };
   const sequenceDuration = p
@@ -228,18 +236,27 @@ function App() {
           </button>
         </nav>
         <span className="badge">{t("badge.local")}</span>
+        {/* The visible text (the other language's name) is the accessible
+            name; it is marked with its own language. */}
         <button
           type="button"
           className="language"
-          aria-label={t("lang.label")}
-          lang={lang === "ar" ? "en" : "ar"}
-          onClick={() => setLang((l) => (l === "ar" ? "en" : "ar"))}
+          title={t("lang.label")}
+          onClick={() => {
+            const next = lang === "ar" ? "en" : "ar";
+            saveLang(next);
+            setLang(next);
+          }}
         >
-          {t("lang.switch")}
+          <span lang={lang === "ar" ? "en" : "ar"}>{t("lang.switch")}</span>
         </button>
       </header>
-      <div role="status" className="status">
-        {busy ? t("status.working") : message}
+      <div role="status" className="status" dir="auto">
+        {busy
+          ? t("status.working")
+          : typeof message === "string"
+            ? message
+            : t(message.key, message.vars)}
       </div>
       <div className="workspace">
         <aside>
@@ -247,7 +264,8 @@ function App() {
           <label>
             {t("projects.name")}
             <input
-              value={name}
+              dir="auto"
+              value={name ?? t("projects.defaultName")}
               onChange={(e) => setName(e.target.value)}
               maxLength={120}
             />
@@ -257,7 +275,11 @@ function App() {
             onClick={() =>
               run(async () => {
                 if (history?.past.length) await save();
-                accept(await call("yamakan.project.create", { name }));
+                accept(
+                  await call("yamakan.project.create", {
+                    name: name ?? t("projects.defaultName"),
+                  }),
+                );
                 await refresh();
               })
             }
@@ -280,7 +302,7 @@ function App() {
                     })
                   }
                 >
-                  {item.name}
+                  <bdi>{item.name}</bdi>
                   <small>
                     {item.error ||
                       t("projects.revision", { revision: item.revision })}
@@ -333,7 +355,7 @@ function App() {
                       throw new Error(v.error?.message || t("import.failed"));
                     if (v.job) {
                       // Variable-frame-rate video: wait for its constant-rate version.
-                      setMessage(t("import.converting", { name: file.name }));
+                      setMessage(msg("import.converting", { name: file.name }));
                       let job = v.job;
                       // Stop waiting (the job continues) after twice the
                       // conversion time limit, queueing included.
@@ -360,10 +382,10 @@ function App() {
                       accept(
                         await call("yamakan.project.open", { projectId: p.id }),
                       );
-                      setMessage(t("import.converted", { name: file.name }));
+                      setMessage(msg("import.converted", { name: file.name }));
                     } else {
                       accept(v.project);
-                      setMessage(t("import.done", { name: v.asset.name }));
+                      setMessage(msg("import.done", { name: v.asset.name }));
                     }
                     await refresh();
                   });
@@ -383,7 +405,7 @@ function App() {
                       />
                     )}
                     <span>
-                      {a.name}
+                      <bdi>{a.name}</bdi>
                       <small>
                         {t(`assets.kind.${a.kind}`)} ·{" "}
                         {t("assets.size", { kb: Math.round(a.bytes / 1024) })}
@@ -489,7 +511,7 @@ function App() {
             <>
               <div className="toolbar">
                 <div>
-                  <h1>{p.name}</h1>
+                  <h1 dir="auto">{p.name}</h1>
                   <small>
                     {t("projects.revision", { revision: p.revision })}
                     {history.past.length ? ` · ${t("toolbar.unsaved")}` : ""}
@@ -583,7 +605,7 @@ function App() {
                     />
                     <span>
                       {t("transport.seconds", {
-                        seconds: Math.round(playhead * 100) / 100,
+                        seconds: formatSeconds(lang, playhead),
                       })}
                     </span>
                   </div>
@@ -612,9 +634,7 @@ function App() {
                           ...p.scenes,
                           {
                             id: crypto.randomUUID(),
-                            name: t("scene.default", {
-                              n: p.scenes.length + 1,
-                            }),
+                            name: `Scene ${p.scenes.length + 1}`,
                             referenceAssetId:
                               p.assets.find((a) => a.kind === "image")?.id ||
                               null,
@@ -635,6 +655,7 @@ function App() {
                       <label>
                         {t("scene.name")}
                         <input
+                          dir="auto"
                           value={s.name}
                           maxLength={120}
                           onChange={(e) =>
@@ -739,6 +760,7 @@ function App() {
                   <label>
                     {t("title.text")}
                     <input
+                      dir="auto"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       maxLength={500}
@@ -750,7 +772,7 @@ function App() {
                       edit((p) => {
                         const track = {
                           id: crypto.randomUUID(),
-                          name: t("track.titles"),
+                          name: "Titles",
                           kind: "video" as const,
                           muted: false,
                           locked: false,
@@ -780,9 +802,7 @@ function App() {
                     <div className="job" role="status">
                       <strong>{t(`job.${job.state}`)}</strong>
                       <progress max="1" value={job.progress} />
-                      <small>
-                        {formatNumber(lang, Math.round(job.progress * 100))}%
-                      </small>
+                      <small>{formatPercent(lang, job.progress)}</small>
                       {["QUEUED", "RUNNING"].includes(job.state) && (
                         <button
                           onClick={() =>
@@ -806,7 +826,11 @@ function App() {
                           {t("job.download")}
                         </a>
                       )}
-                      {job.error && <p className="error">{job.error}</p>}
+                      {job.error && (
+                        <p className="error" dir="auto">
+                          {job.error}
+                        </p>
+                      )}
                     </div>
                   )}
                 </section>
@@ -842,10 +866,7 @@ function App() {
                         ...p.tracks,
                         {
                           id: crypto.randomUUID(),
-                          name:
-                            kind === "video"
-                              ? t("track.picture")
-                              : t("track.audio"),
+                          name: kind === "video" ? "Picture" : "Audio",
                           kind,
                           muted: false,
                           locked: false,
@@ -889,4 +910,7 @@ function App() {
     </div>
   );
 }
+// The page starts in the chosen language and direction before React draws.
+document.documentElement.lang = initialLang();
+document.documentElement.dir = direction(initialLang());
 createRoot(document.getElementById("root")!).render(<App />);

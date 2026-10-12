@@ -130,7 +130,7 @@ const ar: Record<MessageKey, string> = {
   "brand.tagline": "إنتاج إبداعي · مساحة عمل دون اتصال",
   "nav.production": "الإنتاج",
   "nav.tools": "أدوات الوكلاء",
-  "badge.local": "وسائط محلية · عرض بالمعالج",
+  "badge.local": "وسائط محلية · تصيير بالمعالج",
   "status.initial": "أنشئ مشروعًا أو افتح مشروعًا للبدء.",
   "status.working": "جارٍ العمل…",
   "status.opened": "فُتح {name}، المراجعة {revision}.",
@@ -177,7 +177,7 @@ const ar: Record<MessageKey, string> = {
   "history.close": "إغلاق السجل",
   "tools.title": "أدوات الوكلاء في يماكن",
   "tools.intro":
-    "تعتمد المحرِّر وواجهة REST المحلية على عمليات المشروع والعرض نفسها التي جرى التحقق منها.",
+    "يعتمد المحرِّر وواجهة REST المحلية على عمليات المشروع والتصيير نفسها التي جرى التحقق منها.",
   "tools.catalog": "فتح دليل الأدوات ذي الإصدارات",
   "tools.jobs":
     "تعرض المهام التقدم والإلغاء والأخطاء وملفات الفيديو المتحقَّق منها. لا تقبل الواجهة مسارات المشاريع ولا الأوامر العشوائية.",
@@ -233,8 +233,8 @@ const ar: Record<MessageKey, string> = {
   "reference.play": "تشغيل المرجع (ثانيتان)",
   "reference.segment": "مقطع مرجعي",
   "reference.alt": "الإطار المرجعي {frame} من المراجعة المحفوظة {revision}",
-  "reference.rendering": "جارٍ العرض…",
-  "reference.failed": "تعذّر عرض المعاينة المرجعية لهذه المراجعة.",
+  "reference.rendering": "جارٍ التصيير…",
+  "reference.failed": "تعذّر تصيير المعاينة المرجعية لهذه المراجعة.",
 };
 
 export const MESSAGES: Record<Lang, Record<MessageKey, string>> = { en, ar };
@@ -252,18 +252,46 @@ export function formatNumber(lang: Lang, value: number) {
   );
 }
 
+// First-strong isolate / pop directional isolate: an inserted name keeps
+// its own direction and cannot reorder the sentence around it (a Latin
+// "Film (v2)!" in Arabic, or a name carrying bidi controls).
+const FSI = "\u2068";
+const PDI = "\u2069";
+
 // A message with its placeholders filled. Numbers are written in the
-// language's digits; other values are inserted as given.
+// language's digits; text values are isolated. An unknown key (a value the
+// service added later) falls back to English, then to the key itself.
 export function translate(
   lang: Lang,
   key: MessageKey,
   vars: Record<string, string | number> = {},
 ) {
-  return MESSAGES[lang][key].replace(/\{(\w+)\}/g, (whole, name: string) => {
+  const message: string = MESSAGES[lang][key] ?? MESSAGES.en[key] ?? key;
+  return message.replace(/\{(\w+)\}/g, (whole, name: string) => {
     const value = vars[name];
     if (value === undefined) return whole;
-    return typeof value === "number" ? formatNumber(lang, value) : value;
+    return typeof value === "number"
+      ? formatNumber(lang, value)
+      : `${FSI}${value}${PDI}`;
   });
+}
+
+// A duration in seconds with two decimals, in the language's digits
+// (fixed width, so a running readout does not jitter).
+export function formatSeconds(lang: Lang, value: number) {
+  return new Intl.NumberFormat(lang === "ar" ? "ar-u-nu-arab" : "en", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: false,
+  }).format(value);
+}
+
+// A fraction (0–1) as a percentage in the language's digits and sign.
+export function formatPercent(lang: Lang, fraction: number) {
+  return new Intl.NumberFormat(lang === "ar" ? "ar-u-nu-arab" : "en", {
+    style: "percent",
+    maximumFractionDigits: 0,
+  }).format(fraction);
 }
 
 export const direction = (lang: Lang) => (lang === "ar" ? "rtl" : "ltr");
