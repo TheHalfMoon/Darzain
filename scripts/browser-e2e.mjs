@@ -443,6 +443,31 @@ try {
     .filter({ hasText: `revision ${restored.revision + 1}.` })
     .waitFor();
   assert.equal((await getProject()).revision, restored.revision + 1);
+  // Arabic interface: right-to-left page, Arabic labels, left-to-right
+  // timeline, remembered across a reload; then back to English.
+  await page.getByRole("button", { name: "Language", exact: true }).click();
+  await page.waitForFunction(
+    () =>
+      document.documentElement.dir === "rtl" &&
+      document.documentElement.lang === "ar",
+  );
+  await page.getByRole("button", { name: "حفظ", exact: true }).waitFor();
+  assert.equal(
+    await page.locator("section.timeline").getAttribute("dir"),
+    "ltr",
+  );
+  await page.screenshot({ path: join(output, "arabic-interface.png") });
+  await page.reload();
+  await page.waitForFunction(() => document.documentElement.dir === "rtl");
+  await page.getByRole("button", { name: "اللغة", exact: true }).click();
+  await page.waitForFunction(
+    () =>
+      document.documentElement.dir === "ltr" &&
+      document.documentElement.lang === "en",
+  );
+  await page
+    .getByRole("button", { name: "Create project", exact: true })
+    .waitFor();
   assert.deepEqual(errors, []);
   const receipt = {
     runtime:
@@ -462,6 +487,7 @@ try {
       "save",
       "preview",
       "reference preview frame (plan-compiled) with stale notice",
+      "Arabic interface (RTL page, LTR timeline, remembered across reload)",
       "export",
       "download",
       "reload",

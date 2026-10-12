@@ -129,7 +129,7 @@ nav {
 }
 aside {
   padding: 22px 16px;
-  border-right: 1px solid #253047;
+  border-inline-end: 1px solid #253047;
   overflow: auto;
 }
 h1 {
@@ -148,7 +148,7 @@ h2:first-child {
   margin-top: 0;
 }
 h2 span {
-  float: right;
+  float: inline-end;
   color: #7487a5;
 }
 small {
@@ -164,7 +164,7 @@ small {
 }
 .project-list button,
 .asset-list button {
-  text-align: left;
+  text-align: start;
   display: flex;
   gap: 8px;
   align-items: center;
@@ -271,7 +271,7 @@ main {
 .inspector {
   max-height: 440px;
   overflow-y: auto;
-  padding-right: 8px;
+  padding-inline-end: 8px;
 }
 .scene {
   border: 1px solid #2b3750;
@@ -424,7 +424,7 @@ footer {
     display: block;
   }
   aside {
-    border-right: 0;
+    border-inline-end: 0;
     border-bottom: 1px solid #283147;
     max-height: 250px;
   }
@@ -440,4 +440,8 @@ footer {
   .toolbar button {
     font-size: 12px;
   }
+}
+.language {
+  margin-inline-start: 8px;
+  font-family: inherit;
 }

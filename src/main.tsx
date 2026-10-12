@@ -17,6 +17,14 @@ import {
 import { editorView } from "./adapter";
 import { ReferencePreview } from "./reference.tsx";
 import {
+  direction,
+  initialLang,
+  saveLang,
+  translate,
+  formatNumber,
+} from "./i18n.ts";
+import type { Lang, MessageKey } from "./i18n.ts";
+import {
   deleteClip,
   splitClip,
   updateClips as applyClipUpdates,
@@ -33,13 +41,27 @@ const call = <O extends Operation>(
   parameters: OperationInput<O>,
 ) => client.call(operation, parameters);
 function App() {
+  // Interface language: Arabic lays the page out right to left; the
+  // timeline keeps left-to-right time.
+  const [lang, setLang] = useState<Lang>(initialLang);
+  const t = (key: MessageKey, vars?: Record<string, string | number>) =>
+    translate(lang, key, vars);
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.documentElement.dir = direction(lang);
+    saveLang(lang);
+  }, [lang]);
   const [history, setHistory] = useState<ReturnType<
       typeof createHistoryState<Project>
     > | null>(null),
     [projects, setProjects] = useState<any[]>([]),
-    [message, setMessage] = useState("Create or open a project to begin."),
+    [message, setMessage] = useState(() =>
+      translate(initialLang(), "status.initial"),
+    ),
     [busy, setBusy] = useState(false),
-    [name, setName] = useState("Untitled production"),
+    [name, setName] = useState(() =>
+      translate(initialLang(), "projects.defaultName"),
+    ),
     [title, setTitle] = useState(""),
     [selected, setSelected] = useState<string | null>(null),
     [playhead, setPlayhead] = useState(0),
@@ -67,7 +89,7 @@ function App() {
     try {
       await fn();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Operation failed.");
+      setMessage(e instanceof Error ? e.message : t("error.operation"));
     } finally {
       setBusy(false);
     }
@@ -79,14 +101,16 @@ function App() {
       try {
         return pushHistoryState(h, ProjectSchema.parse(fn(h.present)));
       } catch (e) {
-        setMessage(e instanceof Error ? e.message : "Invalid edit.");
+        setMessage(e instanceof Error ? e.message : t("error.edit"));
         return h;
       }
     });
   };
   const accept = (project: Project) => {
     setHistory(createHistoryState(ProjectSchema.parse(project)));
-    setMessage(`Opened ${project.name}, revision ${project.revision}.`);
+    setMessage(
+      t("status.opened", { name: project.name, revision: project.revision }),
+    );
     setSelected(null);
     setPlayhead(0);
     setPlaying(false);
@@ -101,7 +125,7 @@ function App() {
     });
     accept(saved);
     await refresh();
-    setMessage(`Saved revision ${saved.revision}.`);
+    setMessage(t("status.saved", { revision: saved.revision }));
     return saved as Project;
   };
   const sequenceDuration = p
@@ -146,23 +170,23 @@ function App() {
   const addAsset = (assetId: string, trackId?: string, time?: number) =>
     edit((p) => {
       const a = p.assets.find((a) => a.id === assetId);
-      if (!a) throw new Error("Asset missing.");
+      if (!a) throw new Error(t("error.assetMissing"));
       const kind = a.kind === "audio" ? "audio" : "video";
-      const t = trackId
-        ? p.tracks.find((t) => t.id === trackId)
+      const track = trackId
+        ? p.tracks.find((x) => x.id === trackId)
         : p.tracks.find(
-            (t) => t.id === activeTrack && t.kind === kind && !t.locked,
+            (x) => x.id === activeTrack && x.kind === kind && !x.locked,
           ) ||
-          p.tracks.find((t) => t.targeted && t.kind === kind && !t.locked) ||
-          p.tracks.find((t) => t.kind === kind && !t.locked);
-      if (!t || t.locked || t.kind !== kind)
-        throw new Error("Choose an unlocked compatible track.");
+          p.tracks.find((x) => x.targeted && x.kind === kind && !x.locked) ||
+          p.tracks.find((x) => x.kind === kind && !x.locked);
+      if (!track || track.locked || track.kind !== kind)
+        throw new Error(t("error.track"));
       const start =
         time === undefined
           ? Math.max(
               0,
               ...p.clips
-                .filter((c) => c.trackId === t.id)
+                .filter((c) => c.trackId === track.id)
                 .map((c) => c.startFrame + c.durationFrames),
             )
           : Math.round(time * 30);
@@ -172,7 +196,7 @@ function App() {
           ...p.clips,
           {
             id: crypto.randomUUID(),
-            trackId: t.id,
+            trackId: track.id,
             assetId: a.id,
             startFrame: start,
             durationFrames:
@@ -192,27 +216,36 @@ function App() {
           <span className="mark">D</span>
           <div>
             <strong>YAMAKAN</strong>
-            <small>Creative production · Offline workspace</small>
+            <small>{t("brand.tagline")}</small>
           </div>
         </div>
         <nav>
           <button onClick={() => setTools(false)} aria-pressed={!tools}>
-            Production
+            {t("nav.production")}
           </button>
           <button onClick={() => setTools(true)} aria-pressed={tools}>
-            Agent tools
+            {t("nav.tools")}
           </button>
         </nav>
-        <span className="badge">Local media · CPU rendering</span>
+        <span className="badge">{t("badge.local")}</span>
+        <button
+          type="button"
+          className="language"
+          aria-label={t("lang.label")}
+          lang={lang === "ar" ? "en" : "ar"}
+          onClick={() => setLang((l) => (l === "ar" ? "en" : "ar"))}
+        >
+          {t("lang.switch")}
+        </button>
       </header>
       <div role="status" className="status">
-        {busy ? "Working…" : message}
+        {busy ? t("status.working") : message}
       </div>
       <div className="workspace">
         <aside>
-          <h2>Projects</h2>
+          <h2>{t("projects.title")}</h2>
           <label>
-            Project name
+            {t("projects.name")}
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -229,7 +262,7 @@ function App() {
               })
             }
           >
-            Create project
+            {t("projects.create")}
           </button>
           <div className="project-list">
             {projects.map((item) => (
@@ -248,7 +281,10 @@ function App() {
                   }
                 >
                   {item.name}
-                  <small>{item.error || `Revision ${item.revision}`}</small>
+                  <small>
+                    {item.error ||
+                      t("projects.revision", { revision: item.revision })}
+                  </small>
                 </button>
                 <button
                   disabled={busy}
@@ -262,7 +298,7 @@ function App() {
                     })
                   }
                 >
-                  History & recovery
+                  {t("projects.history")}
                 </button>
               </div>
             ))}
@@ -270,12 +306,13 @@ function App() {
           {p && (
             <>
               <h2>
-                Assets <span>{p.assets.length}</span>
+                {t("assets.title")}{" "}
+                <span>{formatNumber(lang, p.assets.length)}</span>
               </h2>
               <input
                 ref={input}
                 type="file"
-                aria-label="Import local media"
+                aria-label={t("assets.import")}
                 accept=".png,.jpg,.jpeg,.webp,.mp4,.mov,.webm,.wav,.mp3,.ogg"
                 disabled={busy}
                 onChange={(e) => {
@@ -293,12 +330,10 @@ function App() {
                     });
                     const v = await r.json();
                     if (!r.ok)
-                      throw new Error(v.error?.message || "Import failed.");
+                      throw new Error(v.error?.message || t("import.failed"));
                     if (v.job) {
                       // Variable-frame-rate video: wait for its constant-rate version.
-                      setMessage(
-                        `Converting ${file.name} to a constant frame rate before editing…`,
-                      );
+                      setMessage(t("import.converting", { name: file.name }));
                       let job = v.job;
                       // Stop waiting (the job continues) after twice the
                       // conversion time limit, queueing included.
@@ -311,7 +346,7 @@ function App() {
                       ) {
                         if (Date.now() > deadline)
                           throw new Error(
-                            `${file.name} is still converting; it will appear in the asset list when it finishes.`,
+                            t("import.stillConverting", { name: file.name }),
                           );
                         await new Promise((resolve) =>
                           setTimeout(resolve, 500),
@@ -321,20 +356,14 @@ function App() {
                         });
                       }
                       if (job.state !== "COMPLETED")
-                        throw new Error(
-                          job.error || "Conversion did not complete.",
-                        );
+                        throw new Error(job.error || t("import.incomplete"));
                       accept(
                         await call("yamakan.project.open", { projectId: p.id }),
                       );
-                      setMessage(
-                        `Imported ${file.name} at a constant frame rate. Click it to add it to the timeline.`,
-                      );
+                      setMessage(t("import.converted", { name: file.name }));
                     } else {
                       accept(v.project);
-                      setMessage(
-                        `Imported ${v.asset.name}. Click it to add it to the timeline.`,
-                      );
+                      setMessage(t("import.done", { name: v.asset.name }));
                     }
                     await refresh();
                   });
@@ -356,7 +385,8 @@ function App() {
                     <span>
                       {a.name}
                       <small>
-                        {a.kind} · {Math.round(a.bytes / 1024)} KB
+                        {t(`assets.kind.${a.kind}`)} ·{" "}
+                        {t("assets.size", { kb: Math.round(a.bytes / 1024) })}
                       </small>
                     </span>
                   </button>
@@ -364,35 +394,30 @@ function App() {
               </div>
             </>
           )}
-          <p className="hint">
-            Media stays on this computer. Imported video sound is not mixed
-            automatically; add a separate audio asset. No inference backend is
-            enabled yet.
-          </p>
+          <p className="hint">{t("hint.media")}</p>
         </aside>
         <main>
           {revisionHistory && (
-            <section className="tools" aria-label="Project history">
-              <h2>Project history & recovery</h2>
+            <section className="tools" aria-label={t("history.label")}>
+              <h2>{t("history.title")}</h2>
               <p>
-                Project {revisionHistory.projectId} · Current revision{" "}
-                {revisionHistory.currentRevision ?? "unverified"}
+                {t("history.current", {
+                  id: revisionHistory.projectId,
+                  revision:
+                    revisionHistory.currentRevision ?? t("history.unverified"),
+                })}
               </p>
-              <p>
-                Restoring creates a new revision. Existing snapshots and the
-                previous head are preserved.
-              </p>
+              <p>{t("history.note")}</p>
               {revisionHistory.currentRevision === null && (
-                <p className="error">
-                  The current project cannot be verified. Choose a verified
-                  snapshot to recover it.
-                </p>
+                <p className="error">{t("history.unverifiable")}</p>
               )}
               {revisionHistory.snapshots.map((snapshot) => (
                 <div key={snapshot.revision} className="scene">
                   <span>
-                    Revision {snapshot.revision} ·{" "}
-                    {snapshot.name || snapshot.error}
+                    {t("history.item", {
+                      revision: snapshot.revision,
+                      name: snapshot.name || snapshot.error || "",
+                    })}
                   </span>
                   <button
                     disabled={
@@ -415,17 +440,13 @@ function App() {
                       })
                     }
                   >
-                    Restore revision {snapshot.revision}
+                    {t("history.restore", { revision: snapshot.revision })}
                   </button>
                 </div>
               ))}
               {history?.past.length ? (
                 <>
-                  <p>
-                    Save your edits or download an unsaved draft before
-                    restoring. Draft JSON retains edits; media stays in this
-                    workspace.
-                  </p>
+                  <p>{t("history.saveFirst")}</p>
                   <button
                     disabled={busy}
                     onClick={() => {
@@ -443,33 +464,26 @@ function App() {
                       setDownloadedDraft(draft);
                     }}
                   >
-                    Download unsaved draft
+                    {t("history.downloadDraft")}
                   </button>
                 </>
               ) : null}
               <button onClick={() => setRevisionHistory(null)}>
-                Close history
+                {t("history.close")}
               </button>
             </section>
           )}
           {tools ? (
             <section className="tools">
-              <h1>Yamakan agent tools</h1>
-              <p>
-                The same validated project and render operations power the
-                editor and local REST API.
-              </p>
+              <h1>{t("tools.title")}</h1>
+              <p>{t("tools.intro")}</p>
               <pre>npm run cli -- yamakan.project.list {"{}"}</pre>
               <p>
                 <a href="/api/v1/tools" target="_blank" rel="noreferrer">
-                  Open the versioned tool catalog
+                  {t("tools.catalog")}
                 </a>
               </p>
-              <p>
-                Jobs expose progress, cancellation, errors and verified video
-                artifacts. Project paths and arbitrary commands are not accepted
-                by the API.
-              </p>
+              <p>{t("tools.jobs")}</p>
             </section>
           ) : p && view ? (
             <>
@@ -477,8 +491,8 @@ function App() {
                 <div>
                   <h1>{p.name}</h1>
                   <small>
-                    Revision {p.revision}
-                    {history.past.length ? " · Unsaved changes" : ""}
+                    {t("projects.revision", { revision: p.revision })}
+                    {history.past.length ? ` · ${t("toolbar.unsaved")}` : ""}
                   </small>
                 </div>
                 <div className="actions">
@@ -486,13 +500,13 @@ function App() {
                     disabled={busy || !history.past.length}
                     onClick={() => setHistory((h) => h && undoHistoryState(h))}
                   >
-                    Undo
+                    {t("action.undo")}
                   </button>
                   <button
                     disabled={busy || !history.future.length}
                     onClick={() => setHistory((h) => h && redoHistoryState(h))}
                   >
-                    Redo
+                    {t("action.redo")}
                   </button>
                   <button
                     disabled={busy}
@@ -502,7 +516,7 @@ function App() {
                       })
                     }
                   >
-                    Save
+                    {t("action.save")}
                   </button>
                   <button
                     className="primary"
@@ -525,7 +539,7 @@ function App() {
                       })
                     }
                   >
-                    Export video
+                    {t("action.export")}
                   </button>
                 </div>
               </div>
@@ -548,10 +562,10 @@ function App() {
                       onClick={() => setPlaying((x) => !x)}
                       disabled={!p.clips.length}
                     >
-                      {playing ? "Pause" : "Play"}
+                      {playing ? t("transport.pause") : t("transport.play")}
                     </button>
                     <input
-                      aria-label="Playhead"
+                      aria-label={t("transport.playhead")}
                       type="range"
                       min="0"
                       step={1 / 30}
@@ -567,7 +581,11 @@ function App() {
                         setPlayhead(Number(e.target.value));
                       }}
                     />
-                    <span>{playhead.toFixed(2)} s</span>
+                    <span>
+                      {t("transport.seconds", {
+                        seconds: Math.round(playhead * 100) / 100,
+                      })}
+                    </span>
                   </div>
                   <ReferencePreview
                     projectId={p.id}
@@ -580,10 +598,11 @@ function App() {
                     unsaved={history.past.length > 0}
                     playing={playing}
                     onSave={() => run(async () => void (await save()))}
+                    t={t}
                   />
                 </section>
                 <section className="inspector">
-                  <h2>Scene & shot</h2>
+                  <h2>{t("scene.heading")}</h2>
                   <button
                     disabled={busy}
                     onClick={() =>
@@ -593,7 +612,9 @@ function App() {
                           ...p.scenes,
                           {
                             id: crypto.randomUUID(),
-                            name: `Scene ${p.scenes.length + 1}`,
+                            name: t("scene.default", {
+                              n: p.scenes.length + 1,
+                            }),
                             referenceAssetId:
                               p.assets.find((a) => a.kind === "image")?.id ||
                               null,
@@ -607,12 +628,12 @@ function App() {
                       }))
                     }
                   >
-                    Add scene
+                    {t("scene.add")}
                   </button>
                   {p.scenes.map((s) => (
                     <div className="scene" key={s.id}>
                       <label>
-                        Scene name
+                        {t("scene.name")}
                         <input
                           value={s.name}
                           maxLength={120}
@@ -629,7 +650,7 @@ function App() {
                         />
                       </label>
                       <label>
-                        Focal length (mm)
+                        {t("scene.focal")}
                         <input
                           type="number"
                           min="8"
@@ -654,7 +675,7 @@ function App() {
                         />
                       </label>
                       <label>
-                        Shot scale
+                        {t("scene.scale")}
                         <select
                           value={s.camera.shotScale}
                           onChange={(e) =>
@@ -674,13 +695,15 @@ function App() {
                             }))
                           }
                         >
-                          {["wide", "medium", "close"].map((v) => (
-                            <option key={v}>{v}</option>
+                          {(["wide", "medium", "close"] as const).map((v) => (
+                            <option key={v} value={v}>
+                              {t(`scene.scale.${v}`)}
+                            </option>
                           ))}
                         </select>
                       </label>
                       <label>
-                        Movement
+                        {t("scene.movement")}
                         <select
                           value={s.camera.movement}
                           onChange={(e) =>
@@ -700,20 +723,21 @@ function App() {
                             }))
                           }
                         >
-                          {["static", "dolly", "pan", "orbit"].map((v) => (
-                            <option key={v}>{v}</option>
-                          ))}
+                          {(["static", "dolly", "pan", "orbit"] as const).map(
+                            (v) => (
+                              <option key={v} value={v}>
+                                {t(`scene.movement.${v}`)}
+                              </option>
+                            ),
+                          )}
                         </select>
                       </label>
                     </div>
                   ))}
-                  <p className="hint">
-                    Camera settings record shot intent. They do not change
-                    imported footage.
-                  </p>
-                  <h2>Title</h2>
+                  <p className="hint">{t("hint.camera")}</p>
+                  <h2>{t("title.heading")}</h2>
                   <label>
-                    Title text
+                    {t("title.text")}
                     <input
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
@@ -726,7 +750,7 @@ function App() {
                       edit((p) => {
                         const track = {
                           id: crypto.randomUUID(),
-                          name: "Titles",
+                          name: t("track.titles"),
                           kind: "video" as const,
                           muted: false,
                           locked: false,
@@ -750,13 +774,15 @@ function App() {
                       })
                     }
                   >
-                    Add title
+                    {t("title.add")}
                   </button>
                   {job && (
                     <div className="job" role="status">
-                      <strong>Export {job.state.toLowerCase()}</strong>
+                      <strong>{t(`job.${job.state}`)}</strong>
                       <progress max="1" value={job.progress} />
-                      <small>{Math.round(job.progress * 100)}%</small>
+                      <small>
+                        {formatNumber(lang, Math.round(job.progress * 100))}%
+                      </small>
                       {["QUEUED", "RUNNING"].includes(job.state) && (
                         <button
                           onClick={() =>
@@ -769,7 +795,7 @@ function App() {
                             )
                           }
                         >
-                          Cancel export
+                          {t("job.cancel")}
                         </button>
                       )}
                       {job.state === "COMPLETED" && (
@@ -777,7 +803,7 @@ function App() {
                           className="download"
                           href={`/api/v1/jobs/${job.id}/artifact`}
                         >
-                          Download MP4
+                          {t("job.download")}
                         </a>
                       )}
                       {job.error && <p className="error">{job.error}</p>}
@@ -785,7 +811,8 @@ function App() {
                   )}
                 </section>
               </div>
-              <section className="timeline">
+              {/* Time runs left to right in every interface language. */}
+              <section className="timeline" dir="ltr">
                 <Timeline
                   tracks={view.tracks}
                   clips={view.clips}
@@ -815,7 +842,10 @@ function App() {
                         ...p.tracks,
                         {
                           id: crypto.randomUUID(),
-                          name: kind === "video" ? "Picture" : "Audio",
+                          name:
+                            kind === "video"
+                              ? t("track.picture")
+                              : t("track.audio"),
                           kind,
                           muted: false,
                           locked: false,
@@ -848,21 +878,14 @@ function App() {
           ) : (
             <section className="empty">
               <span className="large-mark">D</span>
-              <h1>Your next production starts here.</h1>
-              <p>
-                Create a local project, import media, plan a shot, edit the
-                timeline and export a playable video.
-              </p>
-              <p>
-                Projects remain editable after closing and reopening Yamakan.
-              </p>
+              <h1>{t("empty.title")}</h1>
+              <p>{t("empty.body")}</p>
+              <p>{t("empty.persist")}</p>
             </section>
           )}
         </main>
       </div>
-      <footer>
-        Yamakan engineering preview · Project schema v1 · Offline workflows
-      </footer>
+      <footer>{t("footer")}</footer>
     </div>
   );
 }
