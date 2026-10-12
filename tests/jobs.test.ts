@@ -541,7 +541,9 @@ test("a completed export names its render plan and keeps a probe receipt", async
     height: 180,
     durationFrames: 30,
     hasAudio: false,
+    libassApi: JSON.parse(receipt).libassApi,
   });
+  assert.ok(JSON.parse(receipt).libassApi >= 0x01700000, "titles drawn");
   await supervisor.close();
   store.close();
 });

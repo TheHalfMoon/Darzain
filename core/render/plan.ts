@@ -33,6 +33,8 @@ export type VideoLayer = {
   kind: "video" | "image";
   assetId: string;
   assetSha256: string;
+  assetBytes: number;
+  assetExtension: string;
   startTicks: number;
   durationTicks: number;
   sourceStartTicks: number;
@@ -43,6 +45,8 @@ export type AudioInstruction = {
   track: number;
   assetId: string;
   assetSha256: string;
+  assetBytes: number;
+  assetExtension: string;
   startTicks: number;
   durationTicks: number;
   sourceStartTicks: number;
@@ -81,6 +85,13 @@ export function compilePlan(
 ): CompiledPlan {
   if (!/^[a-f0-9]{64}$/.test(snapshotHash))
     throw new CommandError("VALIDATION", "Snapshot hash is invalid.");
+  // The qualified MVP profile renders at 30 frames per second; other rates
+  // need their own timing and verification qualification.
+  if (project.output.fps.num !== 30 || project.output.fps.den !== 1)
+    throw new CommandError(
+      "CAPABILITY_UNAVAILABLE",
+      "Rendering supports 30 frames per second.",
+    );
   const trackIndex = new Map(project.tracks.map((t, i) => [t.id, i]));
   // Mute removes a track; solo on any track of a kind keeps only soloed
   // tracks of that kind.
@@ -120,6 +131,8 @@ export function compilePlan(
       track,
       assetId: a.id,
       assetSha256: a.hash,
+      assetBytes: a.bytes,
+      assetExtension: a.extension,
       startTicks: c.startTicks,
       durationTicks: c.durationTicks,
       sourceStartTicks: c.sourceStartTicks,

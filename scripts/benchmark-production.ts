@@ -4,7 +4,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { randomUUID, createHash } from "node:crypto";
 import { ProjectStore } from "../core/store.ts";
-import { renderProject } from "../core/render.ts";
+import { renderRevision } from "../core/render.ts";
 import { probe } from "../core/media.ts";
 const root = await mkdtemp(path.join(tmpdir(), "darzain-benchmark-"));
 const store = new ProjectStore(path.join(root, "workspace"));
@@ -116,15 +116,15 @@ p.clips.push({
 const saved = await store.save(p, p.revision),
   jobId = randomUUID();
 const started = performance.now();
-const artifact = await renderProject(
+const { output } = await renderRevision(
   store,
-  saved,
-  jobId,
+  saved.id,
+  saved.revision,
+  ["exports", jobId, "attempt-1"],
   new AbortController().signal,
   () => {},
 );
 const elapsedMs = Math.round(performance.now() - started);
-const output = await store.file(p.id, ...artifact.split("/"));
 const metadata = await probe(output),
   bytes = await readFile(output);
 const second = new ProjectStore(store.root);

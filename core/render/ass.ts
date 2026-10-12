@@ -20,35 +20,45 @@ export type TitleCue = {
 };
 
 const WORD_JOINER = "\u2060";
-// CR, CRLF and the Unicode line and paragraph separators.
-const LINE_BREAKS = /\r\n?|[\u2028\u2029]/g;
+// CR, CRLF, NEL and the Unicode line and paragraph separators.
+const LINE_BREAKS = /\r\n?|[\u0085\u2028\u2029]/g;
+
+// The text a title displays: line breaks normalised to "\n" and other
+// control characters dropped. Glyph coverage is checked on this text.
+export function plainTitle(text: string): string {
+  return (
+    text
+      .replace(LINE_BREAKS, "\n")
+      // Control characters are dropped on purpose.
+      // oxlint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u0084\u0086-\u009f]/g, "")
+  );
+}
 
 // Escapes plain text for an ASS Dialogue Text field:
 // - control characters other than line breaks are dropped;
 // - every backslash is followed by a word joiner, so no "\N", "\h", "\n"
 //   or "\{" escape can be formed from project text;
 // - braces are escaped ("\{", "\}") and display literally;
-// - line breaks (CR, LF, CRLF, U+2028, U+2029) become "\N".
+// - line breaks (CR, LF, CRLF, NEL, U+2028, U+2029) become "\N".
 export function escapeAssText(text: string): string {
-  return (
-    text
-      .replace(LINE_BREAKS, "\n")
-      // Control characters are dropped on purpose.
-      // oxlint-disable-next-line no-control-regex
-      .replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, "")
-      .replace(/\\/g, `\\${WORD_JOINER}`)
-      .replace(/[{}]/g, (brace) => `\\${brace}`)
-      .replace(/\n/g, "\\N")
-  );
+  return plainTitle(text)
+    .replace(/\\/g, `\\${WORD_JOINER}`)
+    .replace(/[{}]/g, (brace) => `\\${brace}`)
+    .replace(/\n/g, "\\N");
 }
 
-// ASS time (h:mm:ss.cc) from flick ticks, rounded down to the centisecond.
-// A cue that starts at frame k is visible on frame k and not on frame k-1
-// for any frame rate whose frame lasts longer than a centisecond.
+// ASS time (h:mm:ss.cc) for the instant `ticks`. FFmpeg's ass filter hands
+// libass each frame's time truncated to whole milliseconds, and the float
+// conversion can land a frame 1 ms early (3.7 s arrives as 3699 ms). So the
+// time is placed 1 ms before the instant and rounded down to the
+// centisecond: a frame at the instant is inside the cue, and the frame
+// before it (more than 11 ms earlier below 90 fps) is not.
 export function assTime(ticks: number): string {
   if (!Number.isSafeInteger(ticks) || ticks < 0)
     throw new CommandError("VALIDATION", "Title time is out of range.");
-  const cs = (BigInt(ticks) * 100n) / BigInt(FLICKS_PER_SECOND);
+  const ms = (BigInt(ticks) * 1000n) / BigInt(FLICKS_PER_SECOND);
+  const cs = ms === 0n ? 0n : (ms - 1n) / 10n;
   const h = cs / 360000n;
   const m = (cs / 6000n) % 60n;
   const s = (cs / 100n) % 60n;
@@ -105,7 +115,7 @@ export function compileTitles(
   for (const cue of cues) {
     if (cue.endTicks <= cue.startTicks)
       throw new CommandError("VALIDATION", "Title duration must be positive.");
-    const missing = missingGlyphs(regular.bytes, cue.text);
+    const missing = missingGlyphs(regular.bytes, plainTitle(cue.text));
     if (missing.length)
       throw new CommandError(
         "VALIDATION",

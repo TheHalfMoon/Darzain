@@ -35,7 +35,15 @@ let loaded: Promise<PinnedFont[]> | null = null;
 export function titleFonts(): Promise<PinnedFont[]> {
   loaded ??= Promise.all(
     TITLE_FONT.files.map(async (f) => {
-      const bytes = await readFile(path.join(ROOT, f.file));
+      // A read failure names a host path: it is reported as the fixed
+      // capability message, with the original kept as the cause.
+      const bytes = await readFile(path.join(ROOT, f.file)).catch((cause) => {
+        throw new CommandError(
+          "CAPABILITY_UNAVAILABLE",
+          "A pinned title font could not be read.",
+          { cause },
+        );
+      });
       const sha256 = createHash("sha256").update(bytes).digest("hex");
       if (sha256 !== f.sha256)
         throw new CommandError(
@@ -56,7 +64,7 @@ export function titleFonts(): Promise<PinnedFont[]> {
 // compiler inserts after backslashes.
 const FORMAT = new Set([
   0x0a, 0x200c, 0x200d, 0x200e, 0x200f, 0x061c, 0x2060, 0x2066, 0x2067, 0x2068,
-  0x2069, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0xfeff,
+  0x2069, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0xfeff, 0x200b,
 ]);
 
 // Characters of `text` that `font` has no glyph for (in order, unique).
@@ -71,46 +79,31 @@ export function missingGlyphs(font: Buffer, text: string): string[] {
   return missing;
 }
 
-type Metrics = {
-  glyph: (code: number) => number;
-  advance: (glyph: number) => number;
-  unitsPerEm: number;
-};
-const metricsCache = new WeakMap<Buffer, Metrics>();
+const glyphCache = new WeakMap<Buffer, (code: number) => number>();
 
 const unreadable = (): never => {
   throw new CommandError(
     "CAPABILITY_UNAVAILABLE",
-    "A pinned title font has an unreadable table.",
+    "A pinned title font has an unreadable character map.",
   );
 };
 
-// Offsets of the font's tables by tag.
-function tables(font: Buffer) {
+// Parses the font's Unicode cmap (format 12 preferred, else format 4) as
+// code point → glyph id, 0 when the font has no glyph. Every read is
+// bounds-checked; a malformed table is refused.
+export function glyphMap(font: Buffer): (code: number) => number {
+  const cached = glyphCache.get(font);
+  if (cached) return cached;
   if (font.length < 12) unreadable();
   const count = font.readUInt16BE(4);
-  const found = new Map<string, number>();
+  let cmap = -1;
   for (let i = 0; i < count; i++) {
     const at = 12 + i * 16;
     if (at + 16 > font.length) unreadable();
-    found.set(font.toString("latin1", at, at + 4), font.readUInt32BE(at + 8));
+    if (font.toString("latin1", at, at + 4) === "cmap")
+      cmap = font.readUInt32BE(at + 8);
   }
-  return found;
-}
-
-// Parses what title fitting needs: the Unicode cmap (format 12 preferred,
-// else format 4) as code point → glyph id (0 when missing), and horizontal
-// advances from hmtx in font units.
-export function metrics(font: Buffer): Metrics {
-  const cached = metricsCache.get(font);
-  if (cached) return cached;
-  const t = tables(font);
-  const cmap = t.get("cmap") ?? unreadable();
-  const head = t.get("head") ?? unreadable();
-  const hhea = t.get("hhea") ?? unreadable();
-  const hmtx = t.get("hmtx") ?? unreadable();
-  if (cmap + 4 > font.length || head + 20 > font.length) unreadable();
-  if (hhea + 36 > font.length) unreadable();
+  if (cmap < 0 || cmap + 4 > font.length) unreadable();
   const subtables = font.readUInt16BE(cmap + 2);
   let format4 = -1;
   let format12 = -1;
@@ -130,11 +123,12 @@ export function metrics(font: Buffer): Metrics {
   }
   let glyph: (code: number) => number;
   if (format12 >= 0) {
+    if (format12 + 16 > font.length) unreadable();
     const groups = font.readUInt32BE(format12 + 12);
+    if (format12 + 16 + groups * 12 > font.length) unreadable();
     const ranges: [number, number, number][] = [];
     for (let g = 0; g < groups; g++) {
       const at = format12 + 16 + g * 12;
-      if (at + 12 > font.length) unreadable();
       ranges.push([
         font.readUInt32BE(at),
         font.readUInt32BE(at + 4),
@@ -146,6 +140,7 @@ export function metrics(font: Buffer): Metrics {
       return range ? range[2] + (code - range[0]) : 0;
     };
   } else if (format4 >= 0) {
+    if (format4 + 14 > font.length) unreadable();
     const segX2 = font.readUInt16BE(format4 + 6);
     const ends = format4 + 14;
     const starts = ends + segX2 + 2;
@@ -169,19 +164,12 @@ export function metrics(font: Buffer): Metrics {
       return 0;
     };
   } else return unreadable();
-  const unitsPerEm = font.readUInt16BE(head + 18);
-  const longMetrics = font.readUInt16BE(hhea + 34);
-  if (!unitsPerEm || !longMetrics || hmtx + longMetrics * 4 > font.length)
-    unreadable();
-  const advance = (id: number) =>
-    font.readUInt16BE(hmtx + Math.min(id, longMetrics - 1) * 4);
-  const parsed = { glyph, advance, unitsPerEm };
-  metricsCache.set(font, parsed);
-  return parsed;
+  glyphCache.set(font, glyph);
+  return glyph;
 }
 
 // Whether the font has a glyph for a code point.
 export function coverage(font: Buffer): (code: number) => boolean {
-  const { glyph } = metrics(font);
+  const glyph = glyphMap(font);
   return (code) => glyph(code) !== 0;
 }

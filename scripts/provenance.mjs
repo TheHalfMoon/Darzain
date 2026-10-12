@@ -39,6 +39,19 @@ for (const family of fonts) {
     fontFiles++;
   }
 }
+// The hashes the renderer verifies at load (core/render/fonts.ts) are the
+// ledger's hashes.
+const pinned = new Set(
+  readFileSync("core/render/fonts.ts", "utf8").match(/[a-f0-9]{64}/g) ?? [],
+);
+const ledgered = new Set(fonts.flatMap((f) => f.files.map((x) => x.sha256)));
+if (
+  pinned.size !== ledgered.size ||
+  [...pinned].some((hash) => !ledgered.has(hash))
+)
+  throw new Error(
+    "Font hashes in core/render/fonts.ts differ from the ledger.",
+  );
 const skip = new Set([
   ".git",
   "node_modules",

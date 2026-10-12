@@ -1573,6 +1573,18 @@ export class ProjectStore {
     const p = await this.load(id);
     const a = p.assets.find((a) => a.id === Id.parse(assetId));
     if (!a) throw new Error("Asset not found.");
+    return { file: await this.readyObjectFile(id, a), asset: a };
+  }
+  // The file of a published object, by its hash: the object row is ready and
+  // the file has the recorded size (bytes are re-hashed on import, restore
+  // and scrub, not on every read). Renders resolve their plan's assets this
+  // way, so a frozen revision renders even after the asset left the head.
+  async readyObjectFile(
+    id: string,
+    a: { hash: string; bytes: number; extension: string },
+  ) {
+    if (!/^[a-f0-9]{64}$/.test(a.hash))
+      throw new CommandError("VALIDATION", "Asset hash is invalid.");
     const object = this.#database
       .prepare(
         "SELECT state FROM asset_objects WHERE project_id = ? AND digest = ?",
@@ -1585,7 +1597,7 @@ export class ProjectStore {
       const file = await this.file(id, ...parts);
       const info = await lstat(file).catch(() => null);
       if (object?.state === "ready" && info?.isFile() && info.size === a.bytes)
-        return { file, asset: a };
+        return file;
     }
     throw new CommandError(
       "RECOVERY_REQUIRED",

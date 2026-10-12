@@ -499,12 +499,17 @@ export class JobSupervisor {
           "Job payload is invalid and was quarantined.",
         );
     } catch (e) {
-      // An output that was not registered as the job's artifact is removed
-      // before the terminal state becomes visible.
+      // An output that was not registered as the job's artifact, the
+      // attempt's staging and an emptied job folder are removed before the
+      // terminal state becomes visible.
       if (output.published) {
         await unlink(output.published).catch(() => {});
         output.published = null;
       }
+      await this.#cleanup(row.project_id, jobId, attempt);
+      await rmdir(
+        await this.store.file(row.project_id, "exports", jobId),
+      ).catch(() => {});
       const cancelled = this.store.read(
         (db) => this.#row(db, jobId)?.cancel_requested === 1,
       );

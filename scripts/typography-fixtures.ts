@@ -36,6 +36,24 @@ export const TYPOGRAPHY_FIXTURES = [
     name: "long-word",
     text: "كلمةطويلةجدابدونمسافاتتختبرالقصعندحافةالإطارولاينبغيأنتختفي",
   },
+  {
+    // A line that opens with digits and punctuation, in an Arabic paragraph.
+    name: "leading-digits",
+    text: "١٢: «البداية» — 3.5 ثانية",
+  },
+  {
+    // Characters that are ASS syntax, shown literally.
+    name: "literal-syntax",
+    text: "النص {\\b1} و \\N و \\h و {} يظهر كما هو",
+  },
+  {
+    name: "tatweel-and-signs",
+    text: "مـــرحبـــا — ٥٠٪ — ٣٫١٤ — ٢٬٥٠٠",
+  },
+  {
+    name: "latin-only",
+    text: "Final cut: Scene 4, take 12 (approved).",
+  },
 ] as const;
 
 // Clipping: libass cannot wrap a run without spaces, so one wider than the

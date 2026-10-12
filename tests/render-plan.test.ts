@@ -102,7 +102,7 @@ test("a plan is deterministic, versioned and free of host paths", async () => {
     a.plan.fonts.map((f) => f.sha256),
     fonts.map((f) => f.sha256),
   );
-  assert.ok(a.ass?.includes("Dialogue: 0,0:00:02.00,0:00:03.00,Default"));
+  assert.ok(a.ass?.includes("Dialogue: 0,0:00:01.99,0:00:02.99,Default"));
   // No absolute paths, drive letters or URLs anywhere in the plan.
   assert.doesNotMatch(JSON.stringify(a.plan), /[a-z]:\\|\/\/|\\\\/i);
 });

@@ -55,8 +55,9 @@ export const httpStatus: Record<ErrorCode, number> = {
 export class CommandError extends Error {
   readonly code: ErrorCode;
   readonly retryable: boolean;
-  constructor(code: ErrorCode, message: string) {
-    super(message);
+  // `options.cause` keeps a server-side cause behind a fixed public message.
+  constructor(code: ErrorCode, message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = "CommandError";
     this.code = code;
     this.retryable = retryable[code];

@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { CommandError } from "../command/errors.ts";
 import { mediaTools, workers } from "../process/workers.ts";
+import { RESOURCE_POLICY } from "../command/policy.ts";
 
 const MIN_LIBASS_API = 0x01700000;
 
@@ -34,9 +35,19 @@ export function titleCapability(): Promise<TitleCapability> {
   return probed;
 }
 
+const unavailable = (cause?: unknown) =>
+  new CommandError(
+    "CAPABILITY_UNAVAILABLE",
+    "Titles need FFmpeg with libass 0.17 or newer (automatic text direction and complex shaping).",
+    { cause },
+  );
+
+// Any failure, including a temp-folder error that would name a host path,
+// is reported as the one fixed capability message (cause kept server-side).
 async function probeTitles(): Promise<TitleCapability> {
-  const dir = await mkdtemp(path.join(tmpdir(), "yamakan-ass-probe-"));
+  let dir: string | null = null;
   try {
+    dir = await mkdtemp(path.join(tmpdir(), "yamakan-ass-probe-"));
     await writeFile(
       path.join(dir, "probe.ass"),
       "[Script Info]\nScriptType: v4.00+\nPlayResX: 16\nPlayResY: 16\n\n[Events]\nFormat: Layer, Start, End, Style, Text\n",
@@ -62,19 +73,22 @@ async function probeTitles(): Promise<TitleCapability> {
         "-",
       ],
       cwd: dir,
+      memoryBytes: RESOURCE_POLICY.enforced.workerMemoryBytes,
+      // A hung probe must not hold every title export.
+      signal: AbortSignal.timeout(
+        RESOURCE_POLICY.enforced.probeWallSeconds * 1000,
+      ),
       stderrLimit: 64_000,
       onStderr: (chunk: Buffer) => {
         if (log.length < 64_000) log += chunk.toString("utf8");
       },
     });
     const api = libassApi(log || result.stderr);
-    if (result.code !== 0 || !titlesSupported(api))
-      throw new CommandError(
-        "CAPABILITY_UNAVAILABLE",
-        "Titles need FFmpeg with libass 0.17 or newer (automatic text direction and complex shaping).",
-      );
+    if (result.code !== 0 || !titlesSupported(api)) throw unavailable();
     return { libassApi: api };
+  } catch (e) {
+    throw e instanceof CommandError ? e : unavailable(e);
   } finally {
-    await rm(dir, { recursive: true, force: true }).catch(() => {});
+    if (dir) await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 }
