@@ -61,7 +61,7 @@ try {
   const renders = [];
   for (const [label, width, height] of [
     ["landscape", 1280, 720],
-    ["portrait", 720, 1280],
+    ["portrait", 608, 1080],
   ] as const) {
     const saved = await titled(
       width,
