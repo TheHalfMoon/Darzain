@@ -27,6 +27,23 @@ const en = {
   "projects.create": "Create project",
   "projects.revision": "Revision {revision}",
   "projects.history": "History & recovery",
+  "backups.title": "Backups",
+  "backups.note":
+    "A backup copies the database and verified media to a folder beside this workspace while you keep working. Restoring creates a new workspace folder; this one is not changed.",
+  "backups.create": "Back up now",
+  "backups.show": "Show backups",
+  "backups.none": "No backups yet.",
+  "backups.summary": "{date} · projects: {projects} · {size} MB",
+  "backups.damaged": "Damaged media not copied: {count}",
+  "backups.incomplete": "{id} · incomplete, cannot be restored",
+  "backups.restore": "Restore to a new folder",
+  "backups.made": "Backup created.",
+  "backups.madeDamaged":
+    "Backup created, but {count} damaged media files could not be copied.",
+  "backups.restored":
+    "Restored into a new workspace folder: {folder}. Start Yamakan with that folder as its workspace to open it.",
+  "backups.restoredQuarantined":
+    "Restored into a new workspace folder: {folder}. Media files that could not be verified were quarantined: {count}. Start Yamakan with that folder as its workspace to open it.",
   "assets.title": "Assets",
   "assets.import": "Import local media",
   "assets.kind.image": "image",
@@ -145,6 +162,23 @@ const ar: Record<MessageKey, string> = {
   "projects.create": "إنشاء مشروع",
   "projects.revision": "المراجعة {revision}",
   "projects.history": "السجل والاستعادة",
+  "backups.title": "النسخ الاحتياطية",
+  "backups.note":
+    "تنسخ النسخة الاحتياطية قاعدة البيانات والوسائط المتحقَّق منها إلى مجلد بجوار مساحة العمل هذه وأنت تواصل العمل. تُنشئ الاستعادة مجلد مساحة عمل جديدًا ولا تغيّر هذا المجلد.",
+  "backups.create": "إنشاء نسخة احتياطية الآن",
+  "backups.show": "عرض النسخ الاحتياطية",
+  "backups.none": "لا توجد نسخ احتياطية بعد.",
+  "backups.summary": "{date} · عدد المشاريع: {projects} · {size} ميغابايت",
+  "backups.damaged": "وسائط تالفة لم تُنسخ: {count}",
+  "backups.incomplete": "{id} · غير مكتملة، لا يمكن استعادتها",
+  "backups.restore": "استعادة إلى مجلد جديد",
+  "backups.made": "أُنشئت النسخة الاحتياطية.",
+  "backups.madeDamaged":
+    "أُنشئت النسخة الاحتياطية، لكن تعذّر نسخ ملفات وسائط تالفة عددها {count}.",
+  "backups.restored":
+    "استُعيدت في مجلد مساحة عمل جديد: {folder}. شغّل يماكن مع هذا المجلد مساحةً للعمل لفتحه.",
+  "backups.restoredQuarantined":
+    "استُعيدت في مجلد مساحة عمل جديد: {folder}. عُزلت ملفات وسائط تعذّر التحقق منها، وعددها {count}. شغّل يماكن مع هذا المجلد مساحةً للعمل لفتحه.",
   "assets.title": "الوسائط",
   "assets.import": "استيراد وسائط محلية",
   "assets.kind.image": "صورة",
@@ -289,6 +323,14 @@ export function formatSeconds(lang: Lang, value: number) {
     maximumFractionDigits: 2,
     useGrouping: false,
   }).format(value);
+}
+
+// A moment as a date and time in the language's calendar digits.
+export function formatDate(lang: Lang, iso: string) {
+  return new Intl.DateTimeFormat(lang === "ar" ? "ar-u-nu-arab" : "en", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(iso));
 }
 
 // A fraction (0–1) as a percentage in the language's digits and sign.
