@@ -7,7 +7,7 @@ import {
   unlink,
   statfs,
 } from "node:fs/promises";
-import { createReadStream } from "node:fs";
+import { createReadStream, statfsSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { canonicalJson, sha256Hex } from "./donors/ninerr/canonical.ts";
@@ -130,14 +130,16 @@ CREATE TABLE supervisor(
 INSERT INTO supervisor(id, generation) VALUES (1, 0);
 `;
 // Revision-bound undo/redo (T6): each applied batch records the revision it
-// produced and the revision it started from; the cursor binds undo/redo to
-// the exact head they were computed for.
+// produced, the revision it started from and the principal that wrote it;
+// the cursor binds undo/redo to the exact head they were computed for, and
+// only the writer of a step may undo or redo it.
 const SCHEMA_V4 = `
 CREATE TABLE edit_history(
   project_id TEXT NOT NULL,
   seq INTEGER NOT NULL CHECK(seq > 0),
   revision INTEGER NOT NULL,
   before_revision INTEGER NOT NULL,
+  author TEXT NOT NULL CHECK(length(author) BETWEEN 1 AND 64),
   PRIMARY KEY(project_id, seq)
 ) STRICT;
 CREATE TABLE edit_cursor(
@@ -532,6 +534,18 @@ export class ProjectStore {
   }
 
   #commit(c: Commit): Project {
+    // Every revision writes a snapshot of up to snapshotBytes; the import
+    // reserve stays free, so a stream of small edits cannot fill the disk.
+    const space = statfsSync(this.root);
+    if (
+      Number(space.bavail) * Number(space.bsize) <
+      RESOURCE_POLICY.enforced.diskReserveBytes +
+        RESOURCE_POLICY.enforced.snapshotBytes
+    )
+      throw new CommandError(
+        "LIMIT_EXCEEDED",
+        "Insufficient free disk space to commit a revision.",
+      );
     const db = this.#database;
     const scope =
       c.operation === "project.create" ? WORKSPACE_SCOPE : c.projectId;
@@ -1045,6 +1059,7 @@ export class ProjectStore {
     projectId: string,
     expectedRevision: number,
     operations: Operation[],
+    author: string,
     receipt?: RequestReceipt,
   ) {
     Id.parse(projectId);
@@ -1065,8 +1080,8 @@ export class ProjectStore {
           "DELETE FROM edit_history WHERE project_id = ? AND seq > ?",
         ).run(projectId, cursor);
         db.prepare(
-          "INSERT INTO edit_history(project_id, seq, revision, before_revision) VALUES (?, ?, ?, ?)",
-        ).run(projectId, cursor + 1, revision, expectedRevision);
+          "INSERT INTO edit_history(project_id, seq, revision, before_revision, author) VALUES (?, ?, ?, ?, ?)",
+        ).run(projectId, cursor + 1, revision, expectedRevision, author);
         this.#setCursor(db, projectId, cursor + 1, revision);
       },
     });
@@ -1076,16 +1091,18 @@ export class ProjectStore {
   async undo(
     projectId: string,
     expectedRevision: number,
+    author: string,
     receipt?: RequestReceipt,
   ) {
-    return this.#travel(projectId, expectedRevision, "undo", receipt);
+    return this.#travel(projectId, expectedRevision, "undo", author, receipt);
   }
   async redo(
     projectId: string,
     expectedRevision: number,
+    author: string,
     receipt?: RequestReceipt,
   ) {
-    return this.#travel(projectId, expectedRevision, "redo", receipt);
+    return this.#travel(projectId, expectedRevision, "redo", author, receipt);
   }
   #cursor(db: DatabaseSync, projectId: string) {
     return db
@@ -1108,6 +1125,7 @@ export class ProjectStore {
     projectId: string,
     expectedRevision: number,
     direction: "undo" | "redo",
+    author: string,
     receipt?: RequestReceipt,
   ) {
     Id.parse(projectId);
@@ -1128,14 +1146,21 @@ export class ProjectStore {
           );
         const step = db
           .prepare(
-            "SELECT revision, before_revision FROM edit_history WHERE project_id = ? AND seq = ?",
+            "SELECT revision, before_revision, author FROM edit_history WHERE project_id = ? AND seq = ?",
           )
           .get(projectId, direction === "undo" ? at.cursor : at.cursor + 1) as
-          { revision: number; before_revision: number } | undefined;
+          | { revision: number; before_revision: number; author: string }
+          | undefined;
         if (!step)
           throw new CommandError(
             "REVISION_CONFLICT",
             `Nothing to ${direction} at this revision.`,
+          );
+        // Undo never rewinds another writer's acknowledged work.
+        if (step.author !== author)
+          throw new CommandError(
+            "REVISION_CONFLICT",
+            `The edit to ${direction} was made by another client.`,
           );
         target = direction === "undo" ? step.before_revision : step.revision;
         cursor = direction === "undo" ? at.cursor - 1 : at.cursor + 1;

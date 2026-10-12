@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ProjectSchema } from "../core/project.ts";
 import { RESOURCE_POLICY } from "../core/command/policy.ts";
-import type { Project, Clip } from "../core/project.ts";
+import type { Project } from "../core/project.ts";
 import type { RenderJob } from "../core/render.ts";
 import type { ProjectHistory } from "../core/store.ts";
 import Timeline from "./donors/film-editor/components/Timeline";
@@ -15,6 +15,11 @@ import {
   redoHistoryState,
 } from "./donors/film-editor/utils/historyState";
 import { editorView } from "./adapter";
+import {
+  deleteClip,
+  splitClip,
+  updateClips as applyClipUpdates,
+} from "./edit-ops.ts";
 import { YamakanClient } from "../sdk/client.ts";
 import type { Operation, OperationInput } from "../sdk/client.ts";
 import "./donors/film-editor/editor.css";
@@ -178,37 +183,7 @@ function App() {
       };
     });
   const updateClips = (updates: TimelineClip[]) =>
-    edit((p) => ({
-      ...p,
-      clips: updates.reduce((clips, c) => {
-        const existing = clips.find((x) => x.id === c.id);
-        const old =
-          existing ||
-          clips.find(
-            (x) => x.assetId === c.mediaId || `title-${x.id}` === c.mediaId,
-          );
-        if (!old) return clips;
-        if (
-          (existing && p.tracks.find((t) => t.id === old.trackId)?.locked) ||
-          p.tracks.find((t) => t.id === c.trackId)?.locked
-        )
-          return clips;
-        const converted: Clip = {
-          ...old,
-          id: c.id,
-          trackId: c.trackId,
-          startFrame: Math.max(0, Math.round(c.start * 30)),
-          durationFrames: Math.max(1, Math.round((c.end - c.start) * 30)),
-          sourceFrame:
-            old !== undefined && old.title !== null
-              ? 0
-              : Math.max(0, Math.round((c.sourceIn || 0) * 30)),
-        };
-        return clips.some((x) => x.id === c.id)
-          ? clips.map((x) => (x.id === c.id ? converted : x))
-          : [...clips, converted];
-      }, p.clips),
-    }));
+    edit((p) => applyClipUpdates(p, updates));
   return (
     <div className="app">
       <header>
@@ -818,38 +793,7 @@ function App() {
                   }}
                   onSnappingToggle={() => setSnapping((x) => !x)}
                   onSplitClip={(id, time) =>
-                    edit((p) => {
-                      const c = p.clips.find((c) => c.id === id);
-                      if (
-                        !c ||
-                        p.tracks.find((t) => t.id === c.trackId)?.locked
-                      )
-                        return p;
-                      const offset = Math.round(time * 30) - c.startFrame;
-                      if (offset < 1 || offset >= c.durationFrames) return p;
-                      return {
-                        ...p,
-                        clips: p.clips.flatMap((x) =>
-                          x.id === id
-                            ? [
-                                { ...c, durationFrames: offset },
-                                {
-                                  ...c,
-                                  id: crypto.randomUUID(),
-                                  startFrame: c.startFrame + offset,
-                                  sourceFrame:
-                                    c.assetId &&
-                                    p.assets.find((a) => a.id === c.assetId)
-                                      ?.kind !== "image"
-                                      ? c.sourceFrame + offset
-                                      : 0,
-                                  durationFrames: c.durationFrames - offset,
-                                },
-                              ]
-                            : [x],
-                        ),
-                      };
-                    })
+                    edit((p) => splitClip(p, id, time, crypto.randomUUID()))
                   }
                   onAddTrack={(kind) =>
                     edit((p) => ({
@@ -884,16 +828,7 @@ function App() {
                     }))
                   }
                   onDropMedia={addAsset}
-                  onDeleteClip={() =>
-                    edit((p) => ({
-                      ...p,
-                      clips: p.clips.filter(
-                        (c) =>
-                          c.id !== selected ||
-                          p.tracks.find((t) => t.id === c.trackId)?.locked,
-                      ),
-                    }))
-                  }
+                  onDeleteClip={() => edit((p) => deleteClip(p, selected))}
                 />
               </section>
             </>

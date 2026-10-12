@@ -246,8 +246,9 @@
     "imported": "core/donors/opencut/overlap.ts",
     "sha256": "0ed2ec979ea29d56a2dbbc3f456a8e4bee0850eddb342ad9dbaa6742c16d0001",
     "modifications": [
-      "Elements are Yamakan clips ({ id, startTicks, durationTicks }) in integer flick ticks; PlacementTimeSpan inlined; formatted with Prettier."
+      "Elements are Yamakan clips ({ id, startTicks, durationTicks }) in integer flick ticks; PlacementTimeSpan inlined; formatted with Prettier.",
+      "T6 review: element and span ends use checked tick addition (addTicks)."
     ],
-    "importedSha256": "925466423126e6d92cdfdb61c013b3f97800670a8920baa920d448f57ce4c53d"
+    "importedSha256": "56d0629bd8f19b517644df9ae4205b8166bda5521c8c81d6e1b54a4a0ac01ef7"
   }
 ]

@@ -1,6 +1,8 @@
 // Adapted from OpenCut Classic (MIT) apps/web/src/timeline/placement/overlap.ts
 // @ cf5e79e919144200294fb9fed22a222592a0aeea. Yamakan changes: elements are
-// Yamakan clips ({ id, startTicks, durationTicks }) in integer flick ticks.
+// Yamakan clips ({ id, startTicks, durationTicks }) in integer flick ticks,
+// with ends computed by checked tick addition.
+import { addTicks } from "../../time.ts";
 
 export interface PlacementTimeSpan {
   startTime: number;
@@ -34,7 +36,7 @@ function wouldElementOverlap({
       return false;
     }
 
-    const elementEnd = element.startTicks + element.durationTicks;
+    const elementEnd = addTicks(element.startTicks, element.durationTicks);
     return startTime < elementEnd && endTime > element.startTicks;
   });
 }
@@ -50,7 +52,7 @@ export function canPlaceTimeSpansOnTrack({
     return !wouldElementOverlap({
       elements: track.elements,
       startTime,
-      endTime: startTime + duration,
+      endTime: addTicks(startTime, duration),
       excludeElementId,
     });
   });

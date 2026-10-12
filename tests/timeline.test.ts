@@ -10,6 +10,13 @@ import { execute, Scopes } from "../core/command/registry.ts";
 import { CommandError } from "../core/command/errors.ts";
 import { mediaTools } from "../core/process/workers.ts";
 import type { Operation } from "../core/timeline/operations.ts";
+import {
+  FRAME_TICKS,
+  applyLocal,
+  deleteClip,
+  splitClip,
+  updateClips,
+} from "../src/edit-ops.ts";
 
 const F = 23_520_000; // flicks per 30 fps frame
 const ids = {
@@ -167,33 +174,35 @@ test("a ten-operation batch produces the specified snapshot as one revision", as
     { id: ids.shot, name: "Wide", clipIds: [ids.title] },
   ]);
   assert.equal(p.tracks[1].locked, true);
-  // The same operations through the editing shape (the UI's save path) give
-  // the same canonical project.
+  // The same edits through the editor's own path (src/edit-ops.ts, one edit
+  // at a time on its local edit view, then a whole-project save) give the
+  // same canonical project. The second workspace's generated identifiers
+  // are mapped onto the first's (a deterministic replay mapping); nothing
+  // else is removed or normalised before comparing every field.
   const second = await workspace();
-  const view = await second.store.load(second.project.id);
-  const ops = tenOperations(view, second.audio.id);
-  const { applyBatch } = await import("../core/timeline/operations.ts");
-  const { fromEditView, toEditView } = await import("../core/canonical.ts");
-  const edited = toEditView(applyBatch(fromEditView(view), ops));
-  await second.store.save(
-    { ...edited, revision: view.revision },
-    view.revision,
-  );
+  let view = await second.store.load(second.project.id);
+  for (const op of tenOperations(view, second.audio.id))
+    view =
+      op.type === "clip.split"
+        ? splitClip(
+            view,
+            op.clipId,
+            op.atTicks / FRAME_TICKS / 30,
+            op.newClipId,
+          )
+        : applyLocal(view, [op]);
+  await second.store.save(view, view.revision);
   const viaUi = await second.store.exportProject(second.project.id);
-  const strip = (x: typeof p) => ({
-    ...x,
-    id: "",
-    name: "",
-    revision: 0,
-    assets: x.assets.map((a) => ({ ...a, id: "" })),
-    tracks: x.tracks.map((t) => ({ ...t, id: "" })),
-    clips: x.clips.map((c) => ({
-      ...c,
-      trackId: "",
-      assetId: c.assetId ? "asset" : null,
-    })),
-  });
-  assert.deepEqual(strip(viaUi), strip(p));
+  const mapping = new Map<string, string>([
+    [second.project.id, project.id],
+    [second.audio.id, audio.id],
+    ...second.project.tracks.map(
+      (t, i) => [t.id, project.tracks[i].id] as [string, string],
+    ),
+  ]);
+  let replayed = JSON.stringify(viaUi);
+  for (const [from, to] of mapping) replayed = replayed.replaceAll(from, to);
+  assert.equal(replayed, JSON.stringify(p), "identical canonical bytes");
   store.close();
   second.store.close();
 });
@@ -392,7 +401,7 @@ test("audio gain and fades are rendered, not dropped", async () => {
     return Number(/mean_volume: (-?[\d.]+) dB/.exec(out.stderr)![1]);
   };
   const render = async (
-    audioOps: { gainDb?: number; fadeInTicks?: number },
+    audioOps: { gainDb?: number; fadeInTicks?: number; fadeOutTicks?: number },
     key: string,
   ) => {
     const current = await store.load(project.id);
@@ -452,6 +461,16 @@ test("audio gain and fades are rendered, not dropped", async () => {
     "the fade-in is applied",
   );
   assert.ok(Math.abs(level(faded, 1.2, 0.5) - level(full, 1.2, 0.5)) < 1);
+  // A one-second fade-out: the closing tenth is far quieter than the middle.
+  const out = await render(
+    { gainDb: 0, fadeInTicks: 0, fadeOutTicks: 30 * F },
+    "fade-out",
+  );
+  assert.ok(level(full, 1.85, 0.1) - level(full, 0.5, 0.5) > -3, "control");
+  assert.ok(
+    level(out, 0.5, 0.5) - level(out, 1.88, 0.1) > 15,
+    "the fade-out is applied",
+  );
   await queue.close();
   store.close();
 });
@@ -591,5 +610,380 @@ test("a snapped move lands on the nearest clip edge, by start or by end, and is 
     ]),
     /overlap/,
   );
+  store.close();
+});
+
+test("the editor's own split, delete and trim keep projects with shots and fades saveable", async () => {
+  const { store, project, audio, call } = await workspace();
+  const [, sound] = project.tracks.map((t) => t.id);
+  await call("yamakan.project.applyBatch", {
+    projectId: project.id,
+    expectedRevision: project.revision,
+    operations: [
+      { type: "scene.add", sceneId: ids.scene, name: "Opening" },
+      {
+        type: "clip.add",
+        clipId: ids.tone,
+        trackId: sound,
+        assetId: audio.id,
+        title: null,
+        startTicks: 0,
+        durationTicks: 60 * F,
+        sourceStartTicks: 0,
+      },
+      {
+        type: "clip.setAudio",
+        clipId: ids.tone,
+        fadeInTicks: 20 * F,
+        fadeOutTicks: 20 * F,
+      },
+      {
+        type: "shot.add",
+        sceneId: ids.scene,
+        shotId: ids.shot,
+        name: "Wide",
+        clipIds: [ids.tone],
+      },
+    ],
+  });
+  let view = await store.load(project.id);
+  // Split in the middle: both halves keep valid fades and join the shot.
+  view = splitClip(view, ids.tone, 1, ids.extra);
+  const halves = [ids.tone, ids.extra].map((id) =>
+    view.clips.find((c) => c.id === id)!,
+  );
+  assert.deepEqual(
+    // The edit view omits zero fades.
+    halves.map((c) => [
+      c.durationFrames,
+      c.fadeInFrames ?? 0,
+      c.fadeOutFrames ?? 0,
+    ]),
+    [
+      [30, 20, 0],
+      [30, 0, 20],
+    ],
+  );
+  assert.deepEqual(view.scenes?.[0].shots?.[0].clipIds, [ids.tone, ids.extra]);
+  view = await store.save(view, view.revision);
+  // Trim the second half below its fade: the fade is clamped.
+  const second = view.clips.find((c) => c.id === ids.extra)!;
+  view = updateClips(view, [
+    {
+      id: ids.extra,
+      mediaId: audio.id,
+      trackId: second.trackId,
+      start: 1,
+      end: 1.5,
+      duration: 0.5,
+      speed: 1,
+      sourceIn: 1,
+      effect: null,
+    },
+  ]);
+  const trimmed = view.clips.find((c) => c.id === ids.extra)!;
+  assert.deepEqual([trimmed.durationFrames, trimmed.fadeOutFrames], [15, 15]);
+  view = await store.save(view, view.revision);
+  // Delete the first half: it leaves the shot, and the save succeeds.
+  view = deleteClip(view, ids.tone);
+  assert.deepEqual(view.scenes?.[0].shots?.[0].clipIds, [ids.extra]);
+  view = await store.save(view, view.revision);
+  assert.equal(view.clips.length, 1);
+  store.close();
+});
+
+test("still images have no source offset: they extend left and split cleanly", async () => {
+  const { root, store, project, call } = await workspace();
+  const png = path.join(root, "still.png");
+  execFileSync(
+    mediaTools().ffmpeg,
+    [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=red:s=64x36:d=1",
+      "-frames:v",
+      "1",
+      png,
+    ],
+    { windowsHide: true },
+  );
+  const image = (
+    await store.importAsset(project.id, "still.png", await readFile(png))
+  ).asset;
+  const [picture] = (await store.load(project.id)).tracks.map((t) => t.id);
+  const head = await store.exportProject(project.id);
+  await call("yamakan.project.applyBatch", {
+    projectId: project.id,
+    expectedRevision: head.revision,
+    operations: [
+      {
+        type: "clip.add",
+        clipId: ids.title,
+        trackId: picture,
+        assetId: image.id,
+        title: null,
+        startTicks: 30 * F,
+        durationTicks: 30 * F,
+        sourceStartTicks: 0,
+      },
+      { type: "clip.trim", clipId: ids.title, startTicks: 0 },
+      {
+        type: "clip.split",
+        clipId: ids.title,
+        atTicks: 20 * F,
+        newClipId: ids.title2,
+      },
+    ],
+  });
+  const p = await store.exportProject(project.id);
+  const clip = (id: string) => p.clips.find((c) => c.id === id)!;
+  assert.deepEqual(
+    [ids.title, ids.title2].map((id) => [
+      clip(id).startTicks / F,
+      clip(id).durationTicks / F,
+      clip(id).sourceStartTicks,
+    ]),
+    [
+      [0, 20, 0],
+      [20, 40, 0],
+    ],
+  );
+  store.close();
+});
+
+test("undo never rewinds another writer's batch", async () => {
+  const { store, queue, project, call } = await workspace();
+  const [picture] = project.tracks.map((t) => t.id);
+  const as =
+    (id: "browser-ui" | "local-client") =>
+    (operation: string, parameters: unknown) =>
+      execute(
+        { store, queue, principal: { id, scopes: new Set(Scopes) } },
+        operation,
+        parameters,
+      ).then((r) => r.result as any);
+  const agent = as("browser-ui");
+  const title = (clipId: string, startTicks: number) => ({
+    type: "clip.add" as const,
+    clipId,
+    trackId: picture,
+    assetId: null,
+    title: "Mine",
+    startTicks,
+    durationTicks: 10 * F,
+    sourceStartTicks: 0,
+  });
+  const first = await agent("yamakan.project.applyBatch", {
+    projectId: project.id,
+    expectedRevision: project.revision,
+    operations: [title(ids.title, 0)],
+  });
+  const second = await call("yamakan.project.applyBatch", {
+    projectId: project.id,
+    expectedRevision: first.revision,
+    operations: [title(ids.title2, 20 * F)],
+  });
+  await assert.rejects(
+    agent("yamakan.project.undo", {
+      projectId: project.id,
+      expectedRevision: second.revision,
+    }),
+    (e: unknown) =>
+      e instanceof CommandError &&
+      e.code === "REVISION_CONFLICT" &&
+      /another client/.test(e.message),
+  );
+  // The writer of the last batch may undo it.
+  const undone = await call("yamakan.project.undo", {
+    projectId: project.id,
+    expectedRevision: second.revision,
+  });
+  const p = await store.exportProject(project.id);
+  assert.equal(p.revision, undone.revision);
+  assert.deepEqual(
+    p.clips.map((c) => c.id),
+    [ids.title],
+  );
+  store.close();
+});
+
+test("operations never reuse an identifier, and out-of-range time is a validation error", async () => {
+  const { store, project, call } = await workspace();
+  const [picture, sound] = project.tracks.map((t) => t.id);
+  const add = (clipId: string, trackId: string, startTicks: number) => ({
+    type: "clip.add" as const,
+    clipId,
+    trackId,
+    assetId: null,
+    title: trackId === picture ? "X" : null,
+    startTicks,
+    durationTicks: 10 * F,
+    sourceStartTicks: 0,
+  });
+  const before = await store.exportProject(project.id);
+  for (const operations of [
+    [add(ids.title, picture, 0), add(ids.title, picture, 20 * F)],
+    [
+      add(ids.title, picture, 0),
+      {
+        type: "clip.split",
+        clipId: ids.title,
+        atTicks: 5 * F,
+        newClipId: ids.title,
+      },
+    ],
+    [{ type: "track.add", trackId: sound, name: "Again", kind: "audio" }],
+    [{ type: "scene.add", sceneId: project.id, name: "Clash" }],
+  ])
+    await assert.rejects(
+      call("yamakan.project.applyBatch", {
+        projectId: project.id,
+        expectedRevision: before.revision,
+        operations,
+      }),
+      (e: unknown) =>
+        e instanceof CommandError &&
+        e.code === "VALIDATION" &&
+        /already in use/.test(e.message),
+    );
+  await assert.rejects(
+    call("yamakan.project.applyBatch", {
+      projectId: project.id,
+      expectedRevision: before.revision,
+      operations: [
+        {
+          ...add(ids.title, picture, 0),
+          title: "Far",
+          sourceStartTicks: Number.MAX_SAFE_INTEGER,
+          durationTicks: 1,
+        },
+      ],
+    }),
+    (e: unknown) => e instanceof CommandError && e.code === "VALIDATION",
+  );
+  assert.equal(
+    (await store.exportProject(project.id)).revision,
+    before.revision,
+  );
+  store.close();
+});
+
+test("a snap that would overlap falls back to the next valid placement", async () => {
+  const { store, project, call } = await workspace();
+  const [picture] = project.tracks.map((t) => t.id);
+  const head = await store.exportProject(project.id);
+  const second = crypto.randomUUID();
+  const add = (
+    clipId: string,
+    trackId: string,
+    start: number,
+    frames: number,
+  ) => ({
+    type: "clip.add" as const,
+    clipId,
+    trackId,
+    assetId: null,
+    title: "S",
+    startTicks: start * F,
+    durationTicks: frames * F,
+    sourceStartTicks: 0,
+  });
+  await call("yamakan.project.applyBatch", {
+    projectId: project.id,
+    expectedRevision: head.revision,
+    operations: [
+      { type: "track.add", trackId: second, name: "Upper", kind: "video" },
+      add(ids.extra, picture, 30, 10),
+      add(ids.title, picture, 13, 5),
+      add(ids.title2, second, 4, 5),
+    ],
+  });
+  const now = await store.exportProject(project.id);
+  // Dropping at 1 with a 3-frame snap: the nearest snap (start to 4) would
+  // overlap [13, 18); the end snapping to 13 (start 3) fits and is taken.
+  await call("yamakan.project.applyBatch", {
+    projectId: project.id,
+    expectedRevision: now.revision,
+    operations: [
+      {
+        type: "clip.move",
+        clipId: ids.extra,
+        startTicks: 1 * F,
+        snapTicks: 3 * F,
+      },
+    ],
+  });
+  const p = await store.exportProject(project.id);
+  assert.equal(p.clips.find((c) => c.id === ids.extra)!.startTicks / F, 3);
+  store.close();
+});
+
+test("scene removal takes its shots; moves keep track kinds; redo ends at another commit", async () => {
+  const { store, project, audio, call } = await workspace();
+  const [picture, sound] = project.tracks.map((t) => t.id);
+  const applied = await call("yamakan.project.applyBatch", {
+    projectId: project.id,
+    expectedRevision: project.revision,
+    operations: [
+      { type: "scene.add", sceneId: ids.scene, name: "Gone" },
+      {
+        type: "clip.add",
+        clipId: ids.tone,
+        trackId: sound,
+        assetId: audio.id,
+        title: null,
+        startTicks: 0,
+        durationTicks: 30 * F,
+        sourceStartTicks: 0,
+      },
+      {
+        type: "shot.add",
+        sceneId: ids.scene,
+        shotId: ids.shot,
+        name: "S",
+        clipIds: [ids.tone],
+      },
+      { type: "scene.remove", sceneId: ids.scene },
+    ],
+  });
+  let p = await store.exportProject(project.id);
+  assert.deepEqual(p.scenes, []);
+  assert.equal(p.clips.length, 1, "the clip stays; only its grouping went");
+  await assert.rejects(
+    call("yamakan.project.applyBatch", {
+      projectId: project.id,
+      expectedRevision: applied.revision,
+      operations: [
+        {
+          type: "clip.move",
+          clipId: ids.tone,
+          trackId: picture,
+          startTicks: 0,
+        },
+      ],
+    }),
+    /same kind/,
+  );
+  // Undo, then a whole-project save: the redo is gone.
+  const undone = await call("yamakan.project.undo", {
+    projectId: project.id,
+    expectedRevision: applied.revision,
+  });
+  const view = await store.load(project.id);
+  const saved = await store.save({ ...view, name: "Renamed" }, undone.revision);
+  await assert.rejects(
+    call("yamakan.project.redo", {
+      projectId: project.id,
+      expectedRevision: saved.revision,
+    }),
+    (e: unknown) => e instanceof CommandError && e.code === "REVISION_CONFLICT",
+  );
+  p = await store.exportProject(project.id);
+  assert.equal(p.name, "Renamed");
   store.close();
 });

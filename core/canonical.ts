@@ -191,7 +191,10 @@ const ProjectBody = z
           fail("Asset and track types do not match.");
         if (
           asset.kind !== "image" &&
-          addTicks(c.sourceStartTicks, c.durationTicks) > asset.durationTicks
+          !(
+            Number.isSafeInteger(c.sourceStartTicks + c.durationTicks) &&
+            c.sourceStartTicks + c.durationTicks <= asset.durationTicks
+          )
         )
           fail("Clip extends beyond its source.");
       }
@@ -246,9 +249,22 @@ export function inspectFormat(value: unknown): {
 }
 
 // v1 had no gain, fades or shots; their neutral values are exactly v1's meaning.
+// v1 had no gain, fades or shots: they are added with neutral values. A
+// document that claims v1 but already carries them is not a v1 project and
+// is refused rather than silently overwritten.
 function upgradeV1(value: Record<string, unknown>) {
   const clips = Array.isArray(value.clips) ? value.clips : [];
   const scenes = Array.isArray(value.scenes) ? value.scenes : [];
+  const has = (x: unknown, keys: string[]) =>
+    Boolean(x) && typeof x === "object" && keys.some((k) => k in (x as object));
+  if (
+    clips.some((c) => has(c, ["gainDb", "fadeInTicks", "fadeOutTicks"])) ||
+    scenes.some((sc) => has(sc, ["shots"]))
+  )
+    throw new CommandError(
+      "VALIDATION",
+      "A version 1 project cannot contain version 2 fields.",
+    );
   return {
     ...value,
     formatVersion: FORMAT_VERSION,

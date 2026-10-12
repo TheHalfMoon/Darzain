@@ -174,3 +174,28 @@ test("newer formats can be inspected but not parsed for editing", () => {
     supported: false,
   });
 });
+
+test("a stored v1 canonical snapshot upgrades to v2 losslessly; v1 with v2 fields is refused", () => {
+  const v2 = fromEditView(richView(), "ar");
+  // The same project as v1 stored it: no gain, fades or shots.
+  const v1 = JSON.parse(JSON.stringify(v2));
+  v1.formatVersion = 1;
+  for (const c of v1.clips) {
+    delete c.gainDb;
+    delete c.fadeInTicks;
+    delete c.fadeOutTicks;
+  }
+  for (const s of v1.scenes) delete s.shots;
+  assert.deepEqual(parseCanonical(v1), v2);
+  for (const tamper of [
+    (x: any) => (x.clips[2].gainDb = -6),
+    (x: any) => (x.scenes[0].shots = []),
+  ]) {
+    const claimed = JSON.parse(JSON.stringify(v1));
+    tamper(claimed);
+    assert.throws(
+      () => parseCanonical(claimed),
+      (e: unknown) => e instanceof CommandError && e.code === "VALIDATION",
+    );
+  }
+});

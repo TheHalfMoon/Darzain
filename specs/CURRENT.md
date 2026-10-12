@@ -21,7 +21,8 @@ Updated: 2026-10-12. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 
 - Canonical `yamakan.project` v2: audio gain and linear fades, scenes with shots. Edit view gains optional gain/fade/shot fields (lossless projection).
 - `core/timeline/operations.ts`: typed operations (scene/shot, track, clip add/trim/split/move/remove, title, audio) reduced by `applyBatch` (1–64 operations, validated once). OpenCut overlap (placement checks) and snapping (`clip.move` with an optional `snapTicks`, start or end to the nearest clip edge) adapted behind checked tick types and qualified by fixtures (`core/donors/opencut`, pinned and noticed).
-- Schema v4: `edit_history`, `edit_cursor`. `yamakan.project.applyBatch`, `undo`, `redo` are revision-bound mutations; a stale undo conflicts; non-batch commits clear history.
+- Schema v4: `edit_history`, `edit_cursor`. `yamakan.project.applyBatch`, `undo`, `redo` are revision-bound mutations; a stale undo conflicts; only the principal that wrote a step may undo or redo it; non-batch commits clear history. Commits refuse when free space is below the import reserve plus one snapshot.
+- The editor applies split and delete through the same reducer on its local edit view (`src/edit-ops.ts`) and clamps fades on drag/trim with the shared rule, so UI and tool edits give identical canonical bytes.
 - Render applies audio gain (`volume`) and fades (`afade`).
 
 ## T5 surface (merged)
@@ -92,5 +93,7 @@ Updated: 2026-10-12. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 - Jev key and an OCR LLM backend are founder-provided resources; without them those reviews stay recorded as unavailable.
 
 **Next executable task:** T7 render plan and typography (versioned plan compiler, ASS/libass titles with pinned OFL Arabic/Latin fonts) after T6 merges.
+
+**Recorded for T9 from T6 reviews:** undo/redo write full snapshots and consume the 10,000-revision budget (compaction or head re-pointing); edit history is pruned only by MAX_REVISION; track overlap is enforced by reducers, not by canonical validation (needs a migration decision for existing projects); a request retried across the snapshot format change (`/1`→`/2`) gets IDEMPOTENCY_MISMATCH.
 
 **Recorded for T9 from T5 reviews:** GC for crash-window orphans and hidden retained originals; a retry/discard command for `reconciliationRequired` jobs; attempt reason codes instead of error text; conversion space in the import reservation.
