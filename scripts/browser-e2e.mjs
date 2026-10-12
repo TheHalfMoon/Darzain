@@ -298,6 +298,20 @@ try {
   } finally {
     neighbour.close();
   }
+  // The tool catalog is read with the page's session and shown in place
+  // (a new tab would hold no session).
+  await page.getByRole("button", { name: "Agent tools", exact: true }).click();
+  await page
+    .getByRole("button", {
+      name: "Show the versioned tool catalog",
+      exact: true,
+    })
+    .click();
+  await page
+    .locator("pre.catalog")
+    .filter({ hasText: "yamakan.project.create" })
+    .waitFor();
+  await page.getByRole("button", { name: "Production", exact: true }).click();
   const picture = saved.clips.filter((c) =>
     saved.assets.some((a) => a.id === c.assetId && a.kind === "image"),
   );
@@ -641,6 +655,7 @@ try {
       "launch link required for a session; secret removed from the address bar",
       "another loopback port cannot call the API or load media",
       "keyboard-only Arabic (RTL) backup",
+      "tool catalog shown with the page session",
       "export",
       "download",
       "reload",

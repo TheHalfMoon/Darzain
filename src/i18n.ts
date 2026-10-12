@@ -80,7 +80,7 @@ const en = {
   "tools.title": "Yamakan agent tools",
   "tools.intro":
     "The same validated project and render operations power the editor and local REST API.",
-  "tools.catalog": "Open the versioned tool catalog",
+  "tools.catalog": "Show the versioned tool catalog",
   "tools.jobs":
     "Jobs expose progress, cancellation, errors and verified video artifacts. Project paths and arbitrary commands are not accepted by the API.",
   "toolbar.unsaved": "Unsaved changes",
@@ -216,7 +216,7 @@ const ar: Record<MessageKey, string> = {
   "tools.title": "أدوات الوكلاء في يماكن",
   "tools.intro":
     "يعتمد المحرِّر وواجهة REST المحلية على عمليات المشروع والتصيير نفسها التي جرى التحقق منها.",
-  "tools.catalog": "فتح دليل الأدوات ذي الإصدارات",
+  "tools.catalog": "عرض دليل الأدوات ذي الإصدارات",
   "tools.jobs":
     "تعرض المهام التقدم والإلغاء والأخطاء وملفات الفيديو المتحقَّق منها. لا تقبل الواجهة مسارات المشاريع ولا الأوامر العشوائية.",
   "toolbar.unsaved": "تغييرات غير محفوظة",

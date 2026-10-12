@@ -26,6 +26,7 @@
 //! FFI, like yamakan-procd.
 
 use std::ffi::c_void;
+use std::os::windows::ffi::OsStrExt;
 use std::os::windows::fs::MetadataExt;
 use std::path::Path;
 use std::ptr::null_mut;
@@ -173,8 +174,25 @@ extern "system" {
     fn RevertToSelf() -> Bool;
 }
 
-fn wide(text: &str) -> Vec<u16> {
-    text.encode_utf16().chain(std::iter::once(0)).collect()
+// A path for the Win32 calls in its extended-length form (\\?\ or
+// \\?\UNC\), so a workspace deep enough for its objects to pass 260
+// characters still works; names stay as the system's UTF-16, unconverted.
+fn api_path(path: &Path) -> Vec<u16> {
+    let raw: Vec<u16> = path.as_os_str().encode_wide().collect();
+    let slash = '\\' as u16;
+    let starts = |prefix: &str| {
+        let p: Vec<u16> = prefix.encode_utf16().collect();
+        raw.len() >= p.len() && raw[..p.len()] == p[..]
+    };
+    let mut out: Vec<u16> = if starts(r"\\?\") || starts(r"\\.\") {
+        raw.clone()
+    } else if raw.len() >= 2 && raw[0] == slash && raw[1] == slash {
+        r"\\?\UNC\".encode_utf16().chain(raw[2..].iter().copied()).collect()
+    } else {
+        r"\\?\".encode_utf16().chain(raw.iter().copied()).collect()
+    };
+    out.push(0);
+    out
 }
 
 fn fail(what: &str, code: u32) -> ! {
@@ -263,8 +281,8 @@ impl Drop for Descriptor {
     }
 }
 
-fn read_security(path: &str) -> Result<Descriptor, u32> {
-    let name = wide(path);
+fn read_security(path: &Path) -> Result<Descriptor, u32> {
+    let name = api_path(path);
     let mut owner: Psid = null_mut();
     let mut dacl: *mut c_void = null_mut();
     let mut memory: *mut c_void = null_mut();
@@ -327,7 +345,7 @@ fn is_reparse(path: &Path) -> bool {
 
 // Whether an object below the root is owned by the user, unprotected, and
 // holds exactly the three grants, all inherited.
-fn conforms(path: &str, sids: &mut [Sid; 3]) -> bool {
+fn conforms(path: &Path, sids: &mut [Sid; 3]) -> bool {
     let Ok(descriptor) = read_security(path) else { return false };
     if !sids[0].equals(descriptor.owner) || protected(&descriptor) {
         return false;
@@ -340,28 +358,34 @@ fn conforms(path: &str, sids: &mut [Sid; 3]) -> bool {
         && sids.iter_mut().all(|sid| entries.iter().any(|&(_, _, _, ace_sid)| sid.equals(ace_sid)))
 }
 
-// Every object below `dir` conforms; links and junctions below are refused.
 // Makes the current user the owner of `path` when it is not (setting an
-// owner needs WRITE_OWNER, which the owner-only DACL now grants).
-fn take_ownership(path: &str, user: &mut Sid) -> bool {
+// owner needs WRITE_OWNER, which the owner-only DACL now grants). Below the
+// root, objects another account owns are taken over rather than refused:
+// the root's owner check already decided the folder is this account's.
+fn take_ownership(path: &Path, user: &mut Sid) -> bool {
     let Ok(current) = read_security(path) else { return false };
     if user.equals(current.owner) {
         return true;
     }
     drop(current);
-    let mut name = wide(path);
+    let mut name = api_path(path);
     (unsafe {
         SetNamedSecurityInfoW(name.as_mut_ptr(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, user.ptr(), null_mut(), null_mut(), null_mut())
     }) == 0
 }
 
+// Every object below `dir` conforms; links and junctions below, and
+// entries that cannot be read, are failures.
 fn verify_tree(dir: &Path, sids: &mut [Sid; 3], bad: &mut Vec<String>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         bad.push(dir.display().to_string());
         return;
     };
     for entry in entries {
-        let Ok(entry) = entry else { continue };
+        let Ok(entry) = entry else {
+            bad.push(dir.display().to_string());
+            continue;
+        };
         let path = entry.path();
         let text = path.display().to_string();
         let Ok(meta) = std::fs::symlink_metadata(&path) else {
@@ -369,8 +393,8 @@ fn verify_tree(dir: &Path, sids: &mut [Sid; 3], bad: &mut Vec<String>) {
             continue;
         };
         if meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
-            || !take_ownership(&text, &mut sids[0])
-            || !conforms(&text, sids)
+            || !take_ownership(&path, &mut sids[0])
+            || !conforms(&path, sids)
         {
             bad.push(text);
             continue;
@@ -394,7 +418,7 @@ fn secure(kind: &str, path: &str) {
     // Another account's folder is never adopted: its owner keeps the right
     // to rewrite the DACL, and handles it opened before keep their access.
     {
-        let current = read_security(path).unwrap_or_else(|code| fail("GetNamedSecurityInfo", code));
+        let current = read_security(Path::new(path)).unwrap_or_else(|code| fail("GetNamedSecurityInfo", code));
         if !sids.iter_mut().any(|sid| sid.equals(current.owner)) {
             fail(&format!("owned by another account ({})", sid_text(current.owner)), ERROR_INVALID_OWNER);
         }
@@ -410,7 +434,7 @@ fn secure(kind: &str, path: &str) {
             fail("AddAccessAllowedAceEx", unsafe { GetLastError() });
         }
     }
-    let mut name = wide(path);
+    let mut name = api_path(Path::new(path));
     // The DACL first (an owner may always rewrite it); owners follow once
     // the new DACL grants this user full control.
     let info = DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION;
@@ -439,11 +463,11 @@ fn secure(kind: &str, path: &str) {
     if code != 0 {
         fail("SetSecurityInfo", code);
     }
-    if !take_ownership(path, &mut sids[0]) {
+    if !take_ownership(Path::new(path), &mut sids[0]) {
         fail("could not take ownership", ERROR_ACCESS_DENIED);
     }
     // The reset can report success without reaching every object: check.
-    let root = read_security(path).unwrap_or_else(|code| fail("GetNamedSecurityInfo", code));
+    let root = read_security(Path::new(path)).unwrap_or_else(|code| fail("GetNamedSecurityInfo", code));
     let root_ok = sids[0].equals(root.owner) && protected(&root) && aces(&root).len() == 3;
     drop(root);
     if !root_ok {
@@ -460,7 +484,7 @@ fn secure(kind: &str, path: &str) {
 }
 
 fn describe(path: &str) {
-    let descriptor = read_security(path).unwrap_or_else(|code| fail("GetNamedSecurityInfo", code));
+    let descriptor = read_security(Path::new(path)).unwrap_or_else(|code| fail("GetNamedSecurityInfo", code));
     let list: Vec<String> = aces(&descriptor)
         .into_iter()
         .map(|(kind, flags, mask, sid)| {
@@ -520,7 +544,7 @@ fn probe_other(path: &str) {
     if unsafe { SetThreadToken(null_mut(), impersonation.0) } == 0 {
         fail("SetThreadToken", unsafe { GetLastError() });
     }
-    let name = wide(path);
+    let name = api_path(Path::new(path));
     let handle = unsafe {
         CreateFileW(
             name.as_ptr(),

@@ -130,3 +130,29 @@ test(
     await assert.rejects(restrictToOwner(link, "dir"), /is a link/);
   },
 );
+
+test(
+  "a workspace whose objects lie past 260 characters is still made private",
+  { skip: process.platform !== "win32" && "Windows path limits" },
+  async () => {
+    const { base } = await folder();
+    // A deep root, then an object path like projects/<id>/objects/sha256/...
+    const root = path.join(base, "w".repeat(80), "x".repeat(80), "workspace");
+    const object = path.join(
+      root,
+      "projects",
+      "0".repeat(36),
+      "objects",
+      "sha256",
+      "ab",
+      "ab".repeat(32),
+    );
+    await mkdir(path.dirname(object), { recursive: true });
+    await writeFile(object, "media");
+    assert.ok(object.length > 300, `${object.length} characters`);
+    assert.equal(await readableByOtherAccounts(object), true, "control");
+    await restrictToOwner(root, "dir");
+    assert.equal(await readableByOtherAccounts(object), false);
+    assert.equal((await describeAccess(object)).aces.length, 3);
+  },
+);

@@ -43,6 +43,7 @@ T9 exceeds the plan's four-day bound, so it is split at its interface: **T9a** r
   - The running service's workspace, token, launch file and database are denied, with the root's DACL and owner asserted.
   - It says nothing about an elevated administrator, who can always read. A real second-account check remains a T10 founder step.
 - **Other loopback port:** in the E2E a page on another 127.0.0.1 port, in the same browser and even holding the real session and media key, can neither call the API nor load media, while the same requests succeed from the Yamakan page (control); the other port's server never receives the session, the media key or any Yamakan cookie.
+- Cost and limits: every start (and backup) re-applies and re-checks the whole tree (measured about 0.05 s for a small workspace and 3.8 s for 40,000 files, against the plan's reopen target of 2 s); a marker-based fast path is open. Paths are passed in extended-length form, so deep workspaces work. Files below the root owned by another account are taken over (the root's owner check decides whose folder it is); handles another account opened before the first restriction are not closed, as the README says.
 - Authenticated CLI (token file) works against the hardened service. In the keyboard-only journey in Arabic (RTL), Tab reaches the backup button and Enter runs it.
 
 ## T9a surface (merged)

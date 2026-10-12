@@ -84,6 +84,7 @@ function App() {
     [activeTrack, setActiveTrack] = useState<string | null>(null),
     [job, setJob] = useState<RenderJob | null>(null),
     [tools, setTools] = useState(false),
+    [catalog, setCatalog] = useState<string | null>(null),
     [downloadedDraft, setDownloadedDraft] = useState<Project | null>(null),
     [revisionHistory, setRevisionHistory] = useState<ProjectHistory | null>(
       null,
@@ -601,11 +602,27 @@ function App() {
               <h1>{t("tools.title")}</h1>
               <p>{t("tools.intro")}</p>
               <pre>npm run cli -- yamakan.project.list {"{}"}</pre>
+              {/* Shown here: a new tab would hold no session. */}
               <p>
-                <a href="/api/v1/tools" target="_blank" rel="noreferrer">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    run(async () =>
+                      setCatalog(
+                        JSON.stringify(await client.catalog(), null, 2),
+                      ),
+                    )
+                  }
+                >
                   {t("tools.catalog")}
-                </a>
+                </button>
               </p>
+              {catalog && (
+                <pre className="catalog" dir="ltr">
+                  {catalog}
+                </pre>
+              )}
               <p>{t("tools.jobs")}</p>
             </section>
           ) : p && view ? (
