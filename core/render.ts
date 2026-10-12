@@ -3,7 +3,7 @@ import path from "node:path";
 import { ProjectSchema } from "./project.ts";
 import type { Project } from "./project.ts";
 import { ProjectStore } from "./store.ts";
-import { probe } from "./media.ts";
+import { MEDIA_FORMATS, probe } from "./media.ts";
 import { RESOURCE_POLICY } from "./command/policy.ts";
 import { mediaTools, workers } from "./process/workers.ts";
 export type RenderJob = {
@@ -107,7 +107,12 @@ export async function renderProject(
     }
     const { file, asset } = await store.assetFile(p.id, c.assetId!);
     const index = args.filter((x) => x === "-i").length;
-    args.push("-protocol_whitelist", "file");
+    args.push(
+      "-protocol_whitelist",
+      "file",
+      "-format_whitelist",
+      MEDIA_FORMATS,
+    );
     if (asset.kind === "image") args.push("-loop", "1", "-t", String(len));
     args.push("-i", file);
     if (asset.kind === "audio") {

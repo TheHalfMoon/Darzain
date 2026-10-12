@@ -261,6 +261,8 @@ export class ProjectStore {
   // Bytes promised to in-flight imports (staging + publication).
   #reserved = 0;
   #importing = 0;
+  #publishing = new Map<string, number>();
+  #discarding = new Map<string, Promise<void>>();
   constructor(root: string, options: StoreOptions = {}) {
     this.root = root;
     this.#options = options;
@@ -775,8 +777,104 @@ export class ProjectStore {
     projectId: string,
     source: AsyncIterable<Uint8Array>,
   ): Promise<{ sha256: string; byteLength: number }> {
-    await this.#ensureDirectories(projectId);
-    return (await this.#objects(projectId)).put(source);
+    const release = await this.beginPublication(projectId);
+    try {
+      await this.#ensureDirectories(projectId);
+      return await (await this.#objects(projectId)).put(source);
+    } finally {
+      release();
+    }
+  }
+  // Marks a publication in flight from before its bytes are written until
+  // the returned release is called (after its row commits or it is
+  // abandoned). Unregistered objects are never removed while one is open.
+  async beginPublication(projectId: string) {
+    for (
+      let pending = this.#discarding.get(projectId);
+      pending;
+      pending = this.#discarding.get(projectId)
+    )
+      await pending;
+    this.#publishing.set(projectId, (this.#publishing.get(projectId) ?? 0) + 1);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const n = (this.#publishing.get(projectId) ?? 1) - 1;
+      if (n > 0) this.#publishing.set(projectId, n);
+      else this.#publishing.delete(projectId);
+    };
+  }
+  // Removes a content object that no row registers. Skipped (left for the
+  // T9 garbage collector) while another publication into the project is in
+  // flight, since that publication may be about to register the same bytes.
+  async discardUnregisteredObject(projectId: string, digest: string) {
+    Id.parse(projectId);
+    if (!/^[0-9a-f]{64}$/.test(digest)) return false;
+    if (this.#publishing.has(projectId) || this.#discarding.has(projectId))
+      return false;
+    const registered = this.#database
+      .prepare(
+        "SELECT 1 FROM asset_objects WHERE project_id = ? AND digest = ?",
+      )
+      .get(projectId, digest);
+    if (registered) return false;
+    // Set synchronously after the check, so no publication starts between.
+    const work = (async () => {
+      await unlink(
+        await this.file(
+          projectId,
+          "objects",
+          "sha256",
+          digest.slice(0, 2),
+          digest,
+        ),
+      ).catch(() => {});
+    })();
+    this.#discarding.set(projectId, work);
+    try {
+      await work;
+    } finally {
+      this.#discarding.delete(projectId);
+    }
+    return true;
+  }
+  // Releases a staged version that never joined the project (its conversion
+  // failed or was cancelled): the version row goes, and the object goes too
+  // unless another version still uses the same bytes.
+  async discardStagedVersion(projectId: string, versionId: string) {
+    const digest = this.transaction((db) => {
+      const version = db
+        .prepare(
+          "SELECT digest FROM asset_versions WHERE version_id = ? AND project_id = ?",
+        )
+        .get(versionId, projectId) as { digest: string } | undefined;
+      if (!version) return null;
+      const head = this.#head(projectId);
+      if (
+        head &&
+        this.#canonical(
+          head.snapshot_hash,
+          projectId,
+          head.revision,
+        ).assets.some((a) => a.id === versionId)
+      )
+        return null;
+      db.prepare("DELETE FROM asset_versions WHERE version_id = ?").run(
+        versionId,
+      );
+      const shared = db
+        .prepare(
+          "SELECT 1 FROM asset_versions WHERE project_id = ? AND digest = ? LIMIT 1",
+        )
+        .get(projectId, version.digest);
+      if (shared) return null;
+      db.prepare(
+        "DELETE FROM asset_objects WHERE project_id = ? AND digest = ?",
+      ).run(projectId, version.digest);
+      return version.digest;
+    });
+    if (digest) await this.discardUnregisteredObject(projectId, digest);
   }
   // Canonical bytes for portable export: no host paths, tokens or UI state.
   async exportProject(id: string): Promise<CanonicalProject> {
@@ -986,6 +1084,13 @@ export class ProjectStore {
     declaredBytes?: number,
   ) {
     const staged = await this.stageAsset(id, name, source, declaredBytes);
+    if (staged.probe.variableFrameRate && staged.asset.kind === "video") {
+      await this.discardStagedVersion(id, staged.asset.id);
+      throw new CommandError(
+        "CAPABILITY_UNAVAILABLE",
+        "Variable-frame-rate video is imported through a constant-rate conversion job.",
+      );
+    }
     const project = await this.attachAsset(id, staged.asset);
     return { project, asset: staged.asset, probe: staged.probe };
   }
@@ -1032,6 +1137,7 @@ export class ProjectStore {
     this.#importing++;
     const assetId = randomUUID();
     let temp: string | null = null;
+    let release: (() => void) | null = null;
     const hash = createHash("sha256");
     let received = 0;
     const header: Buffer[] = [];
@@ -1119,6 +1225,7 @@ export class ProjectStore {
       // handle opens eagerly and closes before cleanup, so no deferred open
       // can race the staging file's removal.
       this.#options.fault?.("stage-publish");
+      release = await this.beginPublication(id);
       const source = await open(temp, "r");
       let stored;
       try {
@@ -1153,6 +1260,7 @@ export class ProjectStore {
         },
       };
     } finally {
+      release?.();
       clearTimeout(deadline);
       this.#reserved -= 2 * expected;
       this.#importing--;
@@ -1205,10 +1313,10 @@ export class ProjectStore {
   static registerDerivative(
     db: DatabaseSync,
     projectId: string,
-    derivative: { hash: string; bytes: number },
+    derivative: { id: string; hash: string; bytes: number },
     probe: Record<string, unknown>,
   ) {
-    const versionId = randomUUID();
+    const versionId = derivative.id;
     registerAsset(
       db,
       projectId,

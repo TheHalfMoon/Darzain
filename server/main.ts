@@ -228,12 +228,22 @@ const server = createServer(async (req, res) => {
         );
         // Variable-frame-rate video is edited only through a constant-rate
         // derivative; the asset joins the project when that job succeeds.
-        if (staged.probe.variableFrameRate && staged.asset.kind === "video")
+        if (staged.probe.variableFrameRate && staged.asset.kind === "video") {
+          let job;
+          try {
+            authorize(principal, "yamakan.export.video");
+            job = await api.queue.submitDerivative(upload[1], staged);
+          } catch (e) {
+            // No job holds the staged original, so it is released now.
+            await store.discardStagedVersion(upload[1], staged.asset.id);
+            throw e;
+          }
           return json(202, {
             project: await store.load(upload[1]),
             asset: null,
-            job: await api.queue.submitDerivative(upload[1], staged),
+            job,
           });
+        }
         return json(200, {
           project: await store.attachAsset(upload[1], staged.asset),
           asset: staged.asset,
@@ -267,6 +277,9 @@ const server = createServer(async (req, res) => {
         const job = api.queue.status(exportMatch[1]);
         if (job.state !== "COMPLETED" || !job.artifact)
           throw new Error("Artifact is not complete.");
+        // Only export renders are downloadable files.
+        if (!/^exports\/[0-9a-f-]{36}\/render-\d{1,3}\.mp4$/.test(job.artifact))
+          throw new CommandError("NOT_FOUND", "This job has no file artifact.");
         const file = await store.file(
           job.projectId,
           ...job.artifact.split("/"),

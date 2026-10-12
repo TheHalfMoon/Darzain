@@ -25,6 +25,8 @@ export const RESOURCE_POLICY = Object.freeze({
     // Active (non-terminal) jobs admitted at once; history never counts.
     activeJobs: 128,
     renderWallSeconds: 180,
+    // A constant-rate conversion of a source up to ten minutes long.
+    conversionWallSeconds: 900,
     renderMemoryBytes: 2 * GiB,
     renderThreads: 2,
     mediaDimension: 4096,

@@ -48,6 +48,20 @@ export function mediaHeader(bytes: Buffer, ext: string) {
 // Probes a staged file with an owned, bounded ffprobe: local files only (no
 // network, pipes or playlist subresources), a wall-clock and memory limit,
 // and bounded output. Failures never echo the command line or stderr.
+// The container families Yamakan accepts, for every FFmpeg or ffprobe input;
+// no playlist or concat demuxers.
+export const MEDIA_FORMATS =
+  "mov,matroska,wav,mp3,ogg,png_pipe,jpeg_pipe,webp_pipe,image2";
+
+// Rotation in degrees from a stream's display matrix or legacy rotate tag.
+function rotation(stream: any): number {
+  const matrix = (stream?.side_data_list ?? []).find(
+    (d: any) => d?.side_data_type === "Display Matrix",
+  );
+  const value = Number(matrix?.rotation ?? stream?.tags?.rotate ?? 0);
+  return Number.isFinite(value) ? Math.round(value) : 0;
+}
+
 export async function probe(file: string) {
   const chunks: Buffer[] = [];
   let size = 0;
@@ -64,7 +78,7 @@ export async function probe(file: string) {
         "file",
         // Only the container families Yamakan accepts; no playlist or concat demuxers.
         "-format_whitelist",
-        "mov,matroska,wav,mp3,ogg,png_pipe,jpeg_pipe,webp_pipe,image2",
+        MEDIA_FORMATS,
         "-show_streams",
         "-show_format",
         "-of",
@@ -94,8 +108,11 @@ export async function probe(file: string) {
   const audio = streams.find((x: any) => x.codec_type === "audio");
   if (streams.length > probeStreams || (!visual && !audio))
     throw new Error("Unsupported media streams.");
-  const width = Number(visual?.width || 0);
-  const height = Number(visual?.height || 0);
+  // Display dimensions: FFmpeg applies a ±90° display rotation whenever it
+  // decodes (renders and conversions), so the upright size is the real one.
+  const turned = Math.abs(rotation(visual)) % 180 === 90;
+  const width = Number((turned ? visual?.height : visual?.width) || 0);
+  const height = Number((turned ? visual?.width : visual?.height) || 0);
   if (width > mediaDimension || height > mediaDimension)
     throw new Error(`Media dimensions exceed ${mediaDimension} pixels.`);
   const duration = Number(
