@@ -194,9 +194,9 @@
       "T8: renders any window of a plan (the whole plan for export, one frame as PNG or a short segment as MP4 for reference preview) with absolute timeline timestamps, so the plan's title script times titles in any window; timestamp offsets are rounded to the nearest tick from exact flicks (setpts truncates); clips are cut one frame long and ended by the overlay enable window; audio is shaped in clip time, then cut to the window.",
       "T8a review: each source frame keeps its own timeline time (clip start plus its distance from the clip source start) in export and in any window, with up to two frames of lead-in, so the frame-rate filter selects the same source frame for every output frame at any source rate; renders take an optional wall-clock limit; RENDERER_VERSION versions how plans are drawn.",
       "T8a review 2: the lead-in is bounded by the source (not the clip), so the source frame covering a clip's first instant is always read; clips are placed in a one-tick-per-flick time base (settb) so offsets are exact for any source time base, including looped stills.",
-      "T9c: the render worker runs sandboxed (restricted, low-integrity token) and may write only to its own staging folder, named in the worker request."
+      "T9c: the render worker runs sandboxed (restricted, low-integrity token) and may write only to its own staging folder, named in the worker request; only the main data stream of what it wrote is kept, copied into a file the service creates (keepMainStream), so the worker's permissions and alternate streams never reach a published file."
     ],
-    "importedSha256": "02ac99864ad3fa962815bc76aeae1f2a305de993cbe780693ff205b9a561a787"
+    "importedSha256": "06166a7ddd87402501248556877fd3e830f095cec68a68ee5ffe384b452ddaa8"
   },
   {
     "source": "TheHalfMoon/Skelet",

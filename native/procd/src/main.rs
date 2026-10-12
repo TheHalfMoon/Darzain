@@ -470,12 +470,32 @@ fn grant_owner_full(dir: &str) -> Result<(), String> {
         let result = (|| {
             let old_size = if old.is_null() { 8 } else { *((old as *const u8).add(2) as *const u16) as usize };
             let count = if old.is_null() { 0 } else { *((old as *const u8).add(4) as *const u16) as u32 };
-            let mut acl = vec![0u64; (old_size + 128).div_ceil(8)];
+            let needed = old_size + 8 + GetLengthSid(user_sid) as usize;
+            if needed > 65_532 {
+                return Err("the folder's access list is too large".into());
+            }
+            let mut acl = vec![0u64; needed.div_ceil(8) + 1];
             let acl_ptr = acl.as_mut_ptr() as *mut c_void;
             if InitializeAcl(acl_ptr, (acl.len() * 8) as u32, ACL_REVISION) == 0 {
                 return Err(last_error("InitializeAcl"));
             }
-            // The user's grant first, then every existing entry in order.
+            // Explicit denies keep their place first (canonical order), then
+            // the user's grant, then every other entry in order.
+            let entry = |i: u32| -> Result<(*mut c_void, u8, u8, u32), String> {
+                let mut ace: *mut c_void = null_mut();
+                if GetAce(old, i, &mut ace) == 0 {
+                    return Err(last_error("GetAce"));
+                }
+                let bytes = ace as *const u8;
+                Ok((ace, *bytes, *bytes.add(1), *(bytes.add(2) as *const u16) as u32))
+            };
+            let explicit_deny = |kind: u8, flags: u8| kind == 1 && flags & 0x10 == 0;
+            for i in 0..count {
+                let (ace, kind, flags, size) = entry(i)?;
+                if explicit_deny(kind, flags) && AddAce(acl_ptr, ACL_REVISION, u32::MAX, ace, size) == 0 {
+                    return Err(last_error("AddAce"));
+                }
+            }
             if AddAccessAllowedAceEx(
                 acl_ptr,
                 ACL_REVISION,
@@ -487,12 +507,8 @@ fn grant_owner_full(dir: &str) -> Result<(), String> {
                 return Err(last_error("AddAccessAllowedAceEx"));
             }
             for i in 0..count {
-                let mut ace: *mut c_void = null_mut();
-                if GetAce(old, i, &mut ace) == 0 {
-                    return Err(last_error("GetAce"));
-                }
-                let size = *((ace as *const u8).add(2) as *const u16) as u32;
-                if AddAce(acl_ptr, ACL_REVISION, u32::MAX, ace, size) == 0 {
+                let (ace, kind, flags, size) = entry(i)?;
+                if !explicit_deny(kind, flags) && AddAce(acl_ptr, ACL_REVISION, u32::MAX, ace, size) == 0 {
                     return Err(last_error("AddAce"));
                 }
             }
@@ -560,6 +576,49 @@ fn apply_label(dir: &str, low: bool) -> Result<(), u32> {
     Ok(())
 }
 
+// Folders labelled Low for live workers, by case-folded path: the original
+// spelling and how many live workers hold it. A folder keeps its label until
+// the last of them exits, and every one is restored when procd shuts down.
+fn labels() -> &'static Mutex<HashMap<String, (String, usize)>> {
+    static LABELS: std::sync::OnceLock<Mutex<HashMap<String, (String, usize)>>> = std::sync::OnceLock::new();
+    LABELS.get_or_init(Default::default)
+}
+
+fn hold_label(dir: &str) -> Result<(), String> {
+    let mut held = labels().lock().unwrap();
+    let key = dir.to_lowercase();
+    if let Some(entry) = held.get_mut(&key) {
+        entry.1 += 1;
+        return Ok(());
+    }
+    set_label(dir, true)?;
+    held.insert(key, (dir.to_string(), 1));
+    Ok(())
+}
+
+fn release_label(dir: &str) {
+    let mut held = labels().lock().unwrap();
+    let key = dir.to_lowercase();
+    let last = match held.get_mut(&key) {
+        Some(entry) => {
+            entry.1 -= 1;
+            entry.1 == 0
+        }
+        None => false,
+    };
+    if last {
+        held.remove(&key);
+        let _ = set_label(dir, false);
+    }
+}
+
+fn release_all_labels() {
+    let mut held = labels().lock().unwrap();
+    for (_, (dir, _)) in held.drain() {
+        let _ = set_label(&dir, false);
+    }
+}
+
 // A writable folder must be an existing, absolute, real directory (not a
 // link or junction, which would label its target instead).
 fn writable_dir(dir: &str) -> Result<(), String> {
@@ -615,16 +674,16 @@ fn spawn(fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
 
     let token = sandbox_token()?;
     for (i, dir) in writable.iter().enumerate() {
-        if let Err(e) = set_label(dir, true) {
+        if let Err(e) = hold_label(dir) {
             for done in &writable[..i] {
-                let _ = set_label(done, false);
+                release_label(done);
             }
             return Err(e);
         }
     }
     let restore = |writable: &[String]| {
         for dir in writable {
-            let _ = set_label(dir, false);
+            release_label(dir);
         }
     };
     let result = launch(&exe, &cwd, &line, memory, &token);
@@ -847,7 +906,7 @@ fn main() {
                                 let folders = worker.writable.clone();
                                 drop(worker);
                                 for dir in &folders {
-                                    let _ = set_label(dir, false);
+                                    release_label(dir);
                                 }
                             }
                             send(&out, &format!("EXITED\t{id}\t{code}"));
@@ -870,9 +929,12 @@ fn main() {
             _ => send(&out, &format!("ERROR\t{id}\t{}", hex_encode(b"unknown command"))),
         }
     }
-    // The service is gone (or broke the protocol): end every job, then exit.
+    // The service is gone (or broke the protocol): end every job, restore
+    // every folder's label, then exit. (After a crash of procd itself the
+    // service clears labels across the workspace when it next starts.)
     for worker in workers.lock().unwrap().values() {
         unsafe { TerminateJobObject(worker.job.0, 1) };
     }
+    release_all_labels();
     std::process::exit(0);
 }

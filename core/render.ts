@@ -1,4 +1,6 @@
-import { writeFile, mkdir, unlink } from "node:fs/promises";
+import { writeFile, mkdir, unlink, lstat } from "node:fs/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { ProjectStore } from "./store.ts";
@@ -208,9 +210,14 @@ export async function renderPlan(
     );
   const total = seconds(window.durationTicks);
   const dir = await store.file(plan.projectId, ...staging);
-  const output = path.join(
+  // What the worker writes, and the copy the service keeps of it.
+  const written = path.join(
     dir,
     window.output === "png" ? "frame.partial.png" : "render.partial.mp4",
+  );
+  const output = path.join(
+    dir,
+    window.output === "png" ? "frame.png" : "render.mp4",
   );
   // One limit covers the capability probe, the fit check and the render.
   const controller = new AbortController();
@@ -468,6 +475,11 @@ export async function renderPlan(
         `FFmpeg failed to render the timeline (exit ${result.code}).`,
         { cause: result.stderr },
       );
+    // The worker owned the file it wrote and could have given it its own
+    // permissions or alternate data streams. Only its main stream is kept,
+    // copied into a file this service creates, which inherits the
+    // workspace's owner-only access; the worker's file is removed.
+    await keepMainStream(written, output);
     const probed = await probe(output);
     // The profile is 30 fps (compilePlan), the unit probe counts frames in.
     const expectedFrames = Math.round(duration * 30);
@@ -493,6 +505,7 @@ export async function renderPlan(
       },
     };
   } catch (e) {
+    await unlink(written).catch(() => {});
     await unlink(output).catch(() => {});
     // A wait abandoned by the deadline or a cancel reports why it stopped.
     if (controller.signal.aborted && !(e instanceof CommandError))
@@ -502,6 +515,19 @@ export async function renderPlan(
     clearTimeout(timer);
     signal.removeEventListener("abort", abort);
   }
+}
+
+// Keeps only the main data stream of a file a worker wrote, in a new file
+// this service creates (it inherits the folder's access, not the
+// worker's), and removes the worker's file.
+export async function keepMainStream(written: string, kept: string) {
+  if (!(await lstat(written)).isFile())
+    throw new Error("Rendered output is not a regular file.");
+  await pipeline(
+    createReadStream(written),
+    createWriteStream(kept, { flags: "wx", mode: 0o600 }),
+  );
+  await unlink(written);
 }
 
 // Compiles the render plan of a stored revision and renders it: the one
