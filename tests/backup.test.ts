@@ -112,17 +112,27 @@ test("an online backup taken during imports, edits and garbage collection restor
   const old = new Date(Date.now() - 90 * 60 * 1000);
   await utimes(orphanFile, old, old);
 
+  const tick = () => new Promise((resolve) => setImmediate(resolve));
   let editing = true;
   let committed = 0;
+  let failed = false;
   const edits = (async () => {
     for (let i = 0; editing || i < 5; i++) {
       const head = await store.load(project.id);
-      await store.save({ ...head, name: `Edit ${i}` }, head.revision);
-      committed++;
+      try {
+        await store.save({ ...head, name: `Edit ${i}` }, head.revision);
+        committed++;
+      } catch (e) {
+        // A concurrent import committed first: re-read, as a client would.
+        if (toCommandError(e).code !== "REVISION_CONFLICT") throw e;
+      }
       // Edits arrive as separate requests: yield to the event loop.
-      await new Promise((resolve) => setImmediate(resolve));
+      await tick();
     }
-  })();
+  })().catch((e) => {
+    failed = true;
+    throw e;
+  });
   const imports = (async () => {
     for (const [i, bytes] of media.slice(2).entries())
       await store.importAsset(project.id, `${colors[i + 2]}.png`, bytes);
@@ -131,16 +141,34 @@ test("an online backup taken during imports, edits and garbage collection restor
     const reports = [];
     while (editing) {
       reports.push(await store.collectGarbage());
-      await new Promise((resolve) => setImmediate(resolve));
+      await tick();
     }
     return reports;
   })();
-  const before = committed;
-  const backup = await backupWorkspace(store, home);
-  // Work really overlapped the backup: edits committed while it ran.
-  assert.ok(committed > before, "edits committed during the backup");
-  editing = false;
+  // The store as the backup source, except that the database copy starts
+  // only after edits have committed since the backup began (with objects
+  // already held): the overlap is certain, not a matter of timing.
+  const started = committed;
+  const paced = {
+    root: store.root,
+    get reservedBytes() {
+      return store.reservedBytes;
+    },
+    holdObjects: () => store.holdObjects(),
+    backupDatabase: async (destination: string) => {
+      while (committed < started + 2 && !failed) await tick();
+      return store.backupDatabase(destination);
+    },
+  };
+  let backup;
+  try {
+    backup = await backupWorkspace(paced, home);
+  } finally {
+    // Every loop stops, whatever happened, so a failure cannot hang.
+    editing = false;
+  }
   const [gc] = await Promise.all([collections, edits, imports]);
+  assert.ok(committed >= started + 2, "edits committed during the backup");
   assert.equal(backup.damaged, 0);
   // Garbage collection ran throughout (never removing anything while the
   // backup held objects; see the next test) and collects the orphan.
