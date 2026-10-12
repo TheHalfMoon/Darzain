@@ -9,7 +9,7 @@ import {
 } from "node:fs/promises";
 import { createReadStream, statfsSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, backup } from "node:sqlite";
 import { canonicalJson, sha256Hex } from "./donors/ninerr/canonical.ts";
 import { ProjectSchema, Id, AssetSchema, createProject } from "./project.ts";
 import type { Project, Asset } from "./project.ts";
@@ -29,6 +29,7 @@ import type { CanonicalProject } from "./canonical.ts";
 import { applyBatch } from "./timeline/operations.ts";
 import type { Operation } from "./timeline/operations.ts";
 import { RESOURCE_POLICY } from "./command/policy.ts";
+import { inspectWal } from "./wal.ts";
 
 export type ProjectHistory = {
   projectId: string;
@@ -287,6 +288,10 @@ const EDIT_HISTORY_OPERATIONS = new Set([
 ]);
 type Cursor = { cursor: number; head_revision: number };
 
+// SQLite reports a damaged or foreign file as malformed or not a database.
+const isDamaged = (e: unknown) =>
+  e instanceof Error &&
+  /malformed|not a database|SQLITE_CORRUPT|SQLITE_NOTADB/i.test(e.message);
 const isBusy = (e: unknown) =>
   e instanceof Error && /database is locked|SQLITE_BUSY/i.test(e.message);
 
@@ -299,6 +304,10 @@ export class ProjectStore {
   #importing = 0;
   #publishing = new Map<string, number>();
   #discarding = new Map<string, Promise<void>>();
+  // Open object holds (backups): while any is held, no object file is
+  // deleted, so every object a backup's database copy registers stays
+  // readable until the backup has copied it.
+  #holds = 0;
   constructor(root: string, options: StoreOptions = {}) {
     this.root = root;
     this.#options = options;
@@ -317,6 +326,14 @@ export class ProjectStore {
       );
     const sideFiles = [`${file}-wal`, `${file}-shm`];
     const hadSideFiles = await Promise.all(sideFiles.map(present));
+    // SQLite skips committed transactions after a damaged log frame without
+    // an error and deletes the log at the next checkpoint; such a log is
+    // refused before any connection opens, so it stays as found.
+    if ((await inspectWal(sideFiles[0]))?.damaged)
+      throw new CommandError(
+        "RECOVERY_REQUIRED",
+        "Workspace write-ahead log is damaged (committed changes after the damage would be lost) and was left as found; diagnose it (npm run recovery -- diagnose) and restore a verified backup to a new root.",
+      );
     // Inspect before writing anything: a database this build refuses is left
     // exactly as it was found (no journal-mode change, no schema).
     if (await present(file)) {
@@ -328,7 +345,13 @@ export class ProjectStore {
       } catch (e) {
         refusal = isBusy(e)
           ? new CommandError("BUSY", "Workspace database is busy.")
-          : e;
+          : isDamaged(e)
+            ? new CommandError(
+                "RECOVERY_REQUIRED",
+                "Workspace database is damaged and was left as found; diagnose it (npm run recovery -- diagnose) and restore a verified backup to a new root.",
+                { cause: e },
+              )
+            : e;
       } finally {
         probe.close();
       }
@@ -897,7 +920,11 @@ export class ProjectStore {
   async discardUnregisteredObject(projectId: string, digest: string) {
     Id.parse(projectId);
     if (!/^[0-9a-f]{64}$/.test(digest)) return false;
-    if (this.#publishing.has(projectId) || this.#discarding.has(projectId))
+    if (
+      this.#publishing.has(projectId) ||
+      this.#discarding.has(projectId) ||
+      this.#holds > 0
+    )
       return false;
     const registered = this.#database
       .prepare(
@@ -924,6 +951,83 @@ export class ProjectStore {
       this.#discarding.delete(projectId);
     }
     return true;
+  }
+  // Holds every object file in place until the returned release is called.
+  holdObjects() {
+    this.#holds++;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.#holds--;
+    };
+  }
+  // Copies the database online with SQLite's backup API through this
+  // connection, so the copy includes every write committed before it
+  // completes and nothing after.
+  // One step: a rollback on this connection restarts an incremental copy,
+  // and conflicting edits roll back often enough to stall one.
+  async backupDatabase(destination: string) {
+    await backup(this.#database, destination, { rate: -1 });
+  }
+  // Bytes promised to in-flight imports on this volume.
+  get reservedBytes() {
+    return this.#reserved;
+  }
+  // Removes crash leftovers older than the grace period: content objects no
+  // row registers, temporary files of the object store and staging files of
+  // uploads. Registered objects are never removed here. Nothing is removed
+  // while a backup holds objects, and a project's objects are skipped while
+  // a publication into it is in flight.
+  async collectGarbage(options: { graceMs?: number; now?: number } = {}) {
+    const graceMs = options.graceMs ?? 60 * 60 * 1000;
+    const now = options.now ?? Date.now();
+    const report = { objects: 0, bytes: 0, temporary: 0 };
+    if (this.#holds > 0) return report;
+    const stale = async (file: string) => {
+      const info = await lstat(file).catch(() => null);
+      return info?.isFile() && now - info.mtimeMs > graceMs ? info : null;
+    };
+    const names = async (...parts: string[]) =>
+      readdir(await safePath(this.root, "projects", ...parts)).catch(
+        () => [] as string[],
+      );
+    for (const id of await names()) {
+      if (!Id.safeParse(id).success) continue;
+      for (const dir of [["objects", ".tmp"], ["imports"]]) {
+        if (
+          dir[0] === "imports" ? this.#importing > 0 : this.#publishing.has(id)
+        )
+          continue;
+        for (const name of await names(id, ...dir)) {
+          if (this.#holds > 0) return report;
+          const file = await this.file(id, ...dir, name);
+          if (
+            (await stale(file)) &&
+            (await unlink(file).then(
+              () => true,
+              () => false,
+            ))
+          )
+            report.temporary++;
+        }
+      }
+      for (const prefix of await names(id, "objects", "sha256")) {
+        if (!/^[0-9a-f]{2}$/.test(prefix)) continue;
+        for (const digest of await names(id, "objects", "sha256", prefix)) {
+          if (!/^[0-9a-f]{64}$/.test(digest) || !digest.startsWith(prefix))
+            continue;
+          const info = await stale(
+            await this.file(id, "objects", "sha256", prefix, digest),
+          );
+          if (info && (await this.discardUnregisteredObject(id, digest))) {
+            report.objects++;
+            report.bytes += info.size;
+          }
+        }
+      }
+    }
+    return report;
   }
   // Releases a staged version that never joined the project (its conversion
   // failed or was cancelled): the version row goes, and the object goes too

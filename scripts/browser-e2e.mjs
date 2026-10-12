@@ -1,7 +1,7 @@
 import { chromium } from "playwright-core";
 import { execFileSync, fork } from "node:child_process";
 import { mkdirSync, writeFileSync, mkdtempSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -476,6 +476,37 @@ try {
   await page
     .getByRole("button", { name: "Create project", exact: true })
     .waitFor();
+  // Workspace backup, then restore into a new folder, by keyboard only.
+  const backupButton = page.getByRole("button", {
+    name: "Back up now",
+    exact: true,
+  });
+  await backupButton.focus();
+  await page.keyboard.press("Enter");
+  await page
+    .getByRole("status")
+    .filter({ hasText: "Backup created." })
+    .waitFor({ timeout: 60000 });
+  const restoreButton = page
+    .getByRole("button", { name: "Restore to a new folder", exact: true })
+    .first();
+  await restoreButton.focus();
+  await page.keyboard.press("Enter");
+  await page
+    .getByRole("status")
+    .filter({ hasText: "Restored into a new workspace folder" })
+    .waitFor({ timeout: 60000 });
+  const restoredFolders = join(root, "workspace-recovery", "restored");
+  const [restoredRoot] = await readdir(restoredFolders);
+  const restoreReceipt = JSON.parse(
+    await readFile(join(restoredFolders, restoredRoot, "restore.json"), "utf8"),
+  );
+  const head = await getProject();
+  assert.deepEqual(
+    restoreReceipt.projects.find((p) => p.projectId === head.id)?.revision,
+    head.revision,
+  );
+  assert.deepEqual(restoreReceipt.quarantined, []);
   assert.deepEqual(errors, []);
   const receipt = {
     runtime:
@@ -496,6 +527,7 @@ try {
       "preview",
       "reference preview frame (plan-compiled) with stale notice",
       "Arabic interface (RTL page, LTR timeline, remembered across reload)",
+      "workspace backup and restore into a new folder (keyboard)",
       "export",
       "download",
       "reload",

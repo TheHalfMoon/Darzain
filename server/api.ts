@@ -21,9 +21,11 @@ export const principals: Record<Principal["id"], Principal> = {
 export class CreativeAPI {
   readonly store: ProjectStore;
   readonly queue: JobSupervisor;
-  constructor(store: ProjectStore) {
+  readonly recoveryHome: string | undefined;
+  constructor(store: ProjectStore, options: { recoveryHome?: string } = {}) {
     this.store = store;
     this.queue = new JobSupervisor(store);
+    this.recoveryHome = options.recoveryHome;
   }
   catalog() {
     return {
@@ -54,7 +56,13 @@ export class CreativeAPI {
     requestId?: string,
   ) {
     return execute(
-      { store: this.store, queue: this.queue, principal, requestId },
+      {
+        store: this.store,
+        queue: this.queue,
+        principal,
+        requestId,
+        recoveryHome: this.recoveryHome,
+      },
       name,
       args,
     );

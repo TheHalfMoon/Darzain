@@ -22,6 +22,7 @@
     "benchmark": "node scripts/benchmark-production.ts",
     "mcp": "node mcp/main.ts",
     "migrate": "node cli/migrate.ts",
+    "recovery": "node cli/recovery.ts",
     "build:native": "cargo build --release --manifest-path native/procd/Cargo.toml",
     "qualify:large-import": "node scripts/qualify-large-import.mjs",
     "qualify:typography": "node scripts/qualify-typography.ts",

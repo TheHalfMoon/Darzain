@@ -22,6 +22,7 @@ import { acquireServiceLock } from "../core/service-lock.ts";
 import { isLegacyWorkspace } from "../core/migrate.ts";
 import { closeWorkers } from "../core/process/workers.ts";
 import { closePreviews, preview } from "../core/render/preview.ts";
+import { assertSeparate, defaultRecoveryHome } from "../core/recovery.ts";
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -57,9 +58,25 @@ await store.initialize();
 const sessionToken = randomBytes(32).toString("hex");
 const clientToken = randomBytes(32).toString("hex");
 await writeFile(await safePath(root, "token"), clientToken, { mode: 0o600 });
-const api = new CreativeAPI(store);
+// Backups and restored workspaces live outside the workspace folder.
+const recoveryHome = path.resolve(env("RECOVERY") || defaultRecoveryHome(root));
+try {
+  await assertSeparate(root, recoveryHome);
+} catch (e) {
+  console.error(
+    `The recovery folder must be outside the workspace: ${(e as Error).message}`,
+  );
+  process.exit(1);
+}
+const api = new CreativeAPI(store, { recoveryHome });
 // Durable jobs: reconcile any interrupted attempts and resume queued work.
 await api.queue.start();
+// Crash leftovers from an earlier run (older than the grace period).
+void store
+  .collectGarbage()
+  .catch((e: Error) =>
+    console.warn("Garbage collection skipped: " + e.message),
+  );
 const port = Number(env("PORT") || 4318);
 const origin = `http://127.0.0.1:${port}`;
 function sameToken(value: string, expected: string) {
@@ -117,7 +134,10 @@ const server = createServer(async (req, res) => {
       requestId,
       error: {
         code: error.code,
+        // The recovery folder first: by default it begins with the
+        // workspace path.
         message: error.message
+          .replaceAll(recoveryHome, "[recovery]")
           .replaceAll(root, "[workspace]")
           .replaceAll(projectRoot, "[application]"),
         retryable: error.retryable,
@@ -337,6 +357,12 @@ const server = createServer(async (req, res) => {
           job.projectId,
           ...job.artifact.split("/"),
         );
+        // Backups do not carry exports; a restored workspace exports again.
+        if (!(await stat(file).catch(() => null))?.isFile())
+          throw new CommandError(
+            "NOT_FOUND",
+            "This export's file is not in this workspace; export again.",
+          );
         await media(file, "video/mp4", true);
         return;
       }

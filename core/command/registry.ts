@@ -7,6 +7,13 @@ import { canonicalJson, sha256Hex } from "../donors/ninerr/canonical.ts";
 import type { JobSupervisor } from "../jobs.ts";
 import { CommandError } from "./errors.ts";
 import { RESOURCE_POLICY } from "./policy.ts";
+import {
+  BackupId,
+  backupWorkspace,
+  defaultRecoveryHome,
+  listBackups,
+  restoreFromHome,
+} from "../recovery.ts";
 
 export const RESOURCE_POLICY_HASH = sha256Hex(canonicalJson(RESOURCE_POLICY));
 
@@ -33,6 +40,9 @@ export type CommandContext = {
   queue: JobSupervisor;
   principal: Principal;
   requestId?: string;
+  // Where backups and restored roots go: chosen by the service, never by a
+  // request (default: a "-recovery" folder beside the workspace).
+  recoveryHome?: string;
 };
 type RunContext = CommandContext & { receipt?: RequestReceipt };
 
@@ -44,6 +54,9 @@ type Definition<S extends z.ZodType, R> = {
   run: (ctx: RunContext, input: z.output<S>) => Promise<R> | R;
 };
 const define = <S extends z.ZodType, R>(d: Definition<S, R>) => d;
+
+const home = (ctx: CommandContext) =>
+  ctx.recoveryHome ?? defaultRecoveryHome(ctx.store.root);
 
 const revisionFingerprint = z
   .string()
@@ -176,6 +189,40 @@ export const commands = {
       .strict(),
     run: ({ store, receipt }, a) =>
       store.save(a.project, a.expectedRevision, receipt),
+  }),
+  "yamakan.workspace.backup": define({
+    scope: "project:recover",
+    mutation: true,
+    summary:
+      "Back up the workspace (database and verified media) into the service's recovery folder while work continues.",
+    input: z.object({}).strict(),
+    run: (ctx) => backupWorkspace(ctx.store, home(ctx)),
+  }),
+  "yamakan.workspace.backups": define({
+    scope: "project:read",
+    mutation: false,
+    summary: "List workspace backups, newest first.",
+    input: z.object({}).strict(),
+    run: (ctx) => listBackups(home(ctx)),
+  }),
+  "yamakan.workspace.restore": define({
+    scope: "project:recover",
+    mutation: true,
+    summary:
+      "Restore a backup into a new workspace folder (the current workspace is not changed).",
+    input: z.object({ backupId: BackupId }).strict(),
+    run: (ctx, a) =>
+      restoreFromHome(home(ctx), a.backupId, {
+        reservedBytes: ctx.store.reservedBytes,
+      }),
+  }),
+  "yamakan.workspace.collectGarbage": define({
+    scope: "project:recover",
+    mutation: true,
+    summary:
+      "Remove crash leftovers older than an hour (unregistered media objects, temporary and staging files).",
+    input: z.object({}).strict(),
+    run: ({ store }) => store.collectGarbage(),
   }),
   "yamakan.export.video": define({
     scope: "render:execute",

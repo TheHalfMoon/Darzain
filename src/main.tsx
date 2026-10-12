@@ -22,6 +22,7 @@ import {
   saveLang,
   translate,
   formatNumber,
+  formatDate,
   formatPercent,
   formatSeconds,
 } from "./i18n.ts";
@@ -32,7 +33,11 @@ import {
   updateClips as applyClipUpdates,
 } from "./edit-ops.ts";
 import { YamakanClient } from "../sdk/client.ts";
-import type { Operation, OperationInput } from "../sdk/client.ts";
+import type {
+  Operation,
+  OperationInput,
+  OperationResult,
+} from "../sdk/client.ts";
 import "./donors/film-editor/editor.css";
 import "./style.css";
 // The UI is a same-origin client of the shared command registry; its session
@@ -81,7 +86,10 @@ function App() {
     [downloadedDraft, setDownloadedDraft] = useState<Project | null>(null),
     [revisionHistory, setRevisionHistory] = useState<ProjectHistory | null>(
       null,
-    );
+    ),
+    // Workspace backups, loaded on request.
+    [backups, setBackups] =
+      useState<OperationResult<"yamakan.workspace.backups"> | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const p = history?.present;
   const current = useRef(p);
@@ -325,6 +333,88 @@ function App() {
               </div>
             ))}
           </div>
+          <section className="backups" aria-label={t("backups.title")}>
+            <h2>{t("backups.title")}</h2>
+            <p className="note">{t("backups.note")}</p>
+            <button
+              disabled={busy}
+              onClick={() =>
+                run(async () => {
+                  const made = await call("yamakan.workspace.backup", {});
+                  setBackups(await call("yamakan.workspace.backups", {}));
+                  setMessage(
+                    made.damaged
+                      ? msg("backups.madeDamaged", { count: made.damaged })
+                      : msg("backups.made"),
+                  );
+                })
+              }
+            >
+              {t("backups.create")}
+            </button>
+            {!backups && (
+              <button
+                disabled={busy}
+                onClick={() =>
+                  run(async () =>
+                    setBackups(await call("yamakan.workspace.backups", {})),
+                  )
+                }
+              >
+                {t("backups.show")}
+              </button>
+            )}
+            {backups && backups.length === 0 && <p>{t("backups.none")}</p>}
+            {backups && backups.length > 0 && (
+              <ul className="backup-list">
+                {backups.map((b) => (
+                  <li key={b.backupId}>
+                    {b.complete ? (
+                      <>
+                        <span>
+                          {t("backups.summary", {
+                            date: formatDate(lang, b.createdAt),
+                            projects: b.projects,
+                            size: Math.max(1, Math.ceil(b.bytes / 1e6)),
+                          })}
+                        </span>
+                        {b.damaged > 0 && (
+                          <small className="error">
+                            {t("backups.damaged", { count: b.damaged })}
+                          </small>
+                        )}
+                        <button
+                          disabled={busy}
+                          onClick={() =>
+                            run(async () => {
+                              const restored = await call(
+                                "yamakan.workspace.restore",
+                                { backupId: b.backupId },
+                              );
+                              setMessage(
+                                restored.quarantined.length
+                                  ? msg("backups.restoredQuarantined", {
+                                      folder: restored.root,
+                                      count: restored.quarantined.length,
+                                    })
+                                  : msg("backups.restored", {
+                                      folder: restored.root,
+                                    }),
+                              );
+                            })
+                          }
+                        >
+                          {t("backups.restore")}
+                        </button>
+                      </>
+                    ) : (
+                      <span>{t("backups.incomplete", { id: b.backupId })}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
           {p && (
             <>
               <h2>
