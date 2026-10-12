@@ -15,6 +15,7 @@ import {
   redoHistoryState,
 } from "./donors/film-editor/utils/historyState";
 import { editorView } from "./adapter";
+import { ReferencePreview } from "./reference.tsx";
 import {
   deleteClip,
   splitClip,
@@ -568,6 +569,18 @@ function App() {
                     />
                     <span>{playhead.toFixed(2)} s</span>
                   </div>
+                  <ReferencePreview
+                    projectId={p.id}
+                    revision={p.revision}
+                    frame={Math.round(playhead * 30)}
+                    totalFrames={Math.max(
+                      0,
+                      ...p.clips.map((c) => c.startFrame + c.durationFrames),
+                    )}
+                    unsaved={history.past.length > 0}
+                    playing={playing}
+                    onSave={() => run(async () => void (await save()))}
+                  />
                 </section>
                 <section className="inspector">
                   <h2>Scene & shot</h2>

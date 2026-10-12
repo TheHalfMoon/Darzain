@@ -1,0 +1,52 @@
+{
+  "qualification": "t8-reference-preview-latency",
+  "date": "2026-10-12T14:48:23.029Z",
+  "commit": "c958b972c606108b2968af9e02384906d412316d",
+  "host": {
+    "platform": "win32-x64",
+    "cpu": "13th Gen Intel(R) Core(TM) i5-13420H",
+    "logicalCpus": 12,
+    "memoryGiB": 16
+  },
+  "ffmpeg": "ffmpeg version 8.1.1-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers\r",
+  "fixture": "30 s 1280x720 timeline: FFmpeg test pattern (GOP 60), sine audio, one Arabic/Latin title for the whole duration",
+  "results": {
+    "firstFrameMs": 548,
+    "coldFrame": {
+      "runs": 10,
+      "p50": 389,
+      "p95": 410,
+      "max": 410
+    },
+    "warmFrame": {
+      "runs": 10,
+      "p50": 2,
+      "p95": 2,
+      "max": 2
+    },
+    "coldSegment2s": {
+      "runs": 5,
+      "p50": 822,
+      "p95": 894,
+      "max": 894
+    }
+  },
+  "targets": {
+    "warmFrameP95Ms": {
+      "target": 1000,
+      "measured": 2,
+      "met": true
+    },
+    "coldFrameP95Ms": {
+      "target": 3000,
+      "measured": 410,
+      "met": true
+    },
+    "coldSegment2sP95Ms": {
+      "target": 6000,
+      "measured": 894,
+      "met": true
+    }
+  },
+  "note": "Targets are the plan's proposed values, measured on this host only; Profile A qualification (T10) repeats this on the reference hardware."
+}

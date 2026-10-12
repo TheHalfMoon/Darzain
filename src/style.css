@@ -232,6 +232,28 @@ main {
 .preview canvas {
   max-width: 100%;
 }
+.reference {
+  border-top: 1px solid #27364f;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+.reference-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.reference-head span {
+  color: #9fb2cf;
+  font-size: 0.9em;
+}
+.reference img,
+.reference video {
+  width: 100%;
+  background: #000;
+  border-radius: 4px;
+}
 .transport {
   display: flex;
   align-items: center;

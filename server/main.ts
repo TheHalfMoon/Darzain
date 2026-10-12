@@ -21,6 +21,7 @@ import { RESOURCE_POLICY } from "../core/command/policy.ts";
 import { acquireServiceLock } from "../core/service-lock.ts";
 import { isLegacyWorkspace } from "../core/migrate.ts";
 import { closeWorkers } from "../core/process/workers.ts";
+import { closePreviews, preview } from "../core/render/preview.ts";
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -108,8 +109,10 @@ const server = createServer(async (req, res) => {
     res.writeHead(status, { "Content-Type": "application/json" });
     res.end(JSON.stringify(value));
   };
-  const fail = (error: CommandError) =>
-    json(httpStatus[error.code], {
+  const fail = (error: CommandError) => {
+    // An error is never cached, whatever a route set before failing.
+    if (!res.headersSent) res.setHeader("Cache-Control", "no-store");
+    return json(httpStatus[error.code], {
       apiVersion: 1,
       requestId,
       error: {
@@ -120,6 +123,7 @@ const server = createServer(async (req, res) => {
         retryable: error.retryable,
       },
     });
+  };
   // Streams a file (or one byte range of it) without reading it into memory.
   const media = async (file: string, type: string, attachment = false) => {
     const size = (await stat(file)).size;
@@ -151,6 +155,7 @@ const server = createServer(async (req, res) => {
         res.writeHead(416, {
           "Content-Range": `bytes */${size}`,
           "Content-Length": 0,
+          "Cache-Control": "no-store",
         });
         res.end();
         return;
@@ -250,6 +255,54 @@ const server = createServer(async (req, res) => {
           probe: staged.probe,
         });
       }
+      // Reference preview: a frame (PNG) or short segment (MP4) of a stored
+      // revision, rendered by the export's plan compiler.
+      const previewMatch = /^\/api\/v1\/projects\/([^/]+)\/preview$/.exec(
+        url.pathname,
+      );
+      if (req.method === "GET" && previewMatch) {
+        authorize(principal, "yamakan.project.open");
+        const number = (name: string, fallback?: number) => {
+          const raw = url.searchParams.get(name);
+          if (raw === null && fallback !== undefined) return fallback;
+          if (raw === null || !/^\d{1,9}$/.test(raw))
+            throw new CommandError(
+              "VALIDATION",
+              `${name} must be a whole number.`,
+            );
+          return Number(raw);
+        };
+        const kind = url.searchParams.get("kind") ?? "frame";
+        if (kind !== "frame" && kind !== "segment")
+          throw new CommandError(
+            "VALIDATION",
+            "kind must be frame or segment.",
+          );
+        // A client that leaves (a newer playhead position, a closed tab)
+        // releases its render; the last one to leave stops it.
+        const left = new AbortController();
+        res.once("close", () => {
+          if (!res.writableFinished) left.abort();
+        });
+        const shown = await preview(
+          store,
+          previewMatch[1],
+          number("revision"),
+          kind,
+          number("start"),
+          kind === "segment" ? number("frames", 60) : 1,
+          left.signal,
+        );
+        res.setHeader("X-Preview-Start", String(shown.startFrame));
+        res.setHeader("X-Preview-Frames", String(shown.frames));
+        res.setHeader("X-Plan-Hash", shown.planHash);
+        res.setHeader("X-Revision", String(shown.revision));
+        res.setHeader("X-Preview-Cache", shown.cached ? "hit" : "miss");
+        // A preview of a revision never changes.
+        res.setHeader("Cache-Control", "private, max-age=3600, immutable");
+        await media(shown.file, shown.contentType);
+        return;
+      }
       const asset = /^\/api\/v1\/projects\/([^/]+)\/assets\/([^/]+)$/.exec(
         url.pathname,
       );
@@ -330,7 +383,7 @@ server.listen(port, "127.0.0.1", () =>
 const close = async (code = 0) => {
   if (closing) return;
   closing = true;
-  const drained = api.queue.close();
+  const drained = Promise.all([api.queue.close(), closePreviews()]);
   const stopped = new Promise<void>((resolve) => server.close(() => resolve()));
   await drained;
   await stopped;
