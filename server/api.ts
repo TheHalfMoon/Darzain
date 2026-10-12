@@ -1,5 +1,5 @@
 import { ProjectStore } from "../core/store.ts";
-import { RenderQueue } from "../core/render.ts";
+import { JobSupervisor } from "../core/jobs.ts";
 import {
   API_VERSION,
   RESOURCE_POLICY_HASH,
@@ -20,10 +20,10 @@ export const principals: Record<Principal["id"], Principal> = {
 
 export class CreativeAPI {
   readonly store: ProjectStore;
-  readonly queue: RenderQueue;
+  readonly queue: JobSupervisor;
   constructor(store: ProjectStore) {
     this.store = store;
-    this.queue = new RenderQueue(store);
+    this.queue = new JobSupervisor(store);
   }
   catalog() {
     return {

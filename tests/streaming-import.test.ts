@@ -65,7 +65,15 @@ test("a streamed import records its object, version and probe (VFR identified)",
     vfr,
   ]);
   const size = (await readFile(vfr)).length;
-  const result = await store.importAsset(
+  // The stage-and-attach shortcut refuses VFR video and keeps nothing.
+  await assert.rejects(
+    store.importAsset(project.id, "vfr.mp4", await readFile(vfr)),
+    (e: unknown) =>
+      e instanceof CommandError && e.code === "CAPABILITY_UNAVAILABLE",
+  );
+  assert.equal(rows(root, "asset_objects"), 0);
+  assert.equal(rows(root, "asset_versions"), 0);
+  const result = await store.stageAsset(
     project.id,
     "vfr.mp4",
     createReadStream(vfr, { highWaterMark: 4096 }),
@@ -173,12 +181,19 @@ test("an injected out-of-space failure while staging commits nothing", async () 
   store.close();
 });
 
-test("a version 1 workspace database upgrades to version 2 in place", async () => {
-  const { root, store } = await workspace();
+test("a version 2 workspace with imported media upgrades to version 3 and keeps it", async () => {
+  const { root, store, project } = await workspace();
+  const wav = path.join(root, "tone.wav");
+  ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=1", wav]);
+  const { asset } = await store.importAsset(
+    project.id,
+    "tone.wav",
+    await readFile(wav),
+  );
   store.close();
   const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
   db.exec(
-    "DROP TABLE asset_versions; DROP TABLE asset_objects; DROP TABLE pending_work; PRAGMA user_version = 1",
+    "DROP TABLE attempts; DROP TABLE jobs; DROP TABLE supervisor; PRAGMA user_version = 2",
   );
   db.close();
   const reopened = new ProjectStore(root);
@@ -187,9 +202,35 @@ test("a version 1 workspace database upgrades to version 2 in place", async () =
   assert.equal(
     (check.prepare("PRAGMA user_version").get() as { user_version: number })
       .user_version,
-    2,
+    3,
+  );
+  assert.equal(rows(root, "jobs"), 0);
+  assert.equal(rows(root, "supervisor"), 1);
+  check.close();
+  assert.equal(reopened.assetVersion(asset.id)!.state, "ready");
+  await reopened.assetFile(project.id, asset.id);
+  reopened.close();
+});
+
+test("a version 1 workspace database upgrades step by step to the current version", async () => {
+  const { root, store } = await workspace();
+  store.close();
+  const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
+  db.exec(
+    "DROP TABLE attempts; DROP TABLE jobs; DROP TABLE supervisor; DROP TABLE asset_versions; DROP TABLE asset_objects; DROP TABLE pending_work; PRAGMA user_version = 1",
+  );
+  db.close();
+  const reopened = new ProjectStore(root);
+  await reopened.initialize();
+  const check = new DatabaseSync(path.join(root, "workspace.sqlite"));
+  assert.equal(
+    (check.prepare("PRAGMA user_version").get() as { user_version: number })
+      .user_version,
+    3,
   );
   assert.equal(rows(root, "asset_objects"), 0);
+  assert.equal(rows(root, "jobs"), 0);
+  assert.equal(rows(root, "supervisor"), 1);
   check.close();
   reopened.close();
 });
@@ -300,7 +341,7 @@ test("upgrading to schema v2 registers existing assets (ready, or quarantined if
   await truncate(badFile, 10);
   const db = new DatabaseSync(path.join(root, "workspace.sqlite"));
   db.exec(
-    "DROP TABLE asset_versions; DROP TABLE asset_objects; DROP TABLE pending_work; PRAGMA user_version = 1",
+    "DROP TABLE attempts; DROP TABLE jobs; DROP TABLE supervisor; DROP TABLE asset_versions; DROP TABLE asset_objects; DROP TABLE pending_work; PRAGMA user_version = 1",
   );
   db.close();
   const reopened = new ProjectStore(root);

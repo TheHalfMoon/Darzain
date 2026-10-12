@@ -7,7 +7,8 @@ import { execFileSync } from "node:child_process";
 import { ProjectStore } from "../core/store.ts";
 import { DatabaseSync } from "node:sqlite";
 import { ProjectSchema } from "../core/project.ts";
-import { renderProject, RenderQueue } from "../core/render.ts";
+import { renderProject } from "../core/render.ts";
+import { JobSupervisor } from "../core/jobs.ts";
 import { safePath } from "../core/paths.ts";
 import { CreativeAPI } from "../server/api.ts";
 import { canonicalJson } from "../core/donors/ninerr/canonical.ts";
@@ -118,16 +119,16 @@ test("project import, scene, timeline, title, audio, render and reopen preserve 
   const saved = await store.save(p, p.revision);
   const jobId = crypto.randomUUID();
   let progress = 0;
-  const artifact = await renderProject(
+  const output = await renderProject(
     store,
     saved,
-    jobId,
+    ["exports", jobId, "attempt-1"],
     new AbortController().signal,
     (n) => (progress = n),
   );
   assert.equal(progress, 1);
-  assert.equal(artifact, `exports/${jobId}/render.mp4`);
-  const out = await readFile(await store.file(p.id, ...artifact.split("/")));
+  assert.match(output, /render\.partial\.mp4$/);
+  const out = await readFile(output);
   assert.ok(out.length > 1000);
   const second = new ProjectStore(root);
   await second.initialize();
@@ -245,17 +246,17 @@ test("unknown tools and injected call keys are rejected", async () => {
 });
 test("render queue submissions are idempotent and queued cancellation is terminal", async () => {
   const { store, project } = await fixture();
-  const queue = new RenderQueue(store);
+  const queue = new JobSupervisor(store);
   const one = await queue.submit(project.id, "same");
   const two = await queue.submit(project.id, "same");
   assert.equal(one.id, two.id);
   const next = await queue.submit(project.id, "next");
   queue.cancel(next.id);
-  await new Promise((r) => setTimeout(r, 50));
   assert.equal(queue.status(next.id).state, "CANCELLED");
+  await queue.close();
 });
 
-test("cancellation during artifact publication leaves no completed output", async () => {
+test("cancellation during rendering leaves no partial output", async () => {
   const { store, project } = await fixture();
   project.width = 320;
   project.height = 180;
@@ -271,21 +272,27 @@ test("cancellation during artifact publication leaves no completed output", asyn
   const saved = await store.save(project, 0),
     controller = new AbortController(),
     jobId = crypto.randomUUID();
-  const original = store.file.bind(store);
-  store.file = async (...args: Parameters<typeof store.file>) => {
-    const result = await original(...args);
-    if (args.at(-1) === "render.mp4") controller.abort();
-    return result;
-  };
-  await assert.rejects(
-    renderProject(store, saved, jobId, controller.signal, () => {}),
-    /Cancelled/,
+  const rendering = renderProject(
+    store,
+    saved,
+    ["exports", jobId, "attempt-1"],
+    controller.signal,
+    () => {},
+    () => {
+      controller.abort();
+    },
   );
+  await assert.rejects(rendering, /Cancelled/);
   await assert.rejects(
-    access(await original(project.id, "exports", jobId, "render.mp4")),
-  );
-  await assert.rejects(
-    access(await original(project.id, "exports", jobId, "render.partial.mp4")),
+    access(
+      await store.file(
+        project.id,
+        "exports",
+        jobId,
+        "attempt-1",
+        "render.partial.mp4",
+      ),
+    ),
   );
 });
 
@@ -296,7 +303,7 @@ test("queue closure rejects a submission whose project load finishes afterward",
     new Promise((resolve) => {
       release = resolve;
     });
-  const queue = new RenderQueue(store),
+  const queue = new JobSupervisor(store),
     pending = queue.submit(project.id, "shutdown-race");
   await queue.close();
   release(project);

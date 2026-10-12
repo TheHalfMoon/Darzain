@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ProjectSchema } from "../core/project.ts";
+import { RESOURCE_POLICY } from "../core/command/policy.ts";
 import type { Project, Clip } from "../core/project.ts";
 import type { RenderJob } from "../core/render.ts";
 import type { ProjectHistory } from "../core/store.ts";
@@ -315,11 +316,50 @@ function App() {
                       body: file,
                     });
                     const v = await r.json();
-                    if (!r.ok) throw new Error(v.error);
-                    accept(v.project);
-                    setMessage(
-                      `Imported ${v.asset.name}. Click it to add it to the timeline.`,
-                    );
+                    if (!r.ok)
+                      throw new Error(v.error?.message || "Import failed.");
+                    if (v.job) {
+                      // Variable-frame-rate video: wait for its constant-rate version.
+                      setMessage(
+                        `Converting ${file.name} to a constant frame rate before editing…`,
+                      );
+                      let job = v.job;
+                      // Stop waiting (the job continues) after twice the
+                      // conversion time limit, queueing included.
+                      const deadline =
+                        Date.now() +
+                        2000 * RESOURCE_POLICY.enforced.conversionWallSeconds;
+                      while (
+                        job.state === "QUEUED" ||
+                        job.state === "RUNNING"
+                      ) {
+                        if (Date.now() > deadline)
+                          throw new Error(
+                            `${file.name} is still converting; it will appear in the asset list when it finishes.`,
+                          );
+                        await new Promise((resolve) =>
+                          setTimeout(resolve, 500),
+                        );
+                        job = await call("yamakan.job.status", {
+                          jobId: job.id,
+                        });
+                      }
+                      if (job.state !== "COMPLETED")
+                        throw new Error(
+                          job.error || "Conversion did not complete.",
+                        );
+                      accept(
+                        await call("yamakan.project.open", { projectId: p.id }),
+                      );
+                      setMessage(
+                        `Imported ${file.name} at a constant frame rate. Click it to add it to the timeline.`,
+                      );
+                    } else {
+                      accept(v.project);
+                      setMessage(
+                        `Imported ${v.asset.name}. Click it to add it to the timeline.`,
+                      );
+                    }
                     await refresh();
                   });
                 }}

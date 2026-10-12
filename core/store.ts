@@ -68,7 +68,7 @@ export type StoreOptions = {
 export const SNAPSHOT_FORMAT = "yamakan.project/1";
 export const EDIT_VIEW_FORMAT = "yamakan.edit-view/1";
 const MAX_REVISION = 10000;
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const WORKSPACE_SCOPE = "";
 
 // Asset objects are content-addressed files under a project; a version is a
@@ -92,6 +92,40 @@ CREATE TABLE asset_versions(
 -- Work that must finish after this step; cleared in the work's own transaction.
 CREATE TABLE pending_work(name TEXT PRIMARY KEY) STRICT;
 INSERT INTO pending_work(name) VALUES ('asset-backfill');
+`;
+// Durable jobs (T5): intent in jobs, execution identity in attempts, and one
+// supervisor generation that fences attempts from an earlier service run.
+const SCHEMA_V3 = `
+CREATE TABLE jobs(
+  job_id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  frozen_revision INTEGER NOT NULL CHECK(frozen_revision >= 0),
+  idempotency_key TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  state TEXT NOT NULL CHECK(state IN ('queued', 'preparing', 'running', 'validating', 'succeeded', 'cancelRequested', 'cancelled', 'failed', 'reconciliationRequired')),
+  cancel_requested INTEGER NOT NULL DEFAULT 0 CHECK(cancel_requested IN (0, 1)),
+  progress REAL NOT NULL DEFAULT 0,
+  error TEXT,
+  artifact TEXT,
+  UNIQUE(project_id, kind, frozen_revision, idempotency_key)
+) STRICT;
+CREATE INDEX jobs_active ON jobs(state) WHERE state NOT IN ('succeeded', 'cancelled', 'failed', 'reconciliationRequired');
+CREATE TABLE attempts(
+  job_id TEXT NOT NULL REFERENCES jobs(job_id),
+  attempt_no INTEGER NOT NULL CHECK(attempt_no > 0),
+  generation INTEGER NOT NULL,
+  state TEXT NOT NULL CHECK(state IN ('preparing', 'running', 'validating', 'succeeded', 'cancelled', 'failed')),
+  pid INTEGER,
+  exit_code INTEGER,
+  error TEXT,
+  PRIMARY KEY(job_id, attempt_no)
+) STRICT;
+CREATE TABLE supervisor(
+  id INTEGER PRIMARY KEY CHECK(id = 1),
+  generation INTEGER NOT NULL
+) STRICT;
+INSERT INTO supervisor(id, generation) VALUES (1, 0);
 `;
 const SCHEMA = `
 CREATE TABLE snapshots(
@@ -227,6 +261,8 @@ export class ProjectStore {
   // Bytes promised to in-flight imports (staging + publication).
   #reserved = 0;
   #importing = 0;
+  #publishing = new Map<string, number>();
+  #discarding = new Map<string, Promise<void>>();
   constructor(root: string, options: StoreOptions = {}) {
     this.root = root;
     this.#options = options;
@@ -277,7 +313,7 @@ export class ProjectStore {
         "PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;",
       );
       // Versioned, transactional schema steps; each commits on its own.
-      const steps = [SCHEMA, SCHEMA_V2];
+      const steps = [SCHEMA, SCHEMA_V2, SCHEMA_V3];
       upgradedFrom = acceptable(db);
       for (let v = upgradedFrom; v < SCHEMA_VERSION; v++) {
         db.exec("BEGIN IMMEDIATE");
@@ -637,6 +673,40 @@ export class ProjectStore {
     await this.#ensureDirectories(p.id);
     return p;
   }
+  // Runs fn inside one immediate transaction for other core modules (jobs).
+  // fn must be synchronous: no I/O, process or network wait inside.
+  transaction<T>(fn: (db: DatabaseSync) => T): T {
+    const db = this.#database;
+    try {
+      db.exec("BEGIN IMMEDIATE");
+    } catch (e) {
+      throw isBusy(e)
+        ? new CommandError("BUSY", "Workspace database is busy; retry.")
+        : e;
+    }
+    try {
+      const result = fn(db);
+      db.exec("COMMIT");
+      return result;
+    } catch (e) {
+      if (db.isTransaction) db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+  read<T>(fn: (db: DatabaseSync) => T): T {
+    return fn(this.#database);
+  }
+  // The editing shape of one retained revision (jobs render frozen revisions).
+  async loadRevision(id: string, revision: number): Promise<Project> {
+    Id.parse(id);
+    const row = this.#database
+      .prepare(
+        "SELECT snapshot_hash FROM revisions WHERE project_id = ? AND revision = ?",
+      )
+      .get(id, revision) as { snapshot_hash: string } | undefined;
+    if (!row) throw new Error("Revision not found.");
+    return this.#snapshot(row.snapshot_hash, id, revision);
+  }
   async load(id: string): Promise<Project> {
     Id.parse(id);
     const head = this.#head(id);
@@ -707,8 +777,106 @@ export class ProjectStore {
     projectId: string,
     source: AsyncIterable<Uint8Array>,
   ): Promise<{ sha256: string; byteLength: number }> {
-    await this.#ensureDirectories(projectId);
-    return (await this.#objects(projectId)).put(source);
+    const release = await this.beginPublication(projectId);
+    try {
+      await this.#ensureDirectories(projectId);
+      return await (await this.#objects(projectId)).put(source);
+    } finally {
+      release();
+    }
+  }
+  // Marks a publication in flight from before its bytes are written until
+  // the returned release is called (after its row commits or it is
+  // abandoned). Unregistered objects are never removed while one is open.
+  // importObject holds one only around the copy; a caller that registers
+  // the object later (a derivative job) holds its own until it commits.
+  async beginPublication(projectId: string) {
+    for (
+      let pending = this.#discarding.get(projectId);
+      pending;
+      pending = this.#discarding.get(projectId)
+    )
+      await pending;
+    this.#publishing.set(projectId, (this.#publishing.get(projectId) ?? 0) + 1);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const n = (this.#publishing.get(projectId) ?? 1) - 1;
+      if (n > 0) this.#publishing.set(projectId, n);
+      else this.#publishing.delete(projectId);
+    };
+  }
+  // Removes a content object that no row registers. Skipped (left for the
+  // T9 garbage collector) while another publication into the project is in
+  // flight, since that publication may be about to register the same bytes.
+  async discardUnregisteredObject(projectId: string, digest: string) {
+    Id.parse(projectId);
+    if (!/^[0-9a-f]{64}$/.test(digest)) return false;
+    if (this.#publishing.has(projectId) || this.#discarding.has(projectId))
+      return false;
+    const registered = this.#database
+      .prepare(
+        "SELECT 1 FROM asset_objects WHERE project_id = ? AND digest = ?",
+      )
+      .get(projectId, digest);
+    if (registered) return false;
+    // Set synchronously after the check, so no publication starts between.
+    const work = (async () => {
+      await unlink(
+        await this.file(
+          projectId,
+          "objects",
+          "sha256",
+          digest.slice(0, 2),
+          digest,
+        ),
+      ).catch(() => {});
+    })();
+    this.#discarding.set(projectId, work);
+    try {
+      await work;
+    } finally {
+      this.#discarding.delete(projectId);
+    }
+    return true;
+  }
+  // Releases a staged version that never joined the project (its conversion
+  // failed or was cancelled): the version row goes, and the object goes too
+  // unless another version still uses the same bytes.
+  async discardStagedVersion(projectId: string, versionId: string) {
+    const digest = this.transaction((db) => {
+      const version = db
+        .prepare(
+          "SELECT digest FROM asset_versions WHERE version_id = ? AND project_id = ?",
+        )
+        .get(versionId, projectId) as { digest: string } | undefined;
+      if (!version) return null;
+      const head = this.#head(projectId);
+      if (
+        head &&
+        this.#canonical(
+          head.snapshot_hash,
+          projectId,
+          head.revision,
+        ).assets.some((a) => a.id === versionId)
+      )
+        return null;
+      db.prepare("DELETE FROM asset_versions WHERE version_id = ?").run(
+        versionId,
+      );
+      const shared = db
+        .prepare(
+          "SELECT 1 FROM asset_versions WHERE project_id = ? AND digest = ? LIMIT 1",
+        )
+        .get(projectId, version.digest);
+      if (shared) return null;
+      db.prepare(
+        "DELETE FROM asset_objects WHERE project_id = ? AND digest = ?",
+      ).run(projectId, version.digest);
+      return version.digest;
+    });
+    if (digest) await this.discardUnregisteredObject(projectId, digest);
   }
   // Canonical bytes for portable export: no host paths, tokens or UI state.
   async exportProject(id: string): Promise<CanonicalProject> {
@@ -910,7 +1078,29 @@ export class ProjectStore {
   // publishes it to the content-addressed store, and only then commits a
   // snapshot that references it, together with its object/version rows.
   // Memory use is independent of the media size.
+  // Stage + attach in one call: the common import path.
   async importAsset(
+    id: string,
+    name: string,
+    source: Buffer | AsyncIterable<Uint8Array>,
+    declaredBytes?: number,
+  ) {
+    const staged = await this.stageAsset(id, name, source, declaredBytes);
+    if (staged.probe.variableFrameRate && staged.asset.kind === "video") {
+      await this.discardStagedVersion(id, staged.asset.id);
+      throw new CommandError(
+        "CAPABILITY_UNAVAILABLE",
+        "Variable-frame-rate video is imported through a constant-rate conversion job.",
+      );
+    }
+    const project = await this.attachAsset(id, staged.asset);
+    return { project, asset: staged.asset, probe: staged.probe };
+  }
+  // Streams, probes, publishes and registers an asset's object and version,
+  // without changing any snapshot. A staged asset can be attached later
+  // (after a revision conflict, or once a derivative job has finished)
+  // without re-uploading it.
+  async stageAsset(
     id: string,
     name: string,
     source: Buffer | AsyncIterable<Uint8Array>,
@@ -949,6 +1139,7 @@ export class ProjectStore {
     this.#importing++;
     const assetId = randomUUID();
     let temp: string | null = null;
+    let release: (() => void) | null = null;
     const hash = createHash("sha256");
     let received = 0;
     const header: Buffer[] = [];
@@ -1036,6 +1227,7 @@ export class ProjectStore {
       // handle opens eagerly and closes before cleanup, so no deferred open
       // can race the staging file's removal.
       this.#options.fault?.("stage-publish");
+      release = await this.beginPublication(id);
       const source = await open(temp, "r");
       let stored;
       try {
@@ -1059,33 +1251,83 @@ export class ProjectStore {
         hasAudio: metadata.hasAudio,
         timebase: metadata.timebase,
         frameRate: metadata.frameRate,
+        averageFrameRate: metadata.averageFrameRate,
         variableFrameRate: metadata.variableFrameRate,
       });
-      // The append commutes with concurrent edits, so it applies to whichever
-      // head is current; the object/version rows commit in the same transaction.
-      const project = this.#commit({
-        operation: "asset.import",
-        projectId: id,
-        expectedRevision: null,
-        effects: (db) => registerAsset(db, id, asset, probeRecord),
-        next: (current, revision) => {
-          const head = current();
-          if (head.assets.length >= RESOURCE_POLICY.enforced.assetsPerProject)
-            throw new Error("Asset limit reached.");
-          return {
-            ...head,
-            revision,
-            assets: [...head.assets, asset],
-          };
+      this.transaction((db) => registerAsset(db, id, asset, probeRecord));
+      return {
+        asset,
+        probe: JSON.parse(probeRecord) as Record<string, unknown> & {
+          variableFrameRate: boolean;
+          frameRate: { num: number; den: number } | null;
+          averageFrameRate: { num: number; den: number } | null;
         },
-      });
-      return { project, asset, probe: JSON.parse(probeRecord) };
+      };
     } finally {
+      release?.();
       clearTimeout(deadline);
       this.#reserved -= 2 * expected;
       this.#importing--;
       if (temp) await unlink(temp).catch(() => {});
     }
+  }
+  // Adds an asset whose object is published and ready. The append commutes
+  // with concurrent edits, so it applies to whichever head is current.
+  // `effects` run in the same transaction (a job's success, for example), and
+  // an exception there commits nothing.
+  async attachAsset(
+    id: string,
+    asset: Asset,
+    effects?: (db: DatabaseSync) => void,
+  ) {
+    return this.#commit({
+      operation: "asset.import",
+      projectId: id,
+      expectedRevision: null,
+      effects: (db) => {
+        effects?.(db);
+        const object = db
+          .prepare(
+            "SELECT state, byte_length FROM asset_objects WHERE project_id = ? AND digest = ?",
+          )
+          .get(id, asset.hash) as
+          { state: string; byte_length: number } | undefined;
+        if (object?.state !== "ready" || object.byte_length !== asset.bytes)
+          throw new CommandError(
+            "RECOVERY_REQUIRED",
+            "Only a published, ready media object can be attached.",
+          );
+      },
+      next: (current, revision) => {
+        const head = current();
+        if (head.assets.length >= RESOURCE_POLICY.enforced.assetsPerProject)
+          throw new Error("Asset limit reached.");
+        if (head.assets.some((a) => a.id === asset.id))
+          throw new CommandError("VALIDATION", "Asset is already attached.");
+        return { ...head, revision, assets: [...head.assets, asset] };
+      },
+    });
+  }
+  // Path of a verified media object, for workers that read it.
+  async objectFile(id: string, asset: Asset) {
+    return this.#verifiedAsset(id, asset);
+  }
+  // Records a derivative version (for example a constant-rate mezzanine) of a
+  // logical asset, with its probe and lineage. Runs inside a transaction.
+  static registerDerivative(
+    db: DatabaseSync,
+    projectId: string,
+    derivative: { id: string; hash: string; bytes: number },
+    probe: Record<string, unknown>,
+  ) {
+    const versionId = derivative.id;
+    registerAsset(
+      db,
+      projectId,
+      { id: versionId, hash: derivative.hash, bytes: derivative.bytes },
+      JSON.stringify(probe),
+    );
+    return versionId;
   }
   // Recorded probe and object state for one asset version.
   assetVersion(versionId: string) {

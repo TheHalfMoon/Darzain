@@ -3,7 +3,7 @@ import { ProjectSchema, Id } from "../project.ts";
 import { SNAPSHOT_FORMAT } from "../store.ts";
 import type { ProjectStore, RequestReceipt } from "../store.ts";
 import { canonicalJson, sha256Hex } from "../donors/ninerr/canonical.ts";
-import type { RenderQueue } from "../render.ts";
+import type { JobSupervisor } from "../jobs.ts";
 import { CommandError } from "./errors.ts";
 import { RESOURCE_POLICY } from "./policy.ts";
 
@@ -29,7 +29,7 @@ export type Principal = {
 
 export type CommandContext = {
   store: ProjectStore;
-  queue: RenderQueue;
+  queue: JobSupervisor;
   principal: Principal;
   requestId?: string;
 };

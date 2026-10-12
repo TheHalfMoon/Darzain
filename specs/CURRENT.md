@@ -1,10 +1,10 @@
 # Yamakan current frontier
 
-Updated: 2026-10-11. Canonical repository: `TheHalfMoon/Yamakan` (default branch `main`).
+Updated: 2026-10-12. Canonical repository: `TheHalfMoon/Yamakan` (default branch `main`).
 
 **Phase:** P01 authority (T1–T3), implementation authorized by the [founder decision record](../docs/FOUNDER_DECISION_RECORD.md) against plan `edbaba6c4f5f2f42e968b4ab2273c8e11620d9af`. [IMPLEMENTATION_PLAN](../docs/IMPLEMENTATION_PLAN.md) is the sole task authority; [operational contracts](../docs/OPERATIONAL_CONTRACTS.md) define protocols. Release verdict: **NO-GO** until every T10 gate passes.
 
-**Verified main:** `2b0db1bd` (T4a PR #9 merged at reviewed head `38471d85`; tree identical). T3 #8 `539688b3`, T2 #7 `27e3c7da`, T1 #6 `c1664985`; planning PRs #3–#5 merged earlier.
+**Verified main:** `1ce242b1` (T4b PR #10 merged at reviewed head `79e56b38`; tree identical). T4a #9 `2b0db1bd`, T3 #8 `539688b3`, T2 #7 `27e3c7da`, T1 #6 `c1664985`; planning PRs #3–#5 merged earlier.
 
 | Task | Status | Evidence |
 |---|---|---|
@@ -12,10 +12,17 @@ Updated: 2026-10-11. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 | T2 SQLite snapshot authority | **Merged** (#7, `27e3c7da`) | Combined + security reviews (3 cycles, 3 must-fix resolved); CI `qualify` on exact head after a Linux-only permission fix; Windows tests + Edge E2E |
 | T3 canonical v1 and migration | **Merged** (#8, `539688b3`) | Combined + security reviews (3 cycles; 4 must-fix resolved incl. source-aliasing writes); CI `qualify` on exact head; Windows tests + Edge E2E |
 | T4a process ownership and owned probes | **Merged** (#9, `2b0db1bd`) | Combined + security reviews (3 cycles; 4 must-fix resolved incl. pipe-name traversal); CI `qualify` on exact head; 13 Windows ownership/probe tests; WMI job escape recorded as T9 release blocker |
-| T4b streaming import, asset tables, ≥2 GiB | In review on `feat/t4b-streaming-assets` | Large-import receipt: 2.24 GB, peak 152 MiB ≤ 300 MiB |
-| T5–T10 | Not started | — |
+| T4b streaming import, asset tables, ≥2 GiB | **Merged** (#10, `1ce242b1`) | Combined + security reviews (3 cycles + delta; must-fix resolved incl. slow-loris and admission race); CI `qualify` on exact head after a Linux-only publish-race fix; large-import receipt: 2.24 GB, peak 154 MiB ≤ 300 MiB |
+| T5 durable jobs + VFR derivatives | In review on `feat/t5-durable-jobs` | Windows tests + Edge E2E |
+| T6–T10 | Not started (T6 work in progress on `feat/t6-timeline-reducers`) | — |
 
-## T4b surface (in review)
+## T5 surface (in review)
+
+- Schema v3: `jobs` (intent: project, frozen revision, idempotency key, payload), `attempts` (generation, worker PID, outcome) and `supervisor` (generation). `core/jobs.ts` `JobSupervisor`: every transition is a fenced compare-and-swap in one transaction; a restart takes a new generation, marks earlier attempts failed and re-queues their jobs (local work only). Unknown payloads are quarantined; admission counts only active jobs (`activeJobs` 128).
+- Export renders run on an owned FFmpeg worker (`renderWallSeconds` 180, `renderMemoryBytes` 2 GiB) whose identity is durable before it resumes; partial outputs are never registered, and success, artifact and cancellation are decided by the database.
+- T5b: variable-frame-rate uploads return 202 with a job. The constant-rate derivative attaches as the asset's selected version with lineage; the original object stays retained; attachment and job success commit together. Import is split into stage and attach.
+
+## T4b surface (merged)
 
 - Streaming import: staged with incremental SHA-256, declared-size budget, early signature check, dynamic disk preflight, owned probe, streamed CAS publication, and object/version rows committed with the snapshot. HTTP uploads require Content-Length; playback/download stream byte ranges from disk.
 - Schema v2: `asset_objects`, `asset_versions` (probe incl. time base, frame rate, VFR). Ordered transactional schema steps.
@@ -76,4 +83,4 @@ Updated: 2026-10-11. Canonical repository: `TheHalfMoon/Yamakan` (default branch
 - **Disk:** C: has ~3 GiB free (99% used); D: has ~20 GiB free. Clone and npm cache live on D:. T4's ≥2 GiB import and T10 media tests need a disk-capacity preflight and may need space freed by the founder.
 - Jev key and an OCR LLM backend are founder-provided resources; without them those reviews stay recorded as unavailable.
 
-**Next executable task:** T5a durable jobs (built on `feat/t5-durable-jobs`, awaiting T4b), then T5b constant-rate derivative jobs for VFR sources.
+**Next executable task:** T6 timeline reducers (canonical v2, batch/undo/redo) after T5 merges.
