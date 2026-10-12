@@ -59,14 +59,19 @@ try {
     );
   };
   const renders = [];
+  // The long word fits the landscape frame but not the narrow portrait
+  // one, where it is one of the refused clipping cases below.
   for (const [label, width, height] of [
     ["landscape", 1280, 720],
     ["portrait", 608, 1080],
   ] as const) {
+    const fixtures = TYPOGRAPHY_FIXTURES.filter(
+      (f) => label === "landscape" || f.name !== "long-word",
+    );
     const saved = await titled(
       width,
       height,
-      TYPOGRAPHY_FIXTURES.map((f) => f.text),
+      fixtures.map((f) => f.text),
     );
     const { output, plan, receipt } = await renderRevision(
       store,
@@ -77,7 +82,7 @@ try {
       () => {},
     );
     const frames = [];
-    for (const [i, f] of TYPOGRAPHY_FIXTURES.entries()) {
+    for (const [i, f] of fixtures.entries()) {
       const file = path.join(
         OUT,
         `${label}-${String(i + 1).padStart(2, "0")}-${f.name}.png`,
@@ -122,26 +127,45 @@ try {
   }
   // Clipping: a title wider than the frame is refused before rendering,
   // by the fit check and not by any other failure.
-  const overlong = await titled(1280, 720, [OVERLONG_TITLE]);
-  const clipping = await renderRevision(
-    store,
-    overlong.id,
-    overlong.revision,
-    ["exports", "overlong"],
-    new AbortController().signal,
-    () => {},
-  ).then(
-    () => null,
-    (e: unknown) => e,
-  );
-  if (
-    !(clipping instanceof CommandError) ||
-    clipping.code !== "VALIDATION" ||
-    !/does not fit the frame/.test(clipping.message)
-  )
-    throw new Error("An overlong title was not refused by the fit check.", {
-      cause: clipping,
+  const clipping = [];
+  for (const [label, width, height, text] of [
+    ["landscape", 1280, 720, OVERLONG_TITLE],
+    [
+      "portrait",
+      608,
+      1080,
+      TYPOGRAPHY_FIXTURES.find((f) => f.name === "long-word")!.text,
+    ],
+  ] as const) {
+    const saved = await titled(width, height, [text]);
+    const refusal = await renderRevision(
+      store,
+      saved.id,
+      saved.revision,
+      ["exports", `overlong-${label}`],
+      new AbortController().signal,
+      () => {},
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    if (
+      !(refusal instanceof CommandError) ||
+      refusal.code !== "VALIDATION" ||
+      !/does not fit the frame/.test(refusal.message)
+    )
+      throw new Error("A title wider than its frame was not refused.", {
+        cause: refusal,
+      });
+    clipping.push({
+      label,
+      width,
+      height,
+      text,
+      outcome: "refused",
+      message: refusal.message,
     });
+  }
   const report = {
     qualification: "t7-typography",
     date: new Date().toISOString(),
@@ -153,11 +177,7 @@ try {
     }).split("\n")[0],
     libassApi: `0x${(await titleCapability()).libassApi.toString(16)}`,
     renders,
-    clipping: {
-      text: OVERLONG_TITLE,
-      outcome: "refused",
-      message: clipping.message,
-    },
+    clipping,
     automatedChecks:
       "tests/typography.test.ts: no system-font fallback, escaping against controls, frame-exact cue boundaries, and the margin-band fit check for every fixture",
     arabicReview: {
