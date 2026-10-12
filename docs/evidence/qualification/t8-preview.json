@@ -1,7 +1,7 @@
 {
   "qualification": "t8-reference-preview-latency",
-  "date": "2026-10-12T14:20:15.481Z",
-  "commit": "ef37ec609faf37529506413ca03a210825f0899a",
+  "date": "2026-10-12T14:38:38.479Z",
+  "commit": "a2ed09bab45124b174d3bd1bbd031420a6e7d4c8",
   "host": {
     "platform": "win32-x64",
     "cpu": "13th Gen Intel(R) Core(TM) i5-13420H",
@@ -11,40 +11,40 @@
   "ffmpeg": "ffmpeg version 8.1.1-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers\r",
   "fixture": "30 s 1280x720 timeline: FFmpeg test pattern (GOP 60), sine audio, one Arabic/Latin title for the whole duration",
   "results": {
-    "firstFrameMs": 703,
+    "firstFrameMs": 902,
     "coldFrame": {
       "runs": 10,
-      "p50": 418,
-      "p95": 492,
-      "max": 492
+      "p50": 400,
+      "p95": 585,
+      "max": 585
     },
     "warmFrame": {
       "runs": 10,
-      "p50": 1,
-      "p95": 1,
-      "max": 1
+      "p50": 2,
+      "p95": 2,
+      "max": 2
     },
     "coldSegment2s": {
       "runs": 5,
-      "p50": 707,
-      "p95": 792,
-      "max": 792
+      "p50": 743,
+      "p95": 832,
+      "max": 832
     }
   },
   "targets": {
     "warmFrameP95Ms": {
       "target": 1000,
-      "measured": 1,
+      "measured": 2,
       "met": true
     },
     "coldFrameP95Ms": {
       "target": 3000,
-      "measured": 492,
+      "measured": 585,
       "met": true
     },
     "coldSegment2sP95Ms": {
       "target": 6000,
-      "measured": 792,
+      "measured": 832,
       "met": true
     }
   },
