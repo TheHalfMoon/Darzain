@@ -303,7 +303,7 @@ function App() {
                   }
                 >
                   <bdi>{item.name}</bdi>
-                  <small>
+                  <small dir="auto">
                     {item.error ||
                       t("projects.revision", { revision: item.revision })}
                   </small>

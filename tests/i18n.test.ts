@@ -67,6 +67,12 @@ test("inserted names are isolated so they cannot reorder the sentence; unknown k
   assert.ok(
     spoof.startsWith(`Imported ${FSI}clip`) && spoof.includes(`mp4${PDI}.`),
   );
+  // Its own pop or override characters are removed, so it cannot close the
+  // isolate early.
+  const escape = translate("en", "import.done", {
+    name: `a${PDI}${String.fromCharCode(0x202e)}b`,
+  });
+  assert.ok(escape.startsWith(`Imported ${FSI}ab${PDI}.`), escape);
   // A state the service adds later does not crash the interface.
   assert.equal(translate("ar", "job.PAUSED" as never), "job.PAUSED");
 });

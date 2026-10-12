@@ -272,9 +272,14 @@ export function translate(
     if (value === undefined) return whole;
     return typeof value === "number"
       ? formatNumber(lang, value)
-      : `${FSI}${value}${PDI}`;
+      : `${FSI}${value.replace(BIDI_CONTROLS, "")}${PDI}`;
   });
 }
+
+// Embeddings, overrides and isolates inside a value are removed, so a
+// name cannot close its own isolate early (display only; stored names are
+// unchanged).
+const BIDI_CONTROLS = /[‪-‮⁦-⁩]/g;
 
 // A duration in seconds with two decimals, in the language's digits
 // (fixed width, so a running readout does not jitter).
