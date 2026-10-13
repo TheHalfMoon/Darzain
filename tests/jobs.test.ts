@@ -378,6 +378,10 @@ test(
     try {
       const jobId = await next<string>((m) => m?.jobId);
       ownerPid = await next<number>((m) => m?.ownerPid);
+      assert.ok(
+        ownerPid > 0 && alive(ownerPid),
+        "the process owner is running before the kill",
+      );
       await observer.initialize();
       // Kill only once FFmpeg is resumed and writing its output.
       const partial = path.join(
@@ -390,17 +394,20 @@ test(
         "worker",
         "render.partial.mp4",
       );
-      await within(60000, async () => {
-        if (!running()) throw new Error(`service exited early: ${stderr}`);
-        pid =
-          attempts(observer, jobId).find((a) => a.state === "running")?.pid ??
-          0;
-        const size = await stat(partial).then(
-          (s) => s.size,
-          () => 0,
-        );
-        return pid > 0 && size > 0;
-      });
+      assert.ok(
+        await within(60000, async () => {
+          if (!running()) throw new Error(`service exited early: ${stderr}`);
+          pid =
+            attempts(observer, jobId).find((a) => a.state === "running")?.pid ??
+            0;
+          const size = await stat(partial).then(
+            (s) => s.size,
+            () => 0,
+          );
+          return pid > 0 && size > 0;
+        }),
+        "FFmpeg must have a running PID and nonempty partial output before service kill",
+      );
       assert.ok(pid && alive(pid), "FFmpeg is writing its output");
       assert.ok(running(), `service still running: ${stderr}`);
       child.kill("SIGKILL");
