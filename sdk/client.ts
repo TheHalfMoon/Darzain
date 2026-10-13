@@ -64,7 +64,8 @@ export class YamakanClient {
       body: JSON.stringify({
         apiVersion: 1,
         operation,
-        ...(requestId ? { requestId } : {}),
+        // An empty ID is sent, and refused, rather than silently dropped.
+        ...(requestId !== undefined ? { requestId } : {}),
         parameters,
       }),
     });
