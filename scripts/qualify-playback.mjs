@@ -226,7 +226,8 @@ try {
         : "none";
   });
 
-  // Counts canvas content changes on every animation frame until stopped.
+  // Records every canvas content change, with the marker's brightness, on
+  // every animation frame until stopped.
   const startSampler = () =>
     page.evaluate(() => {
       const c = document.querySelector("section.preview canvas");
@@ -249,9 +250,12 @@ try {
           16,
         ).data;
         let h = 0;
-        for (let i = 0; i < d.length; i += 4)
+        let red = 0;
+        for (let i = 0; i < d.length; i += 4) {
           h = (h * 31 + d[i] + d[i + 1] * 3 + d[i + 2] * 7) >>> 0;
-        if (h !== state.last) state.changes.push(now);
+          red += d[i];
+        }
+        if (h !== state.last) state.changes.push([now, red / 256]);
         state.last = h;
         requestAnimationFrame(tick);
       };
@@ -267,24 +271,53 @@ try {
         stopped: performance.now(),
       };
     });
+  // The marker's luma is 28 + (67 x frame number mod 200); a change that
+  // shows the next source frame (or one a few frames on) is a frame shown, a
+  // black canvas is not, and anything else (a cut, an overlay starting or
+  // ending) is a new picture but cannot be checked.
+  const luma = (red) => red / 1.164 + 16;
+  const classify = (changes) => {
+    const kinds = { next: 0, skipped: 0, framesSkipped: 0, black: 0, other: 0 };
+    for (let i = 1; i < changes.length; i++) {
+      const now = luma(changes[i][1]);
+      if (now < 22) {
+        kinds.black++;
+        continue;
+      }
+      const before = luma(changes[i - 1][1]) - 28;
+      let step = 0;
+      for (let k = 1; k <= 4 && !step; k++) {
+        const expected = 28 + ((((before + 67 * k) % 200) + 200) % 200);
+        if (Math.abs(now - expected) <= 6) step = k;
+      }
+      if (step === 1) kinds.next++;
+      else if (step > 1) {
+        kinds.skipped++;
+        kinds.framesSkipped += step - 1;
+      } else kinds.other++;
+    }
+    return kinds;
+  };
+  // Seeks (sets the playhead while paused), starts counting, presses Play and
+  // counts for the whole window: play-start latency and any freeze count
+  // against the rate.
   const playFor = async (from, seconds) => {
     await page.getByLabel("Playhead").fill(String(from));
     await page.waitForTimeout(400);
-    await page.getByRole("button", { name: "Play", exact: true }).click();
-    // Let playback settle before counting.
-    await page.waitForTimeout(500);
+    const nodeStart = Date.now();
     await startSampler();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
     await page.waitForTimeout(seconds * 1000);
     const sample = await stopSampler();
+    const nodeEnd = Date.now();
     await page.getByRole("button", { name: "Pause", exact: true }).click();
     await page.waitForTimeout(300);
-    // Rates over the whole requested window, from when sampling started to
-    // when it stopped: a preview that freezes part-way counts its frozen
-    // time (the first sample is the starting frame, not a new one).
-    const t = sample.changes.slice(1);
+    const t = sample.changes.slice(1).map((c) => c[0]);
+    const kinds = classify(sample.changes);
     const elapsed = (sample.stopped - sample.started) / 1000;
-    const fps = t.length / elapsed;
-    // Frames shown in each whole second of the window.
+    // New pictures shown: every change but a black canvas.
+    const shown = t.length - kinds.black;
+    const fps = shown / elapsed;
     const windows = [];
     for (let s = sample.started; s + 1000 <= sample.stopped; s += 1000)
       windows.push(t.filter((x) => x >= s && x < s + 1000).length);
@@ -293,28 +326,54 @@ try {
       seconds,
       animationFrames: sample.frames,
       sampledSeconds: Math.round(elapsed * 100) / 100,
-      framesShown: t.length,
+      framesShown: shown,
+      changes: kinds,
       fps: Math.round(fps * 10) / 10,
       minOneSecondWindow: Math.min(...windows),
       // A 30 fps timeline shows 30 new frames a second when nothing drops.
-      droppedEstimate: Math.max(0, Math.round(elapsed * 30 - t.length)),
+      droppedEstimate: Math.max(0, Math.round(elapsed * 30 - shown)),
+      window: [nodeStart, nodeEnd],
     };
   };
   const sustained = await playFor(0, 15);
-  const seek = await playFor(5.5, 3);
-  // Resource pressure: an export renders while the editor plays.
-  const job = await call("yamakan.export.video", {
-    projectId: project.id,
-    idempotencyKey: "pressure",
-  });
+  // Across the cut at 6 s, counted from the Play press after a seek.
+  const seek = await playFor(4.5, 3);
+  // Resource pressure: exports render back to back for the whole window,
+  // and the receipt records how much of the window they covered.
+  const exports = [];
+  let stopExports = false;
+  const exporting = (async () => {
+    for (let i = 0; !stopExports; i++) {
+      const started = Date.now();
+      const job = await call("yamakan.export.video", {
+        projectId: project.id,
+        idempotencyKey: `pressure-${i}`,
+      });
+      let state = job.state;
+      while (!["COMPLETED", "FAILED", "CANCELLED"].includes(state)) {
+        await new Promise((r) => setTimeout(r, 100));
+        state = (await call("yamakan.job.status", { jobId: job.id })).state;
+      }
+      exports.push({ started, ended: Date.now(), state });
+    }
+  })();
+  // The first export is already rendering when counting starts.
+  await new Promise((r) => setTimeout(r, 1000));
   const pressure = await playFor(0, 10);
-  const exported = await call("yamakan.job.status", { jobId: job.id });
+  stopExports = true;
+  await exporting;
+  const [w0, w1] = pressure.window;
+  let covered = 0;
+  for (const e of exports)
+    covered += Math.max(0, Math.min(e.ended, w1) - Math.max(e.started, w0));
+  const exportCoverage = Math.round((covered / (w1 - w0)) * 1000) / 1000;
   // Negative control: the same play with the page's CPU throttled 20x must
   // measure below the threshold, or the sampler cannot see a slow preview.
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 20 });
   const throttled = await playFor(0, 5);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  for (const r of [sustained, seek, pressure, throttled]) delete r.window;
 
   const checks = [
     {
@@ -325,14 +384,15 @@ try {
       gated: true,
     },
     {
-      check: "seek to 5.5 s, then play across the cut at 6 s",
+      check:
+        "seek to 4.5 s, then play across the cut at 6 s (counted from the Play press)",
       measured: seek.fps,
       threshold: MIN_FPS,
       metThreshold: seek.fps >= MIN_FPS,
       gated: false,
     },
     {
-      check: "play while an export renders (resource pressure)",
+      check: `play while exports render back to back (they covered ${Math.round(exportCoverage * 100)}% of the window)`,
       measured: pressure.fps,
       threshold: MIN_FPS,
       metThreshold: pressure.fps >= MIN_FPS,
@@ -356,10 +416,10 @@ try {
         .digest("hex"),
     },
     fixture:
-      "18 s 1280x720 timeline: three 6 s testsrc2 H.264 clips (cuts at 6 s and 12 s), a 4 s upper-track clip from 9 s, an Arabic/Latin title from 2 s to 10 s, a tone; frames shown counted from canvas content changes",
+      "18 s 1280x720 timeline: three 6 s testsrc2 H.264 clips (cuts at 6 s and 12 s), a 4 s upper-track clip from 9 s, an Arabic/Latin title from 2 s to 10 s, a tone; frames shown counted from canvas content changes and checked against a per-frame marker",
     sustained,
     seek,
-    pressure: { ...pressure, exportState: exported.state },
+    pressure: { ...pressure, exports: exports.length, exportCoverage },
     negativeControl: {
       cpuThrottle: 20,
       ...throttled,
