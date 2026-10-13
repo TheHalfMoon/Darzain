@@ -2,7 +2,17 @@ import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -32,6 +42,61 @@ const label = (dir: string) =>
   /Mandatory Label\\(\w+) Mandatory Level/.exec(
     execFileSync("icacls", [dir], { encoding: "utf8", windowsHide: true }),
   )?.[1] ?? null;
+
+test(
+  "a staged worker executable is reverified before reuse",
+  { skip: !windows && "Windows workers" },
+  async () => {
+    const base = await folder();
+    const exe = path.join(base, `worker-probe-${crypto.randomUUID()}.exe`);
+    await copyFile(workerProbe, exe);
+    const owner = new ProcessOwner([exe]);
+    const root = path.join(
+      process.env.LOCALAPPDATA!,
+      "Yamakan",
+      "worker-tools",
+    );
+    let stagingFolder: string | undefined;
+    try {
+      let output = "";
+      const first = await owner.run({
+        executable: exe,
+        args: ["print", "verified"],
+        cwd: base,
+        onStdout: (b) => (output += b.toString("utf8")),
+      });
+      assert.equal(first.code, 0, first.stderr);
+      assert.equal(output, "verified");
+      const prefix = path.parse(exe).name.toLowerCase() + "-";
+      const matches = (await readdir(root)).filter((name) =>
+        name.startsWith(prefix),
+      );
+      assert.equal(
+        matches.length,
+        1,
+        "unique source has one staging directory",
+      );
+      stagingFolder = path.join(root, matches[0]!);
+      const staged = path.join(stagingFolder, path.basename(exe));
+      const bytes = await readFile(staged);
+      bytes[0] ^= 1;
+      await writeFile(staged, bytes);
+      assert.equal((await stat(staged)).size, bytes.length);
+      await assert.rejects(
+        owner.run({
+          executable: exe,
+          args: ["print", "must-not-run"],
+          cwd: base,
+        }),
+        /staged executable differs from its allowlisted source/,
+      );
+    } finally {
+      owner.close();
+      if (stagingFolder)
+        await rm(stagingFolder, { recursive: true, force: true });
+    }
+  },
+);
 
 test(
   "a worker cannot use WMI to escape (PowerShell launch denial or WMI refusal)",

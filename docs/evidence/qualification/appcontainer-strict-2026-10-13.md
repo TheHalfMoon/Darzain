@@ -31,6 +31,12 @@ Development machine: Windows 11, Node 24.19.0, Rust cargo 1.97.1.
 
 Relevant uncommitted diagnostic logs from the qualification machine are in the ignored local `work/` folder; do not copy arbitrary local temp data or credentials into Git.
 
+## Post-review cache integrity correction
+
+An additional code review found that `staged_tool` compared the executable cache with the allowlisted source only when first publishing it, then trusted a cached file on later runs based on source size and modification time. That could execute changed cache bytes despite the claimed validation. It now compares an existing cached executable against the source on every reuse and fails closed if the bytes differ. The Windows regression test `a staged worker executable is reverified before reuse` creates a unique executable copy, stages it, deliberately changes the staged bytes without changing file size, and proves the next launch is rejected. This closes the observed reuse defect, **not** all same-account tampering races between verification and process creation. The trusted local account remains an explicit residual boundary.
+
+The post-fix Windows verification passed: `node --test tests/sandbox.test.ts` **8/8**; full `npm test` **214 passed / 2 POSIX-only skips / 0 failed**, 216 total, 210.5 s in this run; real Edge E2E PASS (0 page errors, 0 external page requests). Lint, typecheck, formatting, provenance and `git diff --check` passed. The total-suite duration was longer than the earlier 92.99 s observation; it cannot be attributed solely to the cache check without a controlled A/B performance measurement on the same host. No release-performance claim is made from this run.
+
 ## Remaining release and review gates
 
 - Independently review the Rust Windows FFI, process attribute use, security descriptors, grant/revoke semantics, and test validity.

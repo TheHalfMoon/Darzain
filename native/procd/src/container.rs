@@ -342,6 +342,12 @@ pub fn staged_tool(exe: &str) -> Result<String, String> {
         meta.last_write_time()
     ));
     let target = folder.join(file);
+    // A cached copy can be modified after it was initially verified. Recheck
+    // every reuse instead of trusting just source size and modification time.
+    // Refuse altered cache entries rather than executing untrusted bytes.
+    if target.exists() && !same_bytes(source, &target)? {
+        return Err("the staged executable differs from its allowlisted source".into());
+    }
     if !target.exists() {
         std::fs::create_dir_all(&folder).map_err(|e| format!("tools folder: {e}"))?;
         // A name of its own, so procds staging at once never share a file.
