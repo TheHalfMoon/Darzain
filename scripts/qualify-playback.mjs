@@ -8,7 +8,9 @@
 // every frame). Scenarios: sustained play from the start for 15 s (gated by
 // the threshold); a seek to 5.5 s then 3 s of play across the cut at 6 s; and
 // 10 s of play while an export renders (resource pressure). The seek and
-// pressure scenarios are measured and reported, not gated. The receipt also
+// pressure scenarios are measured and reported, not gated. A negative
+// control (the same play with the CPU throttled 20x) must measure below the
+// threshold, or the run fails. The receipt also
 // records the WebGL renderer the browser reports, since headless Edge may
 // composite in software. It runs only on a clean tree.
 import { chromium } from "playwright-core";
@@ -285,6 +287,12 @@ try {
   });
   const pressure = await playFor(0, 10);
   const exported = await call("yamakan.job.status", { jobId: job.id });
+  // Negative control: the same play with the page's CPU throttled 20x must
+  // measure below the threshold, or the sampler cannot see a slow preview.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 20 });
+  const throttled = await playFor(0, 5);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
 
   const checks = [
     {
@@ -330,8 +338,15 @@ try {
     sustained,
     seek,
     pressure: { ...pressure, exportState: exported.state },
+    negativeControl: {
+      cpuThrottle: 20,
+      ...throttled,
+      detected: throttled.fps < MIN_FPS,
+    },
     checks,
-    passed: checks.filter((c) => c.gated).every((c) => c.metThreshold),
+    passed:
+      checks.filter((c) => c.gated).every((c) => c.metThreshold) &&
+      throttled.fps < MIN_FPS,
   };
 } finally {
   await browser?.close().catch(() => {});
