@@ -102,6 +102,7 @@ async function assertTitlesFit(
       "-",
     ],
     cwd: dir,
+    readable: [path.join(dir, "measure.ass"), path.join(dir, "fonts")],
     memoryBytes: RESOURCE_POLICY.enforced.renderMemoryBytes,
     signal,
     stderrLimit: 8000,
@@ -278,8 +279,10 @@ export async function renderPlan(
       "1",
     ];
     // Each clip reads its own input, seeked to its source range, so no
-    // input's frames wait in a filter queue for another clip.
+    // input's frames wait in a filter queue for another clip. The worker may
+    // read only these inputs and the title files.
     let inputs = 0;
+    const readable: string[] = [];
     const input = async (
       a: { assetSha256: string; assetBytes: number; assetExtension: string },
       options: string[],
@@ -289,6 +292,7 @@ export async function renderPlan(
         bytes: a.assetBytes,
         extension: a.assetExtension,
       });
+      if (!readable.includes(file)) readable.push(file);
       args.push(
         // `-threads` is an option of each input: every decoder gets the
         // policy's thread count, so memory does not grow with the host's
@@ -458,6 +462,10 @@ export async function renderPlan(
       cwd: dir,
       // The render's own folder is the only place it may write.
       writable: [work],
+      // The title files exist exactly when the plan has titles.
+      readable: plan.titles
+        ? [...readable, path.join(dir, "titles.ass"), path.join(dir, "fonts")]
+        : readable,
       memoryBytes: RESOURCE_POLICY.enforced.renderMemoryBytes,
       signal: controller.signal,
       onCreated,

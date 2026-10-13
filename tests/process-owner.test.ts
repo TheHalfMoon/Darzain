@@ -32,7 +32,7 @@ function withMarker(marker: string) {
     [
       "-NoProfile",
       "-Command",
-      "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like ('*' + $env:MARKER + '*') -and $_.Name -eq 'node.exe' } | ForEach-Object { $_.ProcessId }",
+      "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like ('*' + $env:MARKER + '*') -and $_.Name -eq 'worker-probe.exe' } | ForEach-Object { $_.ProcessId }",
     ],
     {
       encoding: "utf8",
@@ -49,9 +49,12 @@ async function noMarker(marker: string, exclude: number[] = []) {
   }
   return false;
 }
-const node = (code: string, ...args: string[]) => ({
-  executable: process.execPath,
-  args: ["-e", code, ...args],
+const workerProbe = fileURLToPath(
+  new URL("../native/procd/target/release/worker-probe.exe", import.meta.url),
+);
+const probe = (mode: string, ...args: string[]) => ({
+  executable: workerProbe,
+  args: [mode, ...args],
   cwd: tmpdir(),
 });
 
@@ -59,7 +62,7 @@ test(
   "arguments reach the worker exactly, with no shell interpretation",
   { skip: !windows },
   async () => {
-    const owner = new ProcessOwner([process.execPath]);
+    const owner = new ProcessOwner([workerProbe]);
     try {
       const tricky = [
         "plain",
@@ -76,14 +79,14 @@ test(
       ];
       let out = "";
       const result = await owner.run({
-        ...node(
-          "process.stdout.write(JSON.stringify(process.argv.slice(1)))",
-          ...tricky,
-        ),
+        ...probe("args", ...tricky),
         onStdout: (b) => (out += b.toString("utf8")),
       });
       assert.equal(result.code, 0);
-      assert.deepEqual(JSON.parse(out), tricky);
+      assert.deepEqual(
+        out.split(",").map((s) => Buffer.from(s, "hex").toString("utf8")),
+        tricky,
+      );
     } finally {
       owner.close();
     }
@@ -95,14 +98,12 @@ test(
   { skip: !windows },
   async () => {
     process.env.YAMAKAN_TEST_SECRET = "must-not-leak";
-    const owner = new ProcessOwner([process.execPath]);
+    const owner = new ProcessOwner([workerProbe]);
     try {
       let recordedAt = 0;
       let out = "";
       const result = await owner.run({
-        ...node(
-          "process.stdout.write(JSON.stringify({ keys: Object.keys(process.env), at: Date.now() }))",
-        ),
+        ...probe("env"),
         onCreated: async () => {
           await new Promise((r) => setTimeout(r, 400));
           recordedAt = Date.now();
@@ -110,14 +111,19 @@ test(
         onStdout: (b) => (out += b.toString("utf8")),
       });
       assert.equal(result.code, 0);
-      const seen = JSON.parse(out);
+      const [at, keys] = out.trim().split("|");
+      const seen = { at: Number(at), keys: keys.split(",") };
       assert.ok(
         seen.at >= recordedAt,
         "the worker ran only after onCreated finished",
       );
       assert.ok(!seen.keys.includes("YAMAKAN_TEST_SECRET"));
       assert.ok(
-        seen.keys.every((k: string) => /^(SystemRoot|TEMP|TMP)$/i.test(k)),
+        // The profile locations are needed to create an AppContainer process
+        // (paths the container cannot read); nothing else passes.
+        seen.keys.every((k: string) =>
+          /^(SystemRoot|TEMP|TMP|USERPROFILE|LOCALAPPDATA)$/i.test(k),
+        ),
         seen.keys.join(","),
       );
     } finally {
@@ -131,12 +137,12 @@ test(
   "cancellation terminates the worker's job",
   { skip: !windows },
   async () => {
-    const owner = new ProcessOwner([process.execPath]);
+    const owner = new ProcessOwner([workerProbe]);
     try {
       const controller = new AbortController();
       let pid = 0;
       const running = owner.run({
-        ...node("setInterval(() => {}, 1000)"),
+        ...probe("sleep"),
         signal: controller.signal,
         onCreated: (p) => {
           pid = p;
@@ -156,7 +162,7 @@ test(
   "only allowlisted executables can be launched",
   { skip: !windows },
   async () => {
-    const owner = new ProcessOwner([process.execPath]);
+    const owner = new ProcessOwner([workerProbe]);
     try {
       await assert.rejects(
         owner.run({
@@ -226,12 +232,9 @@ test(
   async () => {
     const marker = `yamakan-orphan-${crypto.randomUUID()}`;
     process.env.YAMAKAN_PROCD_FAULT = "after-create";
-    const owner = new ProcessOwner([process.execPath]);
+    const owner = new ProcessOwner([workerProbe]);
     try {
-      await assert.rejects(
-        owner.run(node("setInterval(() => {}, 1000)", marker)),
-        /owner exited/,
-      );
+      await assert.rejects(owner.run(probe("sleep", marker)), /owner exited/);
       assert.ok(await noMarker(marker), "no suspended worker survives");
     } finally {
       delete process.env.YAMAKAN_PROCD_FAULT;
@@ -273,17 +276,15 @@ test(
   "a worker cannot start child processes inside its job",
   { skip: !windows },
   async () => {
-    const owner = new ProcessOwner([process.execPath]);
+    const owner = new ProcessOwner([workerProbe]);
     try {
       let out = "";
       const result = await owner.run({
-        ...node(
-          "const r = require('child_process').spawnSync(process.execPath, ['-e', '1']); process.stdout.write(String(r.error ? r.error.code : r.status))",
-        ),
+        ...probe("child"),
         onStdout: (b) => (out += b.toString("utf8")),
       });
       assert.equal(result.code, 0);
-      assert.notEqual(out, "0", "the child must not run");
+      assert.equal(out, "denied", "the child must not run");
     } finally {
       owner.close();
     }
@@ -301,7 +302,7 @@ test(
           import.meta.url,
         ),
       ),
-      [process.execPath],
+      [workerProbe],
       { stdio: ["pipe", "pipe", "inherit"], windowsHide: true },
     );
     const lines: string[] = [];
@@ -322,7 +323,8 @@ test(
       procd.stdin!.write("SPAWN\tbad2\tzz\t00\t0\t0\t0\n");
       await waitFor((l) => l.startsWith("ERROR\tbad2"));
       procd.stdin!.write(
-        `SPAWN\tok1\t${hex(process.execPath)}\t${hex(tmpdir())}\t0\t0\t0\n`,
+        // memory 0, no writable folders, no readable paths, no arguments
+        `SPAWN\tok1\t${hex(workerProbe)}\t${hex(tmpdir())}\t0\t0\t0\t0\n`,
       );
       await waitFor((l) => l.startsWith("CREATED\tok1"));
       procd.stdin!.write("KILL\tok1\n");

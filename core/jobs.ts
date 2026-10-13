@@ -709,6 +709,8 @@ export class JobSupervisor {
         ],
         cwd: dir,
         writable: [work],
+        // The conversion may read only its source.
+        readable: [source],
         memoryBytes: RESOURCE_POLICY.enforced.renderMemoryBytes,
         signal: controller.signal,
         stderrLimit: 8000,

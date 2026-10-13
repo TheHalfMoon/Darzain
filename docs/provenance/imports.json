@@ -195,9 +195,10 @@
       "T8a review: each source frame keeps its own timeline time (clip start plus its distance from the clip source start) in export and in any window, with up to two frames of lead-in, so the frame-rate filter selects the same source frame for every output frame at any source rate; renders take an optional wall-clock limit; RENDERER_VERSION versions how plans are drawn.",
       "T8a review 2: the lead-in is bounded by the source (not the clip), so the source frame covering a clip's first instant is always read; clips are placed in a one-tick-per-flick time base (settb) so offsets are exact for any source time base, including looped stills.",
       "T9c: the render worker runs sandboxed (restricted, low-integrity token) and may write only to its own worker/ subfolder, named in the worker request; only the main data stream of what it wrote is kept, copied by keepMainStream into a file the service creates in the staging folder the worker could never write, so neither the worker's permissions (on its file or its folder) nor alternate streams reach a published file.",
-      "Resource policy v2 (agent decision, 2026-10-13): -threads is an FFmpeg per-input option, so every render input now gets renderThreads before its -i (the single global -threads, which bound only the first input, is removed) and the libx264 encoder takes the policy value; decoded frames and the encoder are unchanged, so rendered output and RENDERER_VERSION are unaffected."
+      "Resource policy v2 (agent decision, 2026-10-13): -threads is an FFmpeg per-input option, so every render input now gets renderThreads before its -i (the single global -threads, which bound only the first input, is removed) and the libx264 encoder takes the policy value; decoded frames and the encoder are unchanged, so rendered output and RENDERER_VERSION are unaffected.",
+      "Worker read containment (2026-10-13): each render and title-fit worker declares the files it reads (its inputs, titles.ass and the fonts folder), which procd grants to the worker's own AppContainer capability for its lifetime; rendering itself is unchanged."
     ],
-    "importedSha256": "5d28e288859dc7e90a45717ee7d6b24e0d60a88336845600f6bb32dec0cc59cf"
+    "importedSha256": "ac3428b009bc82d500d4fc2f90ebfee0a4c1b50ad70029f27acba40c21a97fb3"
   },
   {
     "source": "TheHalfMoon/Skelet",

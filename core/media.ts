@@ -86,6 +86,8 @@ export async function probe(file: string) {
         `file:${path.basename(file)}`,
       ],
       cwd: path.dirname(file),
+      // The probe may read only the file it probes.
+      readable: [file],
       memoryBytes: workerMemoryBytes,
       signal: controller.signal,
       onStdout: (b) => {
@@ -115,6 +117,13 @@ export async function probe(file: string) {
   const height = Number((turned ? visual?.width : visual?.height) || 0);
   if (width > mediaDimension || height > mediaDimension)
     throw new Error(`Media dimensions exceed ${mediaDimension} pixels.`);
+  // A picture whose size the decoder could not read (a forged header, an
+  // image bomb it refused) is not imported as a zero-sized picture.
+  if (visual && (width <= 0 || height <= 0))
+    throw new CommandError(
+      "MEDIA_INVALID",
+      "Media probe failed; the file is unreadable or unsupported.",
+    );
   const duration = Number(
     info.format?.duration || visual?.duration || audio?.duration || 0,
   );

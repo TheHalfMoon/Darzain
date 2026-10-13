@@ -13,12 +13,14 @@
 //!     (no privileges, Administrators deny-only), so it cannot reach services
 //!     such as WMI that would start a process outside its job, and it can
 //!     write only to the folders its request names (labelled low integrity
-//!     while it runs, restored when it exits).
+//!     while it runs, restored when it exits);
+//!   * a worker runs inside an AppContainer with no network capability and
+//!     reads only what its request names (container.rs).
 //! Worker output travels through anonymous pipes that only procd can read and
 //! is relayed to the service; no named object is ever opened.
 //!
 //! Protocol (tab-separated; strings and data are hex-encoded):
-//!   SPAWN id exe cwd jobMemoryBytes writableCount dir... argc arg...
+//!   SPAWN id exe cwd jobMemoryBytes writableCount dir... readableCount path... argc arg...
 //!       -> CREATED id pid       (suspended, inside its job)
 //!   RESUME id                   -> RESUMED id
 //!   KILL id                     -> (EXITED follows)
@@ -32,6 +34,8 @@ use std::ffi::c_void;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::ptr::null_mut;
 use std::sync::{Arc, Mutex};
+
+mod container;
 
 type Handle = *mut c_void;
 type Bool = i32;
@@ -58,6 +62,7 @@ const MAX_REQUEST_LINE: usize = 256 * 1024;
 const MAX_LIVE_WORKERS: usize = 64;
 const RELAY_CHUNK: usize = 16 * 1024;
 const MAX_WRITABLE: usize = 8;
+const MAX_READABLE: usize = 64;
 const TOKEN_ASSIGN_PRIMARY: u32 = 0x0001;
 const TOKEN_DUPLICATE: u32 = 0x0002;
 const TOKEN_QUERY: u32 = 0x0008;
@@ -304,6 +309,18 @@ struct Worker {
     job: Owned,
     thread: Owned,
     writable: Vec<String>,
+    // Paths granted to this worker's own capability, revoked when it exits.
+    grants: Vec<String>,
+    capability: container::Sid,
+}
+
+// Removes a worker's grants; whether every one was removed.
+fn revoke(worker: &Worker) -> bool {
+    let mut ok = true;
+    for path in &worker.grants {
+        ok &= container::set_access(path, &worker.capability, None).is_ok();
+    }
+    ok
 }
 
 type Out = Arc<Mutex<std::io::Stdout>>;
@@ -397,14 +414,26 @@ fn null_input() -> Result<Owned, String> {
     Ok(Owned(handle))
 }
 
-fn environment() -> Vec<u16> {
-    // A minimal, explicit environment: nothing from the service leaks through.
+fn environment(temp: Option<&str>) -> Vec<u16> {
+    // A minimal, explicit environment: nothing from the service leaks
+    // through. The worker's temporary folder is its own writable folder
+    // (the user's is closed to the container), or none.
     let mut block = Vec::new();
-    for key in ["SystemRoot", "TEMP", "TMP"] {
+    let mut add = |key: &str, value: &str| {
+        block.extend(format!("{key}={value}").encode_utf16());
+        block.push(0);
+    };
+    // Windows creates an AppContainer process only when the profile
+    // locations are in its environment (it fails with error 203 without
+    // them); they are paths the container cannot read anyway.
+    for key in ["SystemRoot", "USERPROFILE", "LOCALAPPDATA"] {
         if let Ok(value) = std::env::var(key) {
-            block.extend(format!("{key}={value}").encode_utf16());
-            block.push(0);
+            add(key, &value);
         }
+    }
+    if let Some(temp) = temp {
+        add("TEMP", temp);
+        add("TMP", temp);
     }
     block.push(0);
     block
@@ -742,6 +771,30 @@ fn release_all_labels() {
     }
 }
 
+// A readable path must be an existing, absolute file or folder that is not
+// a link or junction (a grant would reach its target instead).
+fn readable_path(path: &str) -> Result<(), String> {
+    use std::os::windows::fs::MetadataExt;
+    if !std::path::Path::new(path).is_absolute() {
+        return Err("readable paths must be absolute".into());
+    }
+    match std::fs::symlink_metadata(path) {
+        Ok(meta) if meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT == 0 => Ok(()),
+        _ => Err("a readable path is missing or is a link".into()),
+    }
+}
+
+// A name no other worker of this or any later procd will repeat.
+fn unique() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!("{}.{}.{}", std::process::id(), nanos, NEXT.fetch_add(1, Ordering::Relaxed))
+}
+
 // A writable folder must be an existing, absolute, real directory (not a
 // link or junction, which would label its target instead).
 fn writable_dir(dir: &str) -> Result<(), String> {
@@ -763,7 +816,7 @@ struct Spawned {
     stderr: Owned,
 }
 
-fn spawn(fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
+fn spawn(id: &str, fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
     if fields.len() < 5 {
         return Err("SPAWN needs exe, cwd, memory, writable folders and argc".into());
     }
@@ -776,6 +829,18 @@ fn spawn(fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
     }
     let writable = fields[4..4 + count].iter().map(|f| hex_decode(f)).collect::<Result<Vec<_>, _>>()?;
     let fields = &fields[4 + count..];
+    if fields.is_empty() {
+        return Err("SPAWN needs a readable count".into());
+    }
+    let readable_count: usize = fields[0].parse().map_err(|_| "bad readable count")?;
+    if readable_count > MAX_READABLE || fields.len() < 1 + readable_count {
+        return Err("readable path count mismatch".into());
+    }
+    let readable = fields[1..1 + readable_count].iter().map(|f| hex_decode(f)).collect::<Result<Vec<_>, _>>()?;
+    let fields = &fields[1 + readable_count..];
+    if fields.is_empty() {
+        return Err("SPAWN needs argc".into());
+    }
     let argc: usize = fields[0].parse().map_err(|_| "bad argc")?;
     if argc > 4096 || fields.len() != 1 + argc {
         return Err("argument count mismatch".into());
@@ -783,9 +848,14 @@ fn spawn(fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
     for dir in &writable {
         writable_dir(dir)?;
     }
+    for path in &readable {
+        readable_path(path)?;
+    }
     if !allow.iter().any(|a| a.eq_ignore_ascii_case(&exe)) {
         return Err("executable is not on the allowlist".into());
     }
+    // The worker runs the container's copy of the allowlisted executable.
+    let exe = container::staged_tool(&exe)?;
     let mut line = quote(&exe);
     for field in &fields[1..] {
         line.push(' ');
@@ -796,11 +866,55 @@ fn spawn(fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
     }
 
     let token = sandbox_token()?;
+    // This worker's own capability: what is granted to it no other worker
+    // (or later process) can use.
+    let capability = container::capability_sid(&format!("yamakan.worker.{id}.{}", unique()))?;
+    let mut grants: Vec<String> = Vec::new();
+    let grant = |path: &str, flags: u32, mask: u32, grants: &mut Vec<String>| -> Result<(), String> {
+        container::set_access(path, &capability, Some((flags, mask))).map_err(|e| format!("grant {path}: {e}"))?;
+        grants.push(path.to_string());
+        Ok(())
+    };
+    let granted = (|| -> Result<(), String> {
+        for path in &readable {
+            grant(path, 0, container::FILE_GENERIC_READ, &mut grants)?;
+            // A folder's grant reaches only its existing files when each is
+            // granted too (grants do not re-propagate through a tree).
+            if std::path::Path::new(path).is_dir() {
+                let entries = std::fs::read_dir(path).map_err(|e| format!("list {path}: {e}"))?;
+                for entry in entries.flatten() {
+                    let child = entry.path().to_string_lossy().to_string();
+                    readable_path(&child)?;
+                    if entry.path().is_file() {
+                        grant(&child, 0, container::FILE_GENERIC_READ, &mut grants)?;
+                    }
+                }
+            }
+        }
+        for dir in &writable {
+            grant(dir, container::INHERIT, container::FILE_MODIFY, &mut grants)?;
+        }
+        let named = |p: &str| readable.iter().chain(writable.iter()).any(|x| x.eq_ignore_ascii_case(p));
+        if !named(&cwd) {
+            grant(&cwd, 0, container::FILE_TRAVERSE_ONLY, &mut grants)?;
+        }
+        Ok(())
+    })();
+    let unwind = |grants: &[String]| {
+        for path in grants {
+            let _ = container::set_access(path, &capability, None);
+        }
+    };
+    if let Err(e) = granted {
+        unwind(&grants);
+        return Err(e);
+    }
     for (i, dir) in writable.iter().enumerate() {
         if let Err(e) = hold_label(dir) {
             for done in &writable[..i] {
                 let _ = release_label(done);
             }
+            unwind(&grants);
             return Err(e);
         }
     }
@@ -809,7 +923,7 @@ fn spawn(fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
             let _ = release_label(dir);
         }
     };
-    let result = launch(&exe, &cwd, &line, memory, &token);
+    let result = launch(&exe, &cwd, &line, memory, &token, &capability, writable.first().map(String::as_str));
     match result {
         Ok((job, process)) => {
             if std::env::var("YAMAKAN_PROCD_FAULT").as_deref() == Ok("after-create") {
@@ -817,7 +931,7 @@ fn spawn(fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
                 std::process::abort();
             }
             Ok(Spawned {
-                worker: Worker { job, thread: Owned(process.0.thread), writable },
+                worker: Worker { job, thread: Owned(process.0.thread), writable, grants, capability },
                 process: Owned(process.0.process),
                 pid: process.0.process_id,
                 stdout: process.1,
@@ -826,6 +940,7 @@ fn spawn(fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
         }
         Err(e) => {
             restore(&writable);
+            unwind(&grants);
             Err(e)
         }
     }
@@ -833,7 +948,15 @@ fn spawn(fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
 
 type Launched = (ProcessInformation, Owned, Owned);
 
-fn launch(exe: &str, cwd: &str, line: &str, memory: usize, token: &Owned) -> Result<(Owned, Launched), String> {
+fn launch(
+    exe: &str,
+    cwd: &str,
+    line: &str,
+    memory: usize,
+    token: &Owned,
+    capability: &container::Sid,
+    temp: Option<&str>,
+) -> Result<(Owned, Launched), String> {
     unsafe {
         let job = Owned(CreateJobObjectW(null_mut(), std::ptr::null()));
         if job.0.is_null() {
@@ -866,11 +989,19 @@ fn launch(exe: &str, cwd: &str, line: &str, memory: usize, token: &Owned) -> Res
         let mut inherited = [stdin.0, stdout_write.0, stderr_write.0];
         let mut jobs = [job.0];
 
+        // The worker's AppContainer and its one enabled capability.
+        let mut capabilities = [SidAndAttributes { sid: capability.as_ptr(), attributes: container::SE_GROUP_ENABLED }];
+        let mut security = container::SecurityCapabilities {
+            app_container_sid: container::container_sid()?.as_ptr(),
+            capabilities: capabilities.as_mut_ptr(),
+            capability_count: 1,
+            reserved: 0,
+        };
         let mut size = 0usize;
-        InitializeProcThreadAttributeList(null_mut(), 2, 0, &mut size);
+        InitializeProcThreadAttributeList(null_mut(), 4, 0, &mut size);
         let mut storage = vec![0u8; size];
         let list = storage.as_mut_ptr() as *mut c_void;
-        if InitializeProcThreadAttributeList(list, 2, 0, &mut size) == 0 {
+        if InitializeProcThreadAttributeList(list, 4, 0, &mut size) == 0 {
             return Err(last_error("InitializeProcThreadAttributeList"));
         }
         let result = (|| {
@@ -899,6 +1030,35 @@ fn launch(exe: &str, cwd: &str, line: &str, memory: usize, token: &Owned) -> Res
             {
                 return Err(last_error("job list"));
             }
+            // Fail closed: a worker is never started outside its container.
+            if UpdateProcThreadAttribute(
+                list,
+                0,
+                container::PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
+                &mut security as *mut _ as *mut c_void,
+                std::mem::size_of::<container::SecurityCapabilities>(),
+                null_mut(),
+                null_mut(),
+            ) == 0
+            {
+                return Err(last_error("AppContainer"));
+            }
+            // A less-privileged AppContainer: grants made to ALL APPLICATION
+            // PACKAGES (much of the user's registry, for one) do not apply;
+            // only grants to this container or its capability do.
+            let mut opt_out: u32 = container::ALL_APPLICATION_PACKAGES_OPT_OUT;
+            if UpdateProcThreadAttribute(
+                list,
+                0,
+                container::PROC_THREAD_ATTRIBUTE_ALL_APPLICATION_PACKAGES_POLICY,
+                &mut opt_out as *mut _ as *mut c_void,
+                std::mem::size_of::<u32>(),
+                null_mut(),
+                null_mut(),
+            ) == 0
+            {
+                return Err(last_error("less-privileged AppContainer"));
+            }
             let mut info: StartupInfoExW = std::mem::zeroed();
             info.startup_info.cb = std::mem::size_of::<StartupInfoExW>() as u32;
             info.startup_info.flags = STARTF_USESTDHANDLES;
@@ -910,7 +1070,7 @@ fn launch(exe: &str, cwd: &str, line: &str, memory: usize, token: &Owned) -> Res
             let exe_w = wide(exe);
             let cwd_w = wide(cwd);
             let mut command = wide(line);
-            let mut env = environment();
+            let mut env = environment(temp);
             if CreateProcessAsUserW(
                 token.0,
                 exe_w.as_ptr(),
@@ -990,7 +1150,7 @@ fn main() {
                         continue;
                     }
                 }
-                match spawn(&parts[2..], &allow) {
+                match spawn(id, &parts[2..], &allow) {
                     Ok(spawned) => {
                         workers.lock().unwrap().insert(id.to_string(), spawned.worker);
                         send(&out, &format!("CREATED\t{id}\t{}", spawned.pid));
@@ -1049,8 +1209,13 @@ fn main() {
                                 }
                             }
                             if let Some(worker) = worker {
-                                let folders = worker.writable.clone();
-                                drop(worker);
+                                // The job closes first, so nothing in it can use a
+                                // grant while the grants are removed.
+                                let Worker { job, thread, writable: folders, grants, capability } = worker;
+                                drop((job, thread));
+                                for path in &grants {
+                                    restored &= container::set_access(path, &capability, None).is_ok();
+                                }
                                 for dir in &folders {
                                     restored &= release_label(dir);
                                 }
@@ -1080,6 +1245,7 @@ fn main() {
     // service clears labels across the workspace when it next starts.)
     for worker in workers.lock().unwrap().values() {
         unsafe { TerminateJobObject(worker.job.0, 1) };
+        let _ = revoke(worker);
     }
     release_all_labels();
     std::process::exit(0);
