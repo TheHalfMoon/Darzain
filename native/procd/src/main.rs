@@ -998,10 +998,10 @@ fn launch(
             reserved: 0,
         };
         let mut size = 0usize;
-        InitializeProcThreadAttributeList(null_mut(), 3, 0, &mut size);
+        InitializeProcThreadAttributeList(null_mut(), 4, 0, &mut size);
         let mut storage = vec![0u8; size];
         let list = storage.as_mut_ptr() as *mut c_void;
-        if InitializeProcThreadAttributeList(list, 3, 0, &mut size) == 0 {
+        if InitializeProcThreadAttributeList(list, 4, 0, &mut size) == 0 {
             return Err(last_error("InitializeProcThreadAttributeList"));
         }
         let result = (|| {
@@ -1042,6 +1042,22 @@ fn launch(
             ) == 0
             {
                 return Err(last_error("AppContainer"));
+            }
+            // A less-privileged AppContainer: grants made to ALL APPLICATION
+            // PACKAGES (much of the user's registry, for one) do not apply;
+            // only grants to this container or its capability do.
+            let mut opt_out: u32 = container::ALL_APPLICATION_PACKAGES_OPT_OUT;
+            if UpdateProcThreadAttribute(
+                list,
+                0,
+                container::PROC_THREAD_ATTRIBUTE_ALL_APPLICATION_PACKAGES_POLICY,
+                &mut opt_out as *mut _ as *mut c_void,
+                std::mem::size_of::<u32>(),
+                null_mut(),
+                null_mut(),
+            ) == 0
+            {
+                return Err(last_error("less-privileged AppContainer"));
             }
             let mut info: StartupInfoExW = std::mem::zeroed();
             info.startup_info.cb = std::mem::size_of::<StartupInfoExW>() as u32;

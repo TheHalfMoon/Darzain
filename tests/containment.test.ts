@@ -29,6 +29,9 @@ import { ProcessOwner } from "../core/process/owner.ts";
 import { mediaTools } from "../core/process/workers.ts";
 
 const windows = process.platform === "win32";
+const workerProbe = fileURLToPath(
+  new URL("../native/procd/target/release/worker-probe.exe", import.meta.url),
+);
 const folders: string[] = [];
 after(async () => {
   await Promise.all(
@@ -215,13 +218,27 @@ test(
         await rm(path.join(writable, "ok.txt"), { force: true });
 
         // The same script as a contained worker.
-        const owner = new ProcessOwner([process.execPath]);
+        const owner = new ProcessOwner([workerProbe]);
         let stdout = "";
         let result;
         try {
           result = await owner.run({
-            executable: process.execPath,
-            args: ["-e", HOSTILE, JSON.stringify(targets)],
+            executable: workerProbe,
+            args: [
+              "hostile",
+              sentinel,
+              targets.token,
+              targets.launch,
+              targets.database,
+              otherMedia,
+              granted,
+              targets.profile!,
+              workspace,
+              sentinelDir,
+              writable,
+              String(listenPort),
+              lan || "",
+            ],
             cwd: base,
             readable: [granted],
             writable: [writable],
@@ -230,6 +247,11 @@ test(
         } finally {
           owner.close();
         }
+        assert.equal(
+          result.code,
+          0,
+          `native probe exit=${result.code}; stderr=${result.stderr}; stdout=${stdout}`,
+        );
         const contained = JSON.parse(stdout.trim().split("\n").at(-1)!);
         // Denied: everything it was not given.
         for (const key of [
@@ -239,21 +261,17 @@ test(
           "database",
           "otherMedia",
         ])
-          assert.notEqual(contained[key], "read", `${key}: ${contained[key]}`);
+          assert.equal(contained[key], false, `${key}: ${contained[key]}`);
         for (const key of ["profile", "workspace"])
-          assert.notEqual(
-            contained[key],
-            "listed",
-            `${key}: ${contained[key]}`,
-          );
-        assert.notEqual(contained.writeWorkspace, "written");
-        assert.notEqual(contained.writeSentinelDir, "written");
-        assert.notEqual(contained.child, "started", contained.child);
-        assert.notEqual(contained.loopback, "connected", contained.loopback);
-        if (lan) assert.notEqual(contained.lan, "connected", contained.lan);
+          assert.equal(contained[key], false, `${key}: ${contained[key]}`);
+        assert.equal(contained.writeWorkspace, false);
+        assert.equal(contained.writeSentinelDir, false);
+        assert.equal(contained.child, false, String(contained.child));
+        assert.equal(contained.loopback, false, String(contained.loopback));
+        if (lan) assert.equal(contained.lan, false, String(contained.lan));
         // Allowed: exactly what it was given.
-        assert.equal(contained.granted, "read");
-        assert.equal(contained.writeOwn, "written");
+        assert.equal(contained.granted, true);
+        assert.equal(contained.writeOwn, true);
         assert.equal(result.code, 0, result.stderr);
         assert.ok(!stdout.includes("SENTINEL"));
         // Its grants are gone: an uncontained check of the access lists finds

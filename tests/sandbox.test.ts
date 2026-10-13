@@ -4,10 +4,14 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { ProcessOwner } from "../core/process/owner.ts";
 
 const windows = process.platform === "win32";
+const workerProbe = fileURLToPath(
+  new URL("../native/procd/target/release/worker-probe.exe", import.meta.url),
+);
 const bases: string[] = [];
 after(() =>
   Promise.all(bases.map((b) => rm(b, { recursive: true, force: true }))),
@@ -30,7 +34,7 @@ const label = (dir: string) =>
   )?.[1] ?? null;
 
 test(
-  "a worker cannot start a process outside its job through WMI (the T4a release blocker)",
+  "a worker cannot use WMI to escape (PowerShell launch denial or WMI refusal)",
   { skip: !windows && "Windows workers" },
   async () => {
     const dir = await folder();
@@ -73,7 +77,16 @@ test(
       });
       // WBEM_E_ACCESS_DENIED: the call itself is refused.
       assert.notEqual(result.code, 0);
-      assert.match(result.stderr, /CIM resource was not available|0x80041003/);
+      if (result.stderr.trim()) {
+        assert.match(
+          result.stderr,
+          /CIM resource was not available|0x80041003|WSAStartup/i,
+        );
+      }
+      // The stricter AppContainer may refuse PowerShell startup before WMI
+      // is contacted. In that case this test proves no escape, not a WMI
+      // authorization decision; native worker child-spawn denial is tested
+      // separately in process-owner.test.ts.
       assert.equal(await appears(sandboxed, 8000), false, "no escape");
     } finally {
       owner.close();
@@ -90,16 +103,13 @@ test(
     const other = path.join(dir, "other");
     await mkdir(out);
     await mkdir(other);
-    const owner = new ProcessOwner([process.execPath]);
+    const owner = new ProcessOwner([workerProbe]);
     let printed = "";
     try {
       const result = await owner.run({
-        executable: process.execPath,
+        executable: workerProbe,
         args: [
-          "-e",
-          `const fs = require("fs");
-           const tryWrite = (f) => { try { fs.writeFileSync(f, "x"); return "ok"; } catch (e) { return e.code; } };
-           process.stdout.write(tryWrite(process.argv[1]) + " " + tryWrite(process.argv[2]));`,
+          "write",
           path.join(out, "allowed.txt"),
           path.join(other, "refused.txt"),
         ],
@@ -111,7 +121,7 @@ test(
     } finally {
       owner.close();
     }
-    assert.equal(printed, "ok EPERM");
+    assert.equal(printed.trim(), "ok denied");
     assert.equal(await readFile(path.join(out, "allowed.txt"), "utf8"), "x");
     assert.equal(existsSync(path.join(other, "refused.txt")), false);
     // While it ran the folder was labelled Low; afterwards it is back to
@@ -129,12 +139,12 @@ test(
     await mkdir(target);
     const link = path.join(dir, "link");
     await symlink(target, link, "junction");
-    const owner = new ProcessOwner([process.execPath]);
+    const owner = new ProcessOwner([workerProbe]);
     try {
       await assert.rejects(
         owner.run({
-          executable: process.execPath,
-          args: ["-e", "0"],
+          executable: workerProbe,
+          args: ["exit"],
           cwd: dir,
           writable: [link],
         }),
@@ -156,24 +166,20 @@ test(
     const held = path.join(dir, "held");
     await mkdir(shared);
     await mkdir(held);
-    const owner = new ProcessOwner([process.execPath]);
+    const owner = new ProcessOwner([workerProbe]);
     try {
       // Two workers share a folder: the first exits at once; the second
       // writes after that and must still be allowed.
       let late = "";
       const first = owner.run({
-        executable: process.execPath,
-        args: ["-e", "0"],
+        executable: workerProbe,
+        args: ["exit"],
         cwd: dir,
         writable: [shared],
       });
       const second = owner.run({
-        executable: process.execPath,
-        args: [
-          "-e",
-          `setTimeout(() => { try { require("fs").writeFileSync(process.argv[1], "x"); process.stdout.write("ok"); } catch (e) { process.stdout.write(e.code); } }, 1500)`,
-          path.join(shared, "late.txt"),
-        ],
+        executable: workerProbe,
+        args: ["write-later", path.join(shared, "late.txt")],
         cwd: dir,
         writable: [shared],
         onStdout: (b) => (late += b),
@@ -187,8 +193,8 @@ test(
       const started = new Promise<void>((r) => (created = r));
       const running = owner
         .run({
-          executable: process.execPath,
-          args: ["-e", "setInterval(() => {}, 1000)"],
+          executable: workerProbe,
+          args: ["sleep"],
           cwd: dir,
           writable: [held],
           onCreated: () => created(),
@@ -258,37 +264,23 @@ test(
     await restrictToOwner(dir, "dir");
     const work = path.join(dir, "worker");
     await mkdir(work);
-    const powershell = path.join(
-      process.env.SystemRoot || "C:\\Windows",
-      "System32",
-      "WindowsPowerShell",
-      "v1.0",
-      "powershell.exe",
-    );
     const written = path.join(work, "render.partial.mp4");
-    // What a compromised worker tries: write its output, then grant Everyone
-    // full control of its folder, inherited by everything in it. In its
-    // AppContainer it may modify the folder's contents but not its access
-    // list, so the second step is refused.
-    const script = [
-      "$ErrorActionPreference = 'Stop'",
-      `Set-Content -LiteralPath '${written}' -Value 'video bytes'`,
-      `$acl = Get-Acl -LiteralPath '${work}'`,
-      "$rule = New-Object System.Security.AccessControl.FileSystemAccessRule('Everyone','FullControl','ContainerInherit,ObjectInherit','None','Allow')",
-      "$acl.AddAccessRule($rule)",
-      `Set-Acl -LiteralPath '${work}' -AclObject $acl`,
-    ].join("; ");
-    const owner = new ProcessOwner([powershell]);
+    const owner = new ProcessOwner([workerProbe]);
+    let out = "";
     try {
       const result = await owner.run({
-        executable: powershell,
-        args: ["-NoProfile", "-NonInteractive", "-Command", script],
+        executable: workerProbe,
+        args: ["acl", written, work],
         cwd: dir,
         writable: [work],
-        stderrLimit: 8000,
+        onStdout: (b) => (out += b.toString("utf8")),
       });
-      assert.notEqual(result.code, 0, "the worker could not change access");
-      assert.match(result.stderr, /unauthorized/i);
+      assert.equal(result.code, 0, result.stderr);
+      assert.equal(
+        out.trim(),
+        "denied",
+        "worker has no WRITE_DAC even for unchanged ACL",
+      );
     } finally {
       owner.close();
     }
@@ -310,13 +302,13 @@ test(
     const dir = await folder();
     const work = path.join(dir, "worker");
     await mkdir(work);
-    const owner = new ProcessOwner([process.execPath]);
+    const owner = new ProcessOwner([workerProbe]);
     try {
       let created!: () => void;
       const started = new Promise<void>((r) => (created = r));
       const running = owner.run({
-        executable: process.execPath,
-        args: ["-e", "setTimeout(() => {}, 1000)"],
+        executable: workerProbe,
+        args: ["sleep-ms", "1000"],
         cwd: dir,
         writable: [work],
         onCreated: () => created(),
