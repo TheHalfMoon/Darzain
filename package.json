@@ -28,6 +28,8 @@
     "qualify:typography": "node scripts/qualify-typography.ts",
     "qualify:preview": "node scripts/qualify-preview.ts",
     "qualify:resources": "node scripts/qualify-resources.ts",
+    "qualify:av-sync": "node scripts/qualify-av-sync.ts",
+    "qualify:playback": "node scripts/qualify-playback.mjs",
     "qualify:release": "node scripts/qualify-release.ts"
   },
   "dependencies": {
