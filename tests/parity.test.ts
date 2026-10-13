@@ -2,7 +2,9 @@
 // over REST and over MCP against one real service produce the same results,
 // the same revisions, the same structured errors and the same canonical
 // project bytes. Generated identifiers (project, asset, tracks, jobs) are
-// mapped from the MCP run onto the REST run; nothing else is normalised.
+// mapped from the MCP run onto the REST run. Only timestamps and hashes
+// computed over identifier-bearing content are compared for shape; that
+// content is compared byte for byte through the canonical export.
 // Media import has no MCP tool (raw bytes go to the REST upload route for
 // both), and an unknown MCP tool is a JSON-RPC error by protocol design.
 import test, { after } from "node:test";
@@ -51,7 +53,8 @@ after(async () => {
 });
 
 type Outcome =
-  { ok: true; result: any } | { ok: false; code: string; retryable: boolean };
+  | { ok: true; result: any }
+  | { ok: false; code: string; message: string; retryable: boolean };
 type Transport = {
   name: string;
   call: (op: string, params: unknown, requestId?: string) => Promise<Outcome>;
@@ -69,7 +72,12 @@ function rest(token: string): Transport {
         };
       } catch (e) {
         if (!(e instanceof YamakanError)) throw e;
-        return { ok: false, code: e.code, retryable: e.retryable };
+        return {
+          ok: false,
+          code: e.code,
+          message: e.message,
+          retryable: e.retryable,
+        };
       }
     },
   };
@@ -113,7 +121,12 @@ function mcp(env: NodeJS.ProcessEnv): Transport & {
       assert.equal(reply.error, undefined, JSON.stringify(reply.error));
       const value = JSON.parse(reply.result.content[0].text);
       return reply.result.isError
-        ? { ok: false, code: value.code, retryable: value.retryable }
+        ? {
+            ok: false,
+            code: value.code,
+            message: value.message,
+            retryable: value.retryable,
+          }
         : { ok: true, result: value };
     },
     close: async () => {
@@ -372,247 +385,272 @@ async function journey(
   return { log, project, asset, tracks, job, mp4, canonical };
 }
 
-test("REST and MCP replay the journey with identical results, errors and canonical bytes", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "yamakan-parity-"));
-  folders.push(root);
-  const env = {
-    ...process.env,
-    YAMAKAN_WORKSPACE: path.join(root, "workspace"),
-    YAMAKAN_PORT: String(port),
-    YAMAKAN_URL: base,
-  };
-  const server = fork(
-    fileURLToPath(new URL("../server/main.ts", import.meta.url)),
-    [],
-    {
-      env,
-      silent: true,
-      windowsHide: true,
-    },
-  );
-  children.push(server);
-  await new Promise<void>((resolve, reject) => {
-    server.stdout!.on(
-      "data",
-      (c) => String(c).includes("Yamakan is running") && resolve(),
+test(
+  "REST and MCP replay the journey with identical results, errors and canonical bytes",
+  { timeout: 300_000 },
+  async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "yamakan-parity-"));
+    folders.push(root);
+    const env = {
+      ...process.env,
+      YAMAKAN_WORKSPACE: path.join(root, "workspace"),
+      YAMAKAN_PORT: String(port),
+      YAMAKAN_URL: base,
+    };
+    const server = fork(
+      fileURLToPath(new URL("../server/main.ts", import.meta.url)),
+      [],
+      {
+        env,
+        silent: true,
+        windowsHide: true,
+      },
     );
-    server.once("exit", (code) => reject(new Error(`server exited ${code}`)));
-  });
-  const wav = path.join(root, "tone.wav");
-  execFileSync(
-    mediaTools().ffmpeg,
-    [
-      "-hide_banner",
-      "-loglevel",
-      "error",
-      "-y",
-      "-f",
-      "lavfi",
-      "-i",
-      "sine=frequency=440:duration=4",
-      wav,
-    ],
-    { windowsHide: true },
-  );
-  const wavBytes = await readFile(wav);
-  const workspace = env.YAMAKAN_WORKSPACE;
-  const token = (await readFile(path.join(workspace, "token"), "utf8")).trim();
-  // The launch file holds the link; its fragment carries the secret.
-  const launch = /#launch=([a-f0-9]{64})/.exec(
-    await readFile(path.join(workspace, "launch"), "utf8"),
-  )![1];
-  const session = await (
-    await fetch(`${base}/api/v1/session`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Origin: base },
-      body: JSON.stringify({ launch }),
-    })
-  ).json();
-  const uiHeaders = { "X-Yamakan-Session": session.session };
-
-  const viaMcp = mcp(env);
-  try {
-    const init = await viaMcp.raw("initialize", {
-      protocolVersion: "2025-06-18",
-      capabilities: {},
-      clientInfo: { name: "parity", version: "1" },
+    children.push(server);
+    await new Promise<void>((resolve, reject) => {
+      server.stdout!.on(
+        "data",
+        (c) => String(c).includes("Yamakan is running") && resolve(),
+      );
+      server.once("exit", (code) => reject(new Error(`server exited ${code}`)));
     });
-    assert.equal(init.result.serverInfo.name, "yamakan");
-    // Every registry command is an MCP tool with the same input contract
-    // plus the optional requestId.
-    const catalog = await (
-      await fetch(`${base}/api/v1/tools`, {
-        headers: { Authorization: `Bearer ${token}` },
+    const wav = path.join(root, "tone.wav");
+    execFileSync(
+      mediaTools().ffmpeg,
+      [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:duration=4",
+        wav,
+      ],
+      { windowsHide: true },
+    );
+    const wavBytes = await readFile(wav);
+    const workspace = env.YAMAKAN_WORKSPACE;
+    const token = (
+      await readFile(path.join(workspace, "token"), "utf8")
+    ).trim();
+    // The launch file holds the link; its fragment carries the secret.
+    const launch = /#launch=([a-f0-9]{64})/.exec(
+      await readFile(path.join(workspace, "launch"), "utf8"),
+    )![1];
+    const session = await (
+      await fetch(`${base}/api/v1/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: base },
+        body: JSON.stringify({ launch }),
       })
     ).json();
-    const { tools } = (await viaMcp.raw("tools/list")).result;
-    assert.deepEqual(
-      tools.map((x: { title: string }) => x.title).sort(),
-      catalog.tools.map((x: { name: string }) => x.name).sort(),
-    );
-    for (const tool of tools) {
-      const command = catalog.tools.find(
-        (x: { name: string }) => x.name === tool.title,
-      );
-      const { requestId, ...properties } = tool.inputSchema.properties;
-      assert.ok(requestId);
-      assert.deepEqual(
-        { ...tool.inputSchema, properties },
-        command.inputSchema,
-        tool.title,
-      );
-      assert.equal(tool.annotations.readOnlyHint, !command.mutation);
-    }
+    const uiHeaders = { "X-Yamakan-Session": session.session };
 
-    const idsA = idSet("a");
-    const idsB = idSet("b");
-    const a = await journey(rest(token), token, wavBytes, uiHeaders, idsA);
-    const b = await journey(viaMcp, token, wavBytes, uiHeaders, idsB);
-
-    // Request IDs belong to the principal, not the transport: the REST
-    // run's create, replayed over MCP, returns the same project.
-    assert.deepEqual(
-      await viaMcp.call(
-        "yamakan.project.create",
-        { name: "Parity" },
-        "REST-create-1",
-      ),
-      { ok: true, result: a.project },
-    );
-    // Map the MCP run's generated identifiers onto the REST run's.
-    const mapping = new Map<string, string>([
-      [b.project.id, a.project.id],
-      [b.asset.id, a.asset.id],
-      [b.job.id, a.job.id],
-      ...Object.keys(idsA).map(
-        (k) => [idsB[k as keyof Ids], idsA[k as keyof Ids]] as [string, string],
-      ),
-      ...b.tracks.map(
-        (id: string, i: number) => [id, a.tracks[i]] as [string, string],
-      ),
-    ]);
-    const mapped = (value: unknown) => {
-      let text = JSON.stringify(value);
-      for (const [from, to] of mapping) text = text.replaceAll(from, to);
-      return JSON.parse(text);
-    };
-    // Compared for shape only: timestamps, and hashes computed over content
-    // that contains each run's own identifiers (the head fingerprint, the
-    // render plan hash). That content itself is compared byte for byte
-    // below, through the canonical export.
-    const scrub = (value: any): any =>
-      Array.isArray(value)
-        ? value.map(scrub)
-        : value && typeof value === "object"
-          ? Object.fromEntries(
-              Object.entries(value).map(([k, v]) => [
-                k,
-                /^(createdAt|updatedAt|savedAt|at)$/.test(k) &&
-                typeof v === "string"
-                  ? "<time>"
-                  : /^(headFingerprint|expectedHeadFingerprint|planHash)$/.test(
-                        k,
-                      ) &&
-                      typeof v === "string" &&
-                      /^[a-f0-9]{64}$/.test(v)
-                    ? "<hash over identifiers>"
-                    : scrub(v),
-              ]),
-            )
-          : value;
-    assert.equal(a.log.length, b.log.length);
-    for (let i = 0; i < a.log.length; i++)
-      assert.deepEqual(scrub(mapped(b.log[i])), scrub(a.log[i]), a.log[i].step);
-
-    // The structured errors each step produced, in order.
-    const step = (log: typeof a.log, name: string) =>
-      log.find((x) => x.step === name)!.outcome as any;
-    const codes = a.log
-      .filter((x) => (x.outcome as Outcome)?.ok === false)
-      .map((x) => `${x.step}: ${(x.outcome as { code: string }).code}`);
-    assert.deepEqual(codes, [
-      "batch id reused with other input: IDEMPOTENCY_MISMATCH",
-      "stale batch: REVISION_CONFLICT",
-      "invalid input: VALIDATION",
-      "invalid requestId: VALIDATION",
-      "missing project: NOT_FOUND",
-      "stale undo: REVISION_CONFLICT",
-      "undo of another writer's batch: REVISION_CONFLICT",
-    ]);
-    // Cancelling a finished job changes nothing and returns it as it was.
-    assert.equal(
-      step(a.log, "cancel after completion").result.state,
-      "COMPLETED",
-    );
-    // Replays returned the original results.
-    assert.deepEqual(step(a.log, "batch replayed"), step(a.log, "batch"));
-    assert.deepEqual(
-      step(a.log, "create replayed").result,
-      step(a.log, "create"),
-    );
-    // Identical canonical project bytes and identical exported media (real
-    // MP4 files, not empty downloads).
-    for (const mp4 of [a.mp4, b.mp4]) {
-      assert.ok(mp4.length > 10_000, `${mp4.length} bytes`);
-      assert.equal(mp4.toString("latin1", 4, 8), "ftyp");
-    }
-    assert.equal(
-      JSON.stringify(mapped(b.canonical)),
-      JSON.stringify(a.canonical),
-    );
-    assert.equal(
-      createHash("sha256").update(b.mp4).digest("hex"),
-      createHash("sha256").update(a.mp4).digest("hex"),
-    );
-    await writeFile(
-      path.join(root, "transcript.json"),
-      JSON.stringify({ rest: a.log, mcp: b.log }, null, 2),
-    );
-
-    // A wrong credential fails the same way on both transports.
-    const badRest = await rest("0".repeat(64)).call("yamakan.project.list", {});
-    // MCP reads its credential from the workspace; this one holds a wrong one.
-    const badRoot = path.join(root, "bad");
-    await mkdir(badRoot);
-    await writeFile(path.join(badRoot, "token"), "0".repeat(64));
-    const badMcp = mcp({ ...env, YAMAKAN_WORKSPACE: badRoot });
+    const viaMcp = mcp(env);
     try {
-      await badMcp.raw("initialize", {
+      const init = await viaMcp.raw("initialize", {
         protocolVersion: "2025-06-18",
         capabilities: {},
-        clientInfo: { name: "bad", version: "1" },
+        clientInfo: { name: "parity", version: "1" },
       });
-      assert.deepEqual(await badMcp.call("yamakan.project.list", {}), badRest);
-    } finally {
-      await badMcp.close();
-    }
-    assert.deepEqual(badRest, {
-      ok: false,
-      code: "UNAUTHENTICATED",
-      retryable: false,
-    });
-    // An unknown operation: a VALIDATION error over REST, a JSON-RPC
-    // invalid-params error over MCP (no such tool exists to call).
-    assert.deepEqual(await rest(token).call("yamakan.no.such", {}), {
-      ok: false,
-      code: "VALIDATION",
-      retryable: false,
-    });
-    assert.equal(
-      (
-        await viaMcp.raw("tools/call", {
-          name: "yamakan_no_such",
-          arguments: {},
+      assert.equal(init.result.serverInfo.name, "yamakan");
+      // Every registry command is an MCP tool with the same input contract
+      // plus the optional requestId.
+      const catalog = await (
+        await fetch(`${base}/api/v1/tools`, {
+          headers: { Authorization: `Bearer ${token}` },
         })
-      ).error.code,
-      -32602,
-    );
-  } finally {
-    await viaMcp.close();
-    if (server.exitCode === null) {
-      const done = once(server, "exit");
-      server.send("shutdown");
-      await done;
+      ).json();
+      const { tools } = (await viaMcp.raw("tools/list")).result;
+      assert.deepEqual(
+        tools.map((x: { title: string }) => x.title).sort(),
+        catalog.tools.map((x: { name: string }) => x.name).sort(),
+      );
+      for (const tool of tools) {
+        const command = catalog.tools.find(
+          (x: { name: string }) => x.name === tool.title,
+        );
+        const { requestId, ...properties } = tool.inputSchema.properties;
+        assert.ok(requestId);
+        assert.deepEqual(
+          { ...tool.inputSchema, properties },
+          command.inputSchema,
+          tool.title,
+        );
+        assert.equal(tool.annotations.readOnlyHint, !command.mutation);
+      }
+
+      const idsA = idSet("a");
+      const idsB = idSet("b");
+      const a = await journey(rest(token), token, wavBytes, uiHeaders, idsA);
+      const b = await journey(viaMcp, token, wavBytes, uiHeaders, idsB);
+
+      // Request IDs belong to the principal, not the transport: the REST
+      // run's create, replayed over MCP, returns the same project.
+      assert.deepEqual(
+        await viaMcp.call(
+          "yamakan.project.create",
+          { name: "Parity" },
+          "REST-create-1",
+        ),
+        { ok: true, result: a.project },
+      );
+      // Map the MCP run's generated identifiers onto the REST run's.
+      const mapping = new Map<string, string>([
+        [b.project.id, a.project.id],
+        [b.asset.id, a.asset.id],
+        [b.job.id, a.job.id],
+        ...Object.keys(idsA).map(
+          (k) =>
+            [idsB[k as keyof Ids], idsA[k as keyof Ids]] as [string, string],
+        ),
+        ...b.tracks.map(
+          (id: string, i: number) => [id, a.tracks[i]] as [string, string],
+        ),
+      ]);
+      const mapped = (value: unknown) => {
+        let text = JSON.stringify(value);
+        for (const [from, to] of mapping) text = text.replaceAll(from, to);
+        return JSON.parse(text);
+      };
+      // Compared for shape only: timestamps, and hashes computed over content
+      // that contains each run's own identifiers (the head fingerprint, the
+      // render plan hash). That content itself is compared byte for byte
+      // below, through the canonical export.
+      const scrub = (value: any): any =>
+        Array.isArray(value)
+          ? value.map(scrub)
+          : value && typeof value === "object"
+            ? Object.fromEntries(
+                Object.entries(value).map(([k, v]) => [
+                  k,
+                  /^(createdAt|updatedAt|savedAt|at)$/.test(k) &&
+                  typeof v === "string"
+                    ? "<time>"
+                    : /^(headFingerprint|expectedHeadFingerprint|planHash)$/.test(
+                          k,
+                        ) &&
+                        typeof v === "string" &&
+                        /^[a-f0-9]{64}$/.test(v)
+                      ? "<hash over identifiers>"
+                      : scrub(v),
+                ]),
+              )
+            : value;
+      assert.equal(a.log.length, b.log.length);
+      for (let i = 0; i < a.log.length; i++)
+        assert.deepEqual(
+          scrub(mapped(b.log[i])),
+          scrub(a.log[i]),
+          a.log[i].step,
+        );
+
+      // The structured errors each step produced, in order.
+      const step = (log: typeof a.log, name: string) =>
+        log.find((x) => x.step === name)!.outcome as any;
+      const codes = a.log
+        .filter((x) => (x.outcome as Outcome)?.ok === false)
+        .map((x) => `${x.step}: ${(x.outcome as { code: string }).code}`);
+      assert.deepEqual(codes, [
+        "batch id reused with other input: IDEMPOTENCY_MISMATCH",
+        "stale batch: REVISION_CONFLICT",
+        "invalid input: VALIDATION",
+        "invalid requestId: VALIDATION",
+        "missing project: NOT_FOUND",
+        "stale undo: REVISION_CONFLICT",
+        "undo of another writer's batch: REVISION_CONFLICT",
+      ]);
+      // The refused undo is the per-writer rule, not a stale revision or an
+      // empty history (they share the code).
+      assert.match(
+        step(a.log, "undo of another writer's batch").message,
+        /another client/,
+      );
+      // Cancelling a finished job changes nothing and returns it as it was.
+      assert.equal(
+        step(a.log, "cancel after completion").result.state,
+        "COMPLETED",
+      );
+      // Replays returned the original results.
+      assert.deepEqual(step(a.log, "batch replayed"), step(a.log, "batch"));
+      assert.deepEqual(
+        step(a.log, "create replayed").result,
+        step(a.log, "create"),
+      );
+      // Identical canonical project bytes and identical exported media (real
+      // MP4 files, not empty downloads).
+      for (const mp4 of [a.mp4, b.mp4]) {
+        assert.ok(mp4.length > 10_000, `${mp4.length} bytes`);
+        assert.equal(mp4.toString("latin1", 4, 8), "ftyp");
+      }
+      assert.equal(
+        JSON.stringify(mapped(b.canonical)),
+        JSON.stringify(a.canonical),
+      );
+      assert.equal(
+        createHash("sha256").update(b.mp4).digest("hex"),
+        createHash("sha256").update(a.mp4).digest("hex"),
+      );
+      await writeFile(
+        path.join(root, "transcript.json"),
+        JSON.stringify({ rest: a.log, mcp: b.log }, null, 2),
+      );
+
+      // A wrong credential fails the same way on both transports.
+      const badRest = await rest("0".repeat(64)).call(
+        "yamakan.project.list",
+        {},
+      );
+      // MCP reads its credential from the workspace; this one holds a wrong one.
+      const badRoot = path.join(root, "bad");
+      await mkdir(badRoot);
+      await writeFile(path.join(badRoot, "token"), "0".repeat(64));
+      const badMcp = mcp({ ...env, YAMAKAN_WORKSPACE: badRoot });
+      try {
+        await badMcp.raw("initialize", {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: { name: "bad", version: "1" },
+        });
+        assert.deepEqual(
+          await badMcp.call("yamakan.project.list", {}),
+          badRest,
+        );
+      } finally {
+        await badMcp.close();
+      }
+      assert.deepEqual(badRest, {
+        ok: false,
+        code: "UNAUTHENTICATED",
+        message: "Authentication required.",
+        retryable: false,
+      });
+      // An unknown operation: a VALIDATION error over REST, a JSON-RPC
+      // invalid-params error over MCP (no such tool exists to call).
+      assert.deepEqual(await rest(token).call("yamakan.no.such", {}), {
+        ok: false,
+        code: "VALIDATION",
+        message: "Unknown operation.",
+        retryable: false,
+      });
+      assert.equal(
+        (
+          await viaMcp.raw("tools/call", {
+            name: "yamakan_no_such",
+            arguments: {},
+          })
+        ).error.code,
+        -32602,
+      );
+    } finally {
+      await viaMcp.close();
+      if (server.exitCode === null) {
+        const done = once(server, "exit");
+        server.send("shutdown");
+        await done;
+      }
     }
-  }
-});
+  },
+);

@@ -31,7 +31,7 @@ const REQUEST_ID = {
   maxLength: 128,
   pattern: "^[A-Za-z0-9._:-]+$",
   description:
-    "Optional. Retrying a mutation with the same requestId returns the original result instead of applying it again; reusing it with different arguments fails with IDEMPOTENCY_MISMATCH.",
+    "Optional. Retrying a mutation with the same requestId returns the original result instead of applying it again; reusing it with different arguments fails with IDEMPOTENCY_MISMATCH. Use a fresh unique value (for example a UUID): every local client shares one request-ID space.",
 };
 // MCP clients commonly restrict tool names to [A-Za-z0-9_-].
 const toolName = (operation: string) => operation.replaceAll(".", "_");
@@ -138,7 +138,8 @@ async function handle(message: Message) {
         if (!valid)
           throw new YamakanError(
             "VALIDATION",
-            "Invalid requestId.",
+            // The service's own message for a malformed envelope.
+            "Invalid command envelope.",
             false,
             null,
           );

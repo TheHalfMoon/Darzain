@@ -186,7 +186,7 @@ T9 exceeds the plan's four-day bound, so it is split at its interface: **T9a** r
 
 1. Mid-render kill test with a meaningful orphan window (`tests/jobs.test.ts`; in progress on `test/render-kill-window` in a separate session). Correction: the T5 mid-render kill test waits 5 s, longer than its render, so an orphaned FFmpeg could pass it (found in the PR #22 review); the step 10 claim "no orphan after a kill during render" is unproven until then.
 2. ~~Resource policy~~: v2 frozen as an agent decision ([record](../docs/AGENT_DECISION_RECORD.md)); `npm run qualify:resources` and `qualify:large-import` fail on a breach.
-3. ~~MCP/REST parity replay (step 14)~~: `tests/parity.test.ts` (gaps listed in the release proposal's row 14). MCP tools now take an optional `requestId`, and a refused credential is a structured tool error.
+3. MCP/REST parity replay (step 14): landed as `tests/parity.test.ts`; the row stays Partial (gaps listed in the release proposal's row 14). MCP tools now take an optional `requestId`, and a refused credential is a structured tool error.
 4. Export goldens with negative fixtures and the 10-minute audio-drift fixture (step 8).
 5. 720p playback measurement (step 7).
 6. Worker read containment (AppContainer preferred) and the hostile-media corpus with a sentinel file.
