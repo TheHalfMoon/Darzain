@@ -52,7 +52,10 @@ try {
     "-f",
     "lavfi",
     "-i",
-    "color=c=0x202020:s=640x360:r=30000/1001:d=599.9,drawbox=x=0:y=0:w=640:h=360:color=white:t=fill:enable='lt(mod(t\\,10)\\,0.03)'",
+    // Exactly one flash per mark: the first source frame at or after each
+    // 10 s instant (a frame lasts 1001/30000 s, so a time window could miss
+    // or double it).
+    "color=c=0x202020:s=640x360:r=30000/1001:d=599.9,drawbox=x=0:y=0:w=640:h=360:color=white:t=fill:enable='eq(n\\,ceil(floor(n*1001/300000)*300000/1001))'",
     "-pix_fmt",
     "yuv420p",
     "-c:v",
