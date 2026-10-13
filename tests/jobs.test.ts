@@ -1,8 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fork, spawnSync } from "node:child_process";
-import { once } from "node:events";
-import { access, mkdtemp, readdir } from "node:fs/promises";
+import { access, mkdtemp, readdir, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,7 +11,7 @@ import type { SupervisorOptions } from "../core/jobs.ts";
 import { CommandError } from "../core/command/errors.ts";
 import { workers } from "../core/process/workers.ts";
 
-async function workspace(frames = 30, width = 320) {
+async function workspace(frames = 30, width = 320, height = 180) {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-jobs-"));
   const store = new ProjectStore(root);
   await store.initialize();
@@ -21,7 +20,7 @@ async function workspace(frames = 30, width = 320) {
     {
       ...created,
       width,
-      height: 180,
+      height,
       clips: [
         {
           id: crypto.randomUUID(),
@@ -329,46 +328,111 @@ test("a graceful shutdown re-queues running work for the next start", async () =
   store.close();
 });
 
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Polls until the condition holds or the time runs out; returns the outcome.
+async function within(ms: number, condition: () => boolean | Promise<boolean>) {
+  for (const started = performance.now(); performance.now() - started < ms;) {
+    if (await condition()) return true;
+    await pause(5);
+  }
+  return condition();
+}
+
 test(
   "a service killed mid-render leaves no FFmpeg, and the next start reconciles and finishes",
   { skip: process.platform !== "win32" },
   async () => {
-    const { root, store, project } = await workspace(3000);
+    // Two minutes of 720p: the render takes 9-12 s on the development
+    // machine, so its remaining work far outlasts the 1 s window below and an
+    // orphaned FFmpeg would still be alive when it closes.
+    const { root, store, project } = await workspace(3600, 1280, 720);
     store.close();
+    const messages: any[] = [];
+    let stderr = "";
     const child = fork(
       fileURLToPath(new URL("./fixtures/t5-service.ts", import.meta.url)),
       [root, project.id],
       { stdio: ["ignore", "ignore", "pipe", "ipc"] },
     );
-    const [{ jobId }] = (await once(child, "message")) as [{ jobId: string }];
-    const observer = new ProjectStore(root);
-    await observer.initialize();
-    let pid = 0;
-    for (let t = 0; t < 30000 && !pid; t += 20) {
-      const running = attempts(observer, jobId).find(
-        (a) => a.state === "running",
-      );
-      pid = running?.pid ?? 0;
-      if (!pid) await new Promise((r) => setTimeout(r, 20));
+    child.on("message", (m) => messages.push(m));
+    child.stderr!.on("data", (d) => (stderr += d));
+    const running = () => child.exitCode === null && child.signalCode === null;
+    const exited = new Promise<void>((r) => child.once("exit", () => r()));
+    // An early exit or a timeout fails the wait instead of hanging the test.
+    async function next<T>(match: (m: any) => T | undefined, ms = 60000) {
+      let found: T | undefined;
+      await within(ms, () => {
+        for (const m of messages)
+          if ((found = match(m)) !== undefined) return true;
+        if (!running()) throw new Error(`service exited early: ${stderr}`);
+        return false;
+      });
+      if (found === undefined)
+        throw new Error(`no message within ${ms} ms: ${stderr}`);
+      return found;
     }
-    assert.ok(pid && alive(pid), "FFmpeg is running");
-    const exited = once(child, "exit");
-    child.kill("SIGKILL");
-    await exited;
-    for (let t = 0; t < 5000 && alive(pid); t += 50)
-      await new Promise((r) => setTimeout(r, 50));
-    assert.equal(alive(pid), false, "FFmpeg died with its service");
-    const supervisor = new JobSupervisor(observer);
-    await supervisor.start();
-    const done = await settled(supervisor, jobId);
-    assert.equal(done.state, "COMPLETED", done.error ?? "");
-    const history = attempts(observer, jobId);
-    assert.equal(history[0].state, "failed");
-    assert.match(history[0].error!, /restart/);
-    assert.equal(history.at(-1)!.state, "succeeded");
-    assert.ok(history.at(-1)!.generation > history[0].generation);
-    await supervisor.close();
-    observer.close();
+    const observer = new ProjectStore(root);
+    let pid = 0;
+    let ownerPid = 0;
+    let supervisor: JobSupervisor | undefined;
+    try {
+      const jobId = await next<string>((m) => m?.jobId);
+      ownerPid = await next<number>((m) => m?.ownerPid);
+      assert.ok(
+        ownerPid > 0 && alive(ownerPid),
+        "the process owner is running before the kill",
+      );
+      await observer.initialize();
+      // Kill only once FFmpeg is resumed and writing its output.
+      const partial = path.join(
+        root,
+        "projects",
+        project.id,
+        "exports",
+        jobId,
+        "attempt-1",
+        "worker",
+        "render.partial.mp4",
+      );
+      assert.ok(
+        await within(60000, async () => {
+          if (!running()) throw new Error(`service exited early: ${stderr}`);
+          pid =
+            attempts(observer, jobId).find((a) => a.state === "running")?.pid ??
+            0;
+          const size = await stat(partial).then(
+            (s) => s.size,
+            () => 0,
+          );
+          return pid > 0 && size > 0;
+        }),
+        "FFmpeg must have a running PID and nonempty partial output before service kill",
+      );
+      assert.ok(pid && alive(pid), "FFmpeg is writing its output");
+      assert.ok(running(), `service still running: ${stderr}`);
+      child.kill("SIGKILL");
+      await exited;
+      assert.ok(
+        await within(1000, () => !alive(pid) && !alive(ownerPid)),
+        `FFmpeg ${alive(pid) ? "outlived" : "died with"} its service; procd ${alive(ownerPid) ? "outlived" : "died with"} it`,
+      );
+      supervisor = new JobSupervisor(observer);
+      await supervisor.start();
+      const done = await settled(supervisor, jobId);
+      assert.equal(done.state, "COMPLETED", done.error ?? "");
+      const history = attempts(observer, jobId);
+      assert.equal(history[0].state, "failed");
+      assert.match(history[0].error!, /restart/);
+      assert.equal(history.at(-1)!.state, "succeeded");
+      assert.ok(history.at(-1)!.generation > history[0].generation);
+    } finally {
+      // Stragglers from a failed run must not outlive the test.
+      if (running()) child.kill("SIGKILL");
+      for (const straggler of [pid, ownerPid])
+        if (straggler && alive(straggler)) process.kill(straggler, "SIGKILL");
+      await supervisor?.close();
+      observer.close();
+    }
   },
 );
 
