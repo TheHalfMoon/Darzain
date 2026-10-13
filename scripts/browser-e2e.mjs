@@ -100,6 +100,9 @@ const child = fork(
     windowsHide: true,
   },
 );
+// Release qualification watches the service's network connections.
+if (process.env.YAMAKAN_E2E_PID_FILE)
+  writeFileSync(process.env.YAMAKAN_E2E_PID_FILE, String(child.pid));
 let browser,
   serverError = "";
 child.stderr.on("data", (chunk) => (serverError += String(chunk)));
