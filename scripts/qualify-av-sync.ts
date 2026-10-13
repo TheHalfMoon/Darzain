@@ -1,7 +1,7 @@
 // A/V synchronisation over a ten-minute export (docs/E2E_ACCEPTANCE.md step
 // 8: "audio onset within 20 ms and no accumulating drift on a 10-minute
-// fixture"). The sources are 600 s of 29.97 fps (30000/1001) video and
-// 600 s of 44.1 kHz audio: every 10 s a white flash frame and a 10 ms click
+// fixture"). The sources are 599.9 s of 29.97 fps (30000/1001) video and
+// 599.9 s of 44.1 kHz audio: every 10 s a white flash frame and a 10 ms click
 // mark the same instant. Both are imported and cut into two clips at 300 s (the second
 // continuing the source), exported at 30 fps / 48 kHz, and every flash and
 // click is located in the export. Each click must sit within 20 ms of its
@@ -52,7 +52,7 @@ try {
     "-f",
     "lavfi",
     "-i",
-    "color=c=0x202020:s=640x360:r=30000/1001:d=600,drawbox=x=0:y=0:w=640:h=360:color=white:t=fill:enable='lt(mod(t\\,10)\\,0.03)'",
+    "color=c=0x202020:s=640x360:r=30000/1001:d=599.9,drawbox=x=0:y=0:w=640:h=360:color=white:t=fill:enable='lt(mod(t\\,10)\\,0.03)'",
     "-pix_fmt",
     "yuv420p",
     "-c:v",
@@ -66,7 +66,7 @@ try {
     "-f",
     "lavfi",
     "-i",
-    "aevalsrc='if(lt(mod(t\\,10)\\,0.01)\\,0.8*sin(2*PI*1000*t)\\,0)':s=44100:d=600",
+    "aevalsrc='if(lt(mod(t\\,10)\\,0.01)\\,0.8*sin(2*PI*1000*t)\\,0)':s=44100:d=599.9",
     soundFile,
   ]);
   const videoBytes = await readFile(videoFile);
@@ -157,7 +157,8 @@ try {
     if (bright && !previous) flashes.push(n);
   }
   const clicks = clickTimes(file);
-  const marks = Math.floor(total / 300);
+  // One mark every 10 s (300 frames) from frame 0: 60 marks in 599.9 s.
+  const marks = Math.floor((total - 1) / 300) + 1;
   const rows = [];
   for (let k = 0; k < marks; k++) {
     const instant = k * 10;
@@ -223,7 +224,7 @@ try {
     },
     fixture: {
       description:
-        "600 s of 640x360 30000/1001 fps H.264 (a white flash frame every 10 s) and 600 s of 44.1 kHz WAV (a 10 ms 1 kHz click at the same instants), each cut into two clips at 300 s on the picture and sound tracks; exported at 30 fps, 48 kHz",
+        "599.9 s of 640x360 30000/1001 fps H.264 (a white flash frame every 10 s) and 599.9 s of 44.1 kHz WAV (a 10 ms 1 kHz click at the same instants), each cut into two clips at 300 s on the picture and sound tracks; exported at 30 fps, 48 kHz",
       videoSha256: sha256(videoBytes),
       audioSha256: sha256(audioBytes),
       exportSha256: sha256(exported),
