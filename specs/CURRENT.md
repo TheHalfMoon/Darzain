@@ -187,13 +187,15 @@ T9 exceeds the plan's four-day bound, so it is split at its interface: **T9a** r
 1. Mid-render kill test with a meaningful orphan window (`tests/jobs.test.ts`; in progress on `test/render-kill-window` in a separate session). Correction: the T5 mid-render kill test waits 5 s, longer than its render, so an orphaned FFmpeg could pass it (found in the PR #22 review); the step 10 claim "no orphan after a kill during render" is unproven until then.
 2. ~~Resource policy~~: v2 frozen as an agent decision ([record](../docs/AGENT_DECISION_RECORD.md)); `npm run qualify:resources` and `qualify:large-import` fail on a breach.
 3. MCP/REST parity replay (step 14).
-4. Export goldens with negative fixtures and the 10-minute audio-drift fixture (step 8).
+4. Export goldens with negative fixtures and the 10-minute audio-drift fixture (step 8): landed (`tests/export-golden.test.ts`, `npm run qualify:av-sync`); the row stays Partial.
 5. 720p playback measurement (step 7).
 6. Worker read containment (AppContainer preferred) and the hostile-media corpus with a sentinel file.
 7. Backup/restore request replay safety; the open job/recovery defects listed below.
 8. Pinned distributable bundle and release evidence bundle.
 
 **Recorded for T9 from T6 reviews:** undo/redo write full snapshots and consume the 10,000-revision budget (compaction or head re-pointing); edit history is pruned only by MAX_REVISION; track overlap is enforced by reducers, not by canonical validation (needs a migration decision for existing projects); a request retried across the snapshot format change (`/1`→`/2`) gets IDEMPOTENCY_MISMATCH. Undo binds to the principal, and the CLI and all MCP agents share `local-client` (per-agent identities come with grants).
+
+**Found 2026-10-13 (A/V qualification): a video clip's own sound is never exported.** The render plan takes sound only from clips on sound tracks whose asset is audio, and the schema forbids a video asset on a sound track, so the sound of imported camera footage is silently dropped. An editor MVP should keep it (for example a linked sound clip, or the video clip's audio rendered under its gain/fade). It needs a canonical-format decision (migration) and review; not changed yet.
 
 **Found 2026-10-13 (resource qualification):** a workspace whose path leaves no room under 260 characters for its files is made private and then fails to open with SQLite's "unable to open database file". The service should refuse such a path up front with a clear message (or use extended-length paths for the database).
 
