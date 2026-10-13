@@ -23,7 +23,7 @@
 //!   RESUME id                   -> RESUMED id
 //!   KILL id                     -> (EXITED follows)
 //!   (worker output)             -> OUT id hexChunk | ERR id hexChunk
-//!   (process end, after output) -> EXITED id exitCode
+//!   (process end, after output) -> EXITED id exitCode restored(1|0)
 //!   errors                      -> ERROR id hexMessage
 //! Executables must be on the allowlist given as arguments at startup.
 
@@ -607,13 +607,13 @@ fn label_key(dir: &str) -> String {
 // Back to plain inheritance from the parent for the folder and everything
 // below it: any access entry the worker added (it may change its own
 // folder's DACL) is removed, as is the owner grant labelling may have added.
-fn reset_access(dir: &str) {
+fn reset_access(dir: &str) -> bool {
     let mut empty = vec![0u64; 2];
     if unsafe { InitializeAcl(empty.as_mut_ptr() as *mut c_void, 16, ACL_REVISION) } == 0 {
-        return;
+        return false;
     }
     let mut name = wide(dir);
-    unsafe {
+    let code = unsafe {
         TreeResetNamedSecurityInfoW(
             name.as_mut_ptr(),
             SE_FILE_OBJECT,
@@ -626,15 +626,24 @@ fn reset_access(dir: &str) {
             null_mut(),
             PROGRESS_INVOKE_NEVER,
             null_mut(),
-        );
-    }
+        )
+    };
+    code == 0
 }
 
 // Restores a folder after its last worker: the default label first (that
 // needs WRITE_OWNER, which the access reset may remove), then its access.
-fn restore_folder(dir: &str) {
-    let _ = set_label(dir, false);
-    reset_access(dir);
+// Whether the folder is back to its default label and inherited access. A
+// folder that is now a link or junction is left alone (both calls would
+// follow it) and reported as not restored.
+fn restore_folder(dir: &str) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    match std::fs::symlink_metadata(dir) {
+        Ok(meta) if meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT == 0 => {}
+        _ => return false,
+    }
+    let labelled = set_label(dir, false).is_ok();
+    reset_access(dir) && labelled
 }
 
 fn hold_label(dir: &str) -> Result<(), String> {
@@ -649,7 +658,8 @@ fn hold_label(dir: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn release_label(dir: &str) {
+// Whether the folder was restored (true while another worker still holds it).
+fn release_label(dir: &str) -> bool {
     let mut held = labels().lock().unwrap();
     let key = label_key(dir);
     let last = match held.get_mut(&key) {
@@ -661,14 +671,15 @@ fn release_label(dir: &str) {
     };
     if last {
         held.remove(&key);
-        restore_folder(dir);
+        return restore_folder(dir);
     }
+    true
 }
 
 fn release_all_labels() {
     let mut held = labels().lock().unwrap();
     for (_, (dir, _)) in held.drain() {
-        restore_folder(&dir);
+        let _ = restore_folder(&dir);
     }
 }
 
@@ -729,14 +740,14 @@ fn spawn(fields: &[&str], allow: &[String]) -> Result<Spawned, String> {
     for (i, dir) in writable.iter().enumerate() {
         if let Err(e) = hold_label(dir) {
             for done in &writable[..i] {
-                release_label(done);
+                let _ = release_label(done);
             }
             return Err(e);
         }
     }
     let restore = |writable: &[String]| {
         for dir in writable {
-            release_label(dir);
+            let _ = release_label(dir);
         }
     };
     let result = launch(&exe, &cwd, &line, memory, &token);
@@ -955,14 +966,15 @@ fn main() {
                             // Dropping the worker closes its job; its folders
                             // return to the default label.
                             let worker = workers.lock().unwrap().remove(&id);
+                            let mut restored = true;
                             if let Some(worker) = worker {
                                 let folders = worker.writable.clone();
                                 drop(worker);
                                 for dir in &folders {
-                                    release_label(dir);
+                                    restored &= release_label(dir);
                                 }
                             }
-                            send(&out, &format!("EXITED\t{id}\t{code}"));
+                            send(&out, &format!("EXITED\t{id}\t{code}\t{}", u8::from(restored)));
                         });
                     }
                     Err(message) => send(&out, &format!("ERROR\t{id}\t{}", hex_encode(message.as_bytes()))),

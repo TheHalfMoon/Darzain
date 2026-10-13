@@ -298,3 +298,32 @@ test(
     assert.equal(await readableByOtherAccounts(kept), false);
   },
 );
+
+test(
+  "a folder that cannot be restored after a run fails the run instead of passing silently",
+  { skip: !windows && "Windows workers" },
+  async () => {
+    const dir = await folder();
+    const work = path.join(dir, "worker");
+    await mkdir(work);
+    const owner = new ProcessOwner([process.execPath]);
+    try {
+      let created!: () => void;
+      const started = new Promise<void>((r) => (created = r));
+      const running = owner.run({
+        executable: process.execPath,
+        args: ["-e", "setTimeout(() => {}, 1000)"],
+        cwd: dir,
+        writable: [work],
+        onCreated: () => created(),
+      });
+      await started;
+      // The folder disappears before the worker exits: procd cannot put it
+      // back to the workspace's access, and says so.
+      await rm(work, { recursive: true, force: true });
+      await assert.rejects(running, { code: "RECOVERY_REQUIRED" });
+    } finally {
+      owner.close();
+    }
+  },
+);
