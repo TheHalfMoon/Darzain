@@ -67,18 +67,24 @@ const moving = (seconds, size = "1280x720") => [
   "-g",
   "60",
 ];
-const media = {
-  "a.mp4": make("a.mp4", moving(6)),
-  "b.mp4": make("b.mp4", moving(6)),
-  "c.mp4": make("c.mp4", moving(6)),
-  "overlay.mp4": make("overlay.mp4", moving(4)),
-  "tone.wav": make("tone.wav", [
-    "-f",
-    "lavfi",
-    "-i",
-    "sine=frequency=330:duration=18",
-  ]),
-};
+let media;
+try {
+  media = {
+    "a.mp4": make("a.mp4", moving(6)),
+    "b.mp4": make("b.mp4", moving(6)),
+    "c.mp4": make("c.mp4", moving(6)),
+    "overlay.mp4": make("overlay.mp4", moving(4)),
+    "tone.wav": make("tone.wav", [
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=330:duration=18",
+    ]),
+  };
+} catch (e) {
+  rmSync(root, { recursive: true, force: true, maxRetries: 5 });
+  throw e;
+}
 
 const port = 24345;
 const url = `http://127.0.0.1:${port}`;
@@ -87,7 +93,11 @@ const server = fork(
   [],
   {
     env: {
-      ...process.env,
+      ...Object.fromEntries(
+        Object.entries(process.env).filter(
+          ([k]) => !/^(YAMAKAN|DARZAIN)_/.test(k),
+        ),
+      ),
       YAMAKAN_WORKSPACE: join(root, "workspace"),
       YAMAKAN_PORT: String(port),
     },
@@ -221,7 +231,13 @@ try {
     page.evaluate(() => {
       const c = document.querySelector("section.preview canvas");
       const ctx = c.getContext("2d");
-      const state = { changes: [], frames: 0, running: true, last: -1 };
+      const state = {
+        changes: [],
+        frames: 0,
+        running: true,
+        last: -1,
+        started: performance.now(),
+      };
       window.__sampler = state;
       const tick = (now) => {
         if (!state.running) return;
@@ -247,6 +263,8 @@ try {
       return {
         changes: window.__sampler.changes,
         frames: window.__sampler.frames,
+        started: window.__sampler.started,
+        stopped: performance.now(),
       };
     });
   const playFor = async (from, seconds) => {
@@ -260,22 +278,26 @@ try {
     const sample = await stopSampler();
     await page.getByRole("button", { name: "Pause", exact: true }).click();
     await page.waitForTimeout(300);
-    const t = sample.changes;
-    const elapsed = (t.at(-1) - t[0]) / 1000;
-    const fps = (t.length - 1) / elapsed;
+    // Rates over the whole requested window, from when sampling started to
+    // when it stopped: a preview that freezes part-way counts its frozen
+    // time (the first sample is the starting frame, not a new one).
+    const t = sample.changes.slice(1);
+    const elapsed = (sample.stopped - sample.started) / 1000;
+    const fps = t.length / elapsed;
     // Frames shown in each whole second of the window.
     const windows = [];
-    for (let s = t[0]; s + 1000 <= t.at(-1); s += 1000)
+    for (let s = sample.started; s + 1000 <= sample.stopped; s += 1000)
       windows.push(t.filter((x) => x >= s && x < s + 1000).length);
     return {
       fromSeconds: from,
       seconds,
       animationFrames: sample.frames,
+      sampledSeconds: Math.round(elapsed * 100) / 100,
       framesShown: t.length,
       fps: Math.round(fps * 10) / 10,
       minOneSecondWindow: Math.min(...windows),
       // A 30 fps timeline shows 30 new frames a second when nothing drops.
-      droppedEstimate: Math.max(0, Math.round(elapsed * 30 - (t.length - 1))),
+      droppedEstimate: Math.max(0, Math.round(elapsed * 30 - t.length)),
     };
   };
   const sustained = await playFor(0, 15);
@@ -327,7 +349,7 @@ try {
       logicalCores: cpus().length,
       memoryGiB: Math.round(totalmem() / 1024 ** 3),
       node: process.version,
-      browser: `${browser.browserType().name()} ${browser.version()} (headless)`,
+      browser: `${process.env.YAMAKAN_BROWSER_CHANNEL || "msedge"} ${browser.version()} (headless)`,
       webglRenderer: renderer,
       ffmpegSha256: createHash("sha256")
         .update(readFileSync(ffmpeg))
@@ -353,7 +375,10 @@ try {
   if (server.exitCode === null) {
     const done = once(server, "exit");
     server.send("shutdown");
+    // A stalled shutdown never hangs the run.
+    const timer = setTimeout(() => server.kill(), 15000);
     await done;
+    clearTimeout(timer);
   }
   rmSync(root, { recursive: true, force: true, maxRetries: 5 });
 }
