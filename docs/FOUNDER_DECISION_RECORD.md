@@ -51,3 +51,13 @@ Approval line in the packet's format:
   - the proposed engineering order.
 - **Not covered** by the question or the answer: any memory or resource ceiling. The 300 MiB large-import ceiling in `scripts/qualify-large-import.mjs` is a proposed value, not part of policy v1.
 - **Change rule:** a threshold is never adjusted to pass. A change needs a new policy version and a new founder approval.
+
+## 2026-10-13: continuation to verified completion
+
+- **Source and form:** chat instruction only, in the same interactive session, titled "YAMAKAN — AUTONOMOUS CONTINUATION TO VERIFIED PROJECT COMPLETION". There is no signed approval and no founder GitHub review; none is claimed.
+- **Scope, as stated by the founder:**
+  - continue autonomously through the remaining MVP gates and then the approved roadmap, without routine approval;
+  - treat hostile-media worker **read containment as release-blocking**: an AppContainer is preferred, otherwise a fully restricted token with brokered inputs. A write- or integrity-restricted token alone does not satisfy it. If containment cannot be shown, the affected worker feature stays disabled and the verdict stays NO-GO;
+  - the agent chooses and freezes the **resource and memory policy** (import RSS, decoder/probe memory and time, render memory, disk admission and reserve, job budgets), with scope, fixtures, enforcement and failure behaviour.
+- **Attribution:** values the agent chooses under this delegation are recorded as agent decisions, with their rationale, and are not attributed to approval I or any earlier founder decision.
+- **Not authorized:** purchases, paid services or inference, cloud spend, and a public release. Human- and administrator-only gates stay open until they genuinely run: native Arabic review, clean profiles, a second account, packet capture and disk-full runs.
