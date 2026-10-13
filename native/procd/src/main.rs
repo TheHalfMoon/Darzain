@@ -235,6 +235,7 @@ extern "system" {
     fn GetAce(acl: *mut c_void, index: u32, ace: *mut *mut c_void) -> Bool;
     fn AddAce(acl: *mut c_void, revision: u32, start: u32, list: *mut c_void, length: u32) -> Bool;
     fn GetTokenInformation(token: Handle, class: i32, info: *mut c_void, length: u32, returned: *mut u32) -> Bool;
+    fn GetSecurityDescriptorControl(descriptor: *mut c_void, control: *mut u16, revision: *mut u32) -> Bool;
     fn GetNamedSecurityInfoW(
         name: *const u16,
         kind: i32,
@@ -633,6 +634,61 @@ fn reset_access(dir: &str) -> bool {
 
 // Restores a folder after its last worker: the default label first (that
 // needs WRITE_OWNER, which the access reset may remove), then its access.
+// Whether every object below `dir` can be read and holds only inherited
+// access entries in an unprotected DACL. The tree reset can report success
+// without reaching an object it was denied, so its result is checked.
+fn inherits_only(path: &std::path::Path) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+    let name: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let mut dacl: *mut c_void = null_mut();
+    let mut descriptor: *mut c_void = null_mut();
+    let code = unsafe {
+        GetNamedSecurityInfoW(
+            name.as_ptr(),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION,
+            null_mut(),
+            null_mut(),
+            &mut dacl,
+            null_mut(),
+            &mut descriptor,
+        )
+    };
+    if code != 0 {
+        return false;
+    }
+    let ok = unsafe {
+        let mut control = 0u16;
+        let mut revision = 0u32;
+        GetSecurityDescriptorControl(descriptor, &mut control, &mut revision);
+        let unprotected = control & 0x1000 == 0;
+        let count = if dacl.is_null() { 0 } else { *((dacl as *const u8).add(4) as *const u16) as u32 };
+        let inherited = (0..count).all(|i| {
+            let mut ace: *mut c_void = null_mut();
+            GetAce(dacl, i, &mut ace) != 0 && *(ace as *const u8).add(1) & 0x10 != 0
+        });
+        !dacl.is_null() && unprotected && inherited
+    };
+    unsafe { LocalFree(descriptor) };
+    ok
+}
+
+fn tree_inherits_only(dir: &std::path::Path) -> bool {
+    let Ok(entries) = std::fs::read_dir(dir) else { return false };
+    for entry in entries {
+        let Ok(entry) = entry else { return false };
+        let path = entry.path();
+        let Ok(meta) = std::fs::symlink_metadata(&path) else { return false };
+        if !inherits_only(&path) {
+            return false;
+        }
+        if meta.is_dir() && !meta.file_type().is_symlink() && !tree_inherits_only(&path) {
+            return false;
+        }
+    }
+    true
+}
+
 // Whether the folder is back to its default label and inherited access. A
 // folder that is now a link or junction is left alone (both calls would
 // follow it) and reported as not restored.
@@ -643,7 +699,9 @@ fn restore_folder(dir: &str) -> bool {
         _ => return false,
     }
     let labelled = set_label(dir, false).is_ok();
-    reset_access(dir) && labelled
+    let reset = reset_access(dir);
+    let path = std::path::Path::new(dir);
+    labelled && reset && inherits_only(path) && tree_inherits_only(path)
 }
 
 fn hold_label(dir: &str) -> Result<(), String> {
