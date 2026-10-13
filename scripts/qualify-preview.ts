@@ -14,6 +14,9 @@ import path from "node:path";
 import { ProjectStore } from "../core/store.ts";
 import { preview } from "../core/render/preview.ts";
 import { mediaTools, closeWorkers } from "../core/process/workers.ts";
+import { QUALIFICATION_POLICY } from "../core/qualification-policy.ts";
+
+const LIMITS = QUALIFICATION_POLICY.thresholds;
 
 const RECEIPT = "docs/evidence/qualification/t8-preview.json";
 const git = (...args: string[]) =>
@@ -146,9 +149,18 @@ try {
     coldSegment2s: stats(segments),
   };
   const targets = {
-    warmFrameP95Ms: { target: 1000, measured: results.warmFrame.p95 },
-    coldFrameP95Ms: { target: 3000, measured: results.coldFrame.p95 },
-    coldSegment2sP95Ms: { target: 6000, measured: results.coldSegment2s.p95 },
+    warmFrameP95Ms: {
+      target: LIMITS.referenceStillWarm.p95Ms,
+      measured: results.warmFrame.p95,
+    },
+    coldFrameP95Ms: {
+      target: LIMITS.referenceStillCold.p95Ms,
+      measured: results.coldFrame.p95,
+    },
+    coldSegment2sP95Ms: {
+      target: LIMITS.referenceSegmentCold.p95Ms,
+      measured: results.coldSegment2s.p95,
+    },
   };
   const report = {
     qualification: "t8-reference-preview-latency",

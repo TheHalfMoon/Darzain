@@ -8,9 +8,9 @@
 
 **Machine:** Windows 11 Home 10.0.26300, Node 24.19 and Microsoft Edge 155.0.4283.45 (both recorded by hash), FFmpeg 8.1.1 (gyan.dev full build); all hashes are in the receipt.
 
-The launch and reopen targets are the plan's proposed ones. [E2E_ACCEPTANCE](E2E_ACCEPTANCE.md) requires a frozen hardware/fixture/threshold policy before a row can pass, and freezing it is a founder approval (approval I). Until then the ✓ below means "met the proposed target", not "passed the gate".
+**Frozen policy.** The founder approved freezing the plan's proposed targets on 2026-10-13 (approval I). They are now hard thresholds in [`core/qualification-policy.ts`](../core/qualification-policy.ts) (`yamakan.qualification-policy/v1`), with this machine as the hardware profile and the fixtures stated there. The qualification scripts read their thresholds from it. The ✓ below are passes under that policy on this machine's development profile. The clean-profile requirement of each row still applies.
 
-| Measure                                                                                                                    | Result                                                                                                           | Proposed target                      |
+| Measure                                                                                                                    | Result                                                                                                           | Frozen threshold (p95)               |
 | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
 | Cold launch: service start to ready on a fresh workspace, 5 runs (warm OS file cache; with 5 runs p95 is the maximum)      | p50 394 ms, p95 460 ms                                                                                           | ≤ 5 s ✓                              |
 | Reopen: service start to project open over the API; one 10 s 720p clip, 200 revisions; 5 runs                              | p50 456 ms, p95 492 ms                                                                                           | ≤ 2 s ✓                              |
@@ -123,7 +123,7 @@ Recommendation: treat read containment as a ship-blocking candidate for the foun
 
 **Founder or administrator only:**
 
-1. Approval of a frozen hardware/fixture/threshold policy for launch, reopen, preview and playback (approval I). Until then those rows cannot pass.
+1. ~~Approval of a frozen hardware/fixture/threshold policy~~: approved 2026-10-13 and recorded in `core/qualification-policy.ts`.
 2. A clean Windows Profile A run of the whole journey with the bundle and the network disabled, plus a packet-level egress capture (administrator).
 3. A real second Windows account denied the workspace, and a restore on a second clean profile.
 4. Native Arabic review of the T7 title goldens and the T8b/T9 interface strings, including the choice of digits.

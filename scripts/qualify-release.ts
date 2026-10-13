@@ -1,8 +1,8 @@
 // T10 release qualification on this machine. Records, at a clean commit:
 // the environment and every pinned or built artifact by hash (native helpers
 // are rebuilt first, so their hashes are the commit's), cold-launch and
-// reopen times against the plan's proposed targets (launch ≤ 5 s, reopen
-// ≤ 2 s), the full test suite, and the browser E2E with two offline checks:
+// reopen times against the frozen qualification policy
+// (core/qualification-policy.ts), the full test suite, and the browser E2E with two offline checks:
 // every request the browser pages make (recorded by the E2E) and a sampled
 // capture of the TCP connections and listeners of the service's process
 // tree. It never adjusts a target, and it records what it cannot establish
@@ -18,6 +18,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ProjectStore } from "../core/store.ts";
 import { closeWorkers, mediaTools } from "../core/process/workers.ts";
+import { QUALIFICATION_POLICY } from "../core/qualification-policy.ts";
+
+const LIMITS = QUALIFICATION_POLICY.thresholds;
 
 const RECEIPT = "docs/evidence/qualification/t10-release.json";
 const git = (...args: string[]) =>
@@ -394,22 +397,24 @@ try {
     receipt: "yamakan.release-qualification/2",
     measuredAt: new Date().toISOString(),
     environment,
-    targets: {
-      note: "Proposed targets from the plan; they are not yet a frozen, founder-approved hardware/fixture policy",
-      coldLaunchMs: 5000,
-      reopenMs: 2000,
+    policy: {
+      version: QUALIFICATION_POLICY.policy,
+      approved: QUALIFICATION_POLICY.approved,
+      hardware: QUALIFICATION_POLICY.hardware,
+      coldLaunchP95Ms: LIMITS.coldLaunch.p95Ms,
+      reopenP95Ms: LIMITS.reopen.p95Ms,
     },
     coldLaunch: {
       method:
         "service start to its ready line on a fresh workspace, 5 runs; the OS file cache is warm after the build (fresh workspace, not a cold OS cache); with 5 runs p95 is the maximum",
       ...stats(launches),
-      metTarget: stats(launches).p95 <= 5000,
+      passed: stats(launches).p95 <= LIMITS.coldLaunch.p95Ms,
     },
     reopen: {
       fixture:
         "one 10 s 1280x720 H.264/AAC clip, 200 saved revisions; service start to project open over the authenticated API, 5 runs",
       ...stats(reopens),
-      metTarget: stats(reopens).p95 <= 2000,
+      passed: stats(reopens).p95 <= LIMITS.reopen.p95Ms,
     },
     tests: {
       exitCode: suiteCode,

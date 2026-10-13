@@ -176,6 +176,8 @@ T9 exceeds the plan's four-day bound, so it is split at its interface: **T9a** r
 - **Disk (2026-10-12):** C: has ~1.9 GiB free; D: has ~18 GiB free. Clone and npm cache live on D:. T4's ≥2 GiB import and T10 media tests need a disk-capacity preflight and may need space freed by the founder.
 - Jev key and an OCR LLM backend are founder-provided resources; without them those reviews stay recorded as unavailable.
 
+**Founder decision 2026-10-13 (approval I):** the plan's proposed performance targets are frozen as hard thresholds on the stated hardware profile and fixtures in `core/qualification-policy.ts` (`yamakan.qualification-policy/v1`): cold launch ≤ 5 s, reopen ≤ 2 s, reference still ≤ 1 s warm / ≤ 3 s cold, 2 s segment ≤ 6 s cold (all p95), and 720p playback ≥ 24 fps (not yet measured). Changing them needs a new policy version and approval. Not approved: worker read containment as ship-blocking, and the engineering order; both remain open.
+
 **Next executable task:** after T10 merges, the engineering items in the release proposal (pinned bundle first, then the parity, golden/drift, MP3/three-scene and hostile-media harnesses), and the founder items listed there.
 
 **Recorded for T9 from T6 reviews:** undo/redo write full snapshots and consume the 10,000-revision budget (compaction or head re-pointing); edit history is pruned only by MAX_REVISION; track overlap is enforced by reducers, not by canonical validation (needs a migration decision for existing projects); a request retried across the snapshot format change (`/1`→`/2`) gets IDEMPOTENCY_MISMATCH. Undo binds to the principal, and the CLI and all MCP agents share `local-client` (per-agent identities come with grants).
