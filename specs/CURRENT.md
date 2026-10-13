@@ -91,7 +91,7 @@ T9 exceeds the plan's four-day bound, so it is split at its interface: **T9a** r
 - `core/render/preview.ts`: previews of a stored revision through the same plan compiler, filtergraph, ASS script and fonts; cached per project under `cache/preview`, keyed by plan hash, window, kind and the FFmpeg build; bounded by `previewCacheBytes` (256 MiB, least recently used first, entries used within a minute kept); one render at a time with identical requests shared; segments up to `previewSegmentFrames` (150).
 - `GET /api/v1/projects/:id/preview?revision&kind=frame|segment&start&frames` (scope `project:read` via `yamakan.project.open`), with `X-Plan-Hash` and `X-Preview-Cache`.
 - Editor: a reference panel under the interactive preview shows the saved revision's frame at the resting playhead, names the revision, says **Stale** while edits are unsaved, and plays a 2-second reference segment.
-- Evidence: preview frames match export frames (PSNR > 35 dB at the same profile); `npm run qualify:preview` records cold/warm frame and 2 s segment latency against the plan's proposed targets.
+- Evidence: preview frames match export frames (PSNR > 35 dB at the same profile); `npm run qualify:preview` records cold/warm frame and 2 s segment latency against the frozen thresholds in `core/qualification-policy.ts`.
 
 ## T7 surface (merged)
 
@@ -175,6 +175,8 @@ T9 exceeds the plan's four-day bound, so it is split at its interface: **T9a** r
 
 - **Disk (2026-10-12):** C: has ~1.9 GiB free; D: has ~18 GiB free. Clone and npm cache live on D:. T4's ≥2 GiB import and T10 media tests need a disk-capacity preflight and may need space freed by the founder.
 - Jev key and an OCR LLM backend are founder-provided resources; without them those reviews stay recorded as unavailable.
+
+**Founder decision 2026-10-13 (approval I):** the plan's proposed performance targets are frozen as hard thresholds on the stated hardware profile and fixtures in `core/qualification-policy.ts` (`yamakan.qualification-policy/v1`): cold launch ≤ 5 s, reopen ≤ 2 s, reference still ≤ 1 s warm / ≤ 3 s cold, 2 s segment ≤ 6 s cold (all p95), and 720p playback ≥ 24 fps (not yet measured). Changing them needs a new policy version and approval. Not approved: worker read containment as ship-blocking, and the engineering order; both remain open. Not covered: any memory or resource ceiling (the 300 MiB import ceiling stays proposed). Recorded in `docs/FOUNDER_DECISION_RECORD.md`.
 
 **Next executable task:** after T10 merges, the engineering items in the release proposal (pinned bundle first, then the parity, golden/drift, MP3/three-scene and hostile-media harnesses), and the founder items listed there.
 
