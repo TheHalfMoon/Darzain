@@ -38,7 +38,23 @@ export type RunOptions = {
   // Bound on retained stderr, returned with the result.
   stderrLimit?: number;
 };
-export type RunResult = { code: number; pid: number; stderr: string };
+export type RunResult = {
+  code: number;
+  pid: number;
+  stderr: string;
+  // Peak committed memory of the worker's Job Object (Windows); null where
+  // no job measures it.
+  peakMemoryBytes: number | null;
+};
+// What every finished Windows worker reports to observers (qualification
+// measures real product paths through this, not copies of their commands).
+export type WorkerReport = {
+  executable: string;
+  code: number;
+  peakMemoryBytes: number;
+  memoryLimitBytes: number;
+  wallMs: number;
+};
 
 const hex = (text: string) => Buffer.from(text, "utf8").toString("hex");
 
@@ -85,7 +101,7 @@ type Pending = {
   stderr: (chunk: Buffer) => void;
   // `restored`: the worker's writable folders are back to their default
   // label and inherited access.
-  exited: (code: number, restored: boolean) => void;
+  exited: (code: number, restored: boolean, peakBytes: number) => void;
   failed: (message: string) => void;
 };
 
@@ -99,6 +115,7 @@ export class ProcessOwner {
   // Runs in progress, from the first await until settled.
   #active = 0;
   #closed = false;
+  #observers = new Set<(report: WorkerReport) => void>();
 
   constructor(allowedExecutables: string[]) {
     this.ownership = ownershipMode();
@@ -144,14 +161,15 @@ export class ProcessOwner {
     this.#ready = new Promise<void>((resolve, reject) => {
       const lines = createInterface({ input: child.stdout! });
       lines.on("line", (line) => {
-        const [kind, id, value, extra] = line.split("\t");
+        const [kind, id, value, extra, peak] = line.split("\t");
         if (kind === "READY") return resolve();
         const p = this.#pending.get(id);
         if (!p) return;
         if (kind === "OUT") p.stdout(Buffer.from(value ?? "", "hex"));
         else if (kind === "ERR") p.stderr(Buffer.from(value ?? "", "hex"));
         else if (kind === "CREATED") p.created(Number(value));
-        else if (kind === "EXITED") p.exited(Number(value), extra !== "0");
+        else if (kind === "EXITED")
+          p.exited(Number(value), extra !== "0", Number(peak ?? 0) || 0);
         else if (kind === "ERROR")
           p.failed(Buffer.from(value ?? "", "hex").toString("utf8"));
       });
@@ -209,6 +227,8 @@ export class ProcessOwner {
     const limit = options.stderrLimit ?? 64 * 1024;
     let stderr = "";
     let pid = 0;
+    let peakMemoryBytes = 0;
+    const started = performance.now();
     try {
       const code = await new Promise<number>((resolve, reject) => {
         const kill = () => void this.#send(`KILL\t${id}`);
@@ -236,8 +256,16 @@ export class ProcessOwner {
             options.onStderr?.(chunk);
             stderr = (stderr + chunk.toString("utf8")).slice(-limit);
           },
-          exited: (exitCode, restored) => {
+          exited: (exitCode, restored, peakBytes) => {
             settle();
+            peakMemoryBytes = peakBytes;
+            this.#report({
+              executable: path.basename(executable),
+              code: exitCode,
+              peakMemoryBytes: peakBytes,
+              memoryLimitBytes: options.memoryBytes ?? 0,
+              wallMs: performance.now() - started,
+            });
             // A folder the worker left in a state procd could not undo is
             // reported, never ignored: the run fails with the reason.
             if (restored) resolve(exitCode);
@@ -284,7 +312,7 @@ export class ProcessOwner {
           );
         }
       });
-      return { code, pid, stderr };
+      return { code, pid, stderr, peakMemoryBytes };
     } finally {
       this.#pending.delete(id);
     }
@@ -327,9 +355,23 @@ export class ProcessOwner {
           code: code ?? (signal ? 1 : 0),
           pid: child.pid ?? 0,
           stderr,
+          peakMemoryBytes: null,
         });
       });
     });
+  }
+
+  // Observers see every finished Windows worker; returns an unsubscribe.
+  observe(listener: (report: WorkerReport) => void) {
+    this.#observers.add(listener);
+    return () => void this.#observers.delete(listener);
+  }
+  #report(report: WorkerReport) {
+    for (const listener of this.#observers) {
+      try {
+        listener(report);
+      } catch {}
+    }
   }
 
   // Ends every job (and every known POSIX worker) and the owner itself.

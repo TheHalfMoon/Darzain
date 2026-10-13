@@ -27,6 +27,7 @@
     "qualify:large-import": "node scripts/qualify-large-import.mjs",
     "qualify:typography": "node scripts/qualify-typography.ts",
     "qualify:preview": "node scripts/qualify-preview.ts",
+    "qualify:resources": "node scripts/qualify-resources.ts",
     "qualify:release": "node scripts/qualify-release.ts"
   },
   "dependencies": {
