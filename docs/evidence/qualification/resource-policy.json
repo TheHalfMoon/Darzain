@@ -1,57 +1,63 @@
 {
-  "receipt": "yamakan.resource-qualification/1",
+  "receipt": "yamakan.resource-qualification/2",
   "policy": "yamakan.resource-policy/v2",
-  "commit": "a78d77b4b636976333d727258c6458ee77990449",
-  "measuredAt": "2026-10-13T07:04:36.791Z",
+  "commit": "ee4745316da7ccbe017e8b0c595d8a9d48d5f6dc",
+  "cleanTree": true,
+  "measuredAt": "2026-10-13T07:24:12.626Z",
   "environment": {
     "cpu": "13th Gen Intel(R) Core(TM) i5-13420H",
     "logicalCores": 12,
     "memoryGiB": 16,
     "node": "v24.19.0",
-    "ffmpeg": "ffmpeg version 8.1.1-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers\r"
+    "ffmpeg": "ffmpeg version 8.1.1-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+    "ffmpegSha256": "09948d4cdd0650da6ff5a87577469f2a218dc2615ae379f8f734d24c49de0f73",
+    "ffprobeSha256": "a6618e99bb58869ded3c6f37b53aa1a8d701c3591dbb7b5b317d47369c112be2",
+    "procdSha256": "0b637ec3c4e972b5ad02cdafcdc87c8113901ab9f86b49501eab02fa101c0bd7"
   },
   "corpus": {
     "h264-1080p.mp4": "bb41b91598f2e480e7d0b4eb2c64a1b63afe70ef170e559236bd836ad2362196",
     "h264-2160p.mp4": "d5681b240258322155cb37990c9b1ac2dae65cf50c1428b2a29451f4714b1731",
     "hevc-2160p.mp4": "146bbccb4acd43b3e410c18eacf64594dcf0a287bf744e3bc13f37289dbb0cce",
     "hevc-4096x2160-10bit.mov": "fe93374976f9712d272af10b53a0cf754e4b613b33f331876939ab59d88a1038",
-    "vp9-1080p.webm": "c0fa1e01d1277d6ec169448cdf8c185f1de50f52d8dad68a3b58a91ab36986c5",
-    "av1-1080p.webm": "8011c8121488bb5834ddd1fa4e3ef1eb0d81f329408fbdb8bf7704364aff5d81",
+    "vp9-1080p.webm": "4922d0373bafb807be72c5d02d23dd979aa376f453fc2f80d3606801aaacee08",
+    "av1-1080p.webm": "fdeb37bb6254b995c7cb733e06826a778fccadb81adb88680a954f340842531a",
     "prores-1080p.mov": "4e82d958828efa1d07b285abe1328f9d29410bdf9934f8ef9fd8fbaea928306d",
+    "h264-4096x4096.mp4": "813c73a93b055e7fa156509b6721ff815365c50c115441c22b97adbe436a8dfa",
     "still-4096.png": "3bbd8a870241e7c8f2757bb409e74b6a2e69b801354f07b6f87486fadc6ac1d3",
     "still-4096.jpg": "5addf67dd4f95d83c6e02ae48aacfb09f565d313292e8ad1375af25ba5883e87",
     "still-4096.webp": "a64b270c15cf39a51a8e499a2fc0a82d0719a56d920f0ae1371e2210f62bbd2e",
     "tone-600s.wav": "2a245e6bc396107df08793045bc8f115559060461464b6bce66395310591ae82",
     "tone-600s.mp3": "34c8c15f5870679cb5a052caab190e11092ea42292a8c40a8cfbc6214c73a61f",
-    "tone-600s.ogg": "01a20dc76317081b22bc09c3ebe50f4a1b9aa5d1ad92469c2e566fc5b1c9675e",
+    "tone-600s.ogg": "f14a61f66285f94687ad8aa0b2bb17d72f20f08da5dedde7105632c1bbb4f85f",
     "vfr-1080p.mp4": "f5c236075ceb1c2b535895d8baad8a7c65dd728d17e1f0c67a5aba441e725fed"
   },
   "byFamily": {
     "import": {
-      "workers": 14,
-      "peakMiB": 73,
-      "maxWallMs": 531,
-      "limitMiB": 1024
+      "workers": 15,
+      "peakMiB": 72,
+      "maxShareOfLimit": 0.07,
+      "maxWallMs": 650
     },
     "conversion": {
       "workers": 2,
-      "peakMiB": 677,
-      "maxWallMs": 11915,
-      "limitMiB": 2048
+      "peakMiB": 274,
+      "maxShareOfLimit": 0.134,
+      "maxWallMs": 9832
     },
     "export": {
-      "workers": 6,
-      "peakMiB": 1522,
-      "maxWallMs": 10423,
-      "limitMiB": 2048
+      "workers": 10,
+      "peakMiB": 985,
+      "maxShareOfLimit": 0.481,
+      "maxWallMs": 4669
     },
     "preview": {
       "workers": 13,
       "peakMiB": 182,
-      "maxWallMs": 1535,
-      "limitMiB": 2048
+      "maxShareOfLimit": 0.089,
+      "maxWallMs": 672
     }
   },
+  "heavyExportRunsPeakMiB": [985, 985, 980],
   "workers": [
     {
       "phase": "import:h264-1080p.mp4",
@@ -59,15 +65,19 @@
       "code": 0,
       "peakMiB": 28,
       "limitMiB": 1024,
-      "wallMs": 196
+      "shareOfLimit": 0.027,
+      "wallMs": 650,
+      "metThreshold": true
     },
     {
       "phase": "import:h264-2160p.mp4",
       "executable": "ffprobe.EXE",
       "code": 0,
-      "peakMiB": 44,
+      "peakMiB": 43,
       "limitMiB": 1024,
-      "wallMs": 202
+      "shareOfLimit": 0.042,
+      "wallMs": 108,
+      "metThreshold": true
     },
     {
       "phase": "import:hevc-2160p.mp4",
@@ -75,7 +85,9 @@
       "code": 0,
       "peakMiB": 22,
       "limitMiB": 1024,
-      "wallMs": 165
+      "shareOfLimit": 0.021,
+      "wallMs": 120,
+      "metThreshold": true
     },
     {
       "phase": "import:hevc-4096x2160-10bit.mov",
@@ -83,7 +95,9 @@
       "code": 0,
       "peakMiB": 22,
       "limitMiB": 1024,
-      "wallMs": 155
+      "shareOfLimit": 0.021,
+      "wallMs": 125,
+      "metThreshold": true
     },
     {
       "phase": "import:vp9-1080p.webm",
@@ -91,7 +105,9 @@
       "code": 0,
       "peakMiB": 25,
       "limitMiB": 1024,
-      "wallMs": 243
+      "shareOfLimit": 0.024,
+      "wallMs": 114,
+      "metThreshold": true
     },
     {
       "phase": "import:av1-1080p.webm",
@@ -99,7 +115,9 @@
       "code": 0,
       "peakMiB": 22,
       "limitMiB": 1024,
-      "wallMs": 215
+      "shareOfLimit": 0.021,
+      "wallMs": 85,
+      "metThreshold": true
     },
     {
       "phase": "import:prores-1080p.mov",
@@ -107,15 +125,29 @@
       "code": 0,
       "peakMiB": 22,
       "limitMiB": 1024,
-      "wallMs": 169
+      "shareOfLimit": 0.021,
+      "wallMs": 91,
+      "metThreshold": true
+    },
+    {
+      "phase": "import:h264-4096x4096.mp4",
+      "executable": "ffprobe.EXE",
+      "code": 0,
+      "peakMiB": 63,
+      "limitMiB": 1024,
+      "shareOfLimit": 0.061,
+      "wallMs": 116,
+      "metThreshold": true
     },
     {
       "phase": "import:still-4096.png",
       "executable": "ffprobe.EXE",
       "code": 0,
-      "peakMiB": 73,
+      "peakMiB": 72,
       "limitMiB": 1024,
-      "wallMs": 506
+      "shareOfLimit": 0.07,
+      "wallMs": 222,
+      "metThreshold": true
     },
     {
       "phase": "import:still-4096.jpg",
@@ -123,7 +155,9 @@
       "code": 0,
       "peakMiB": 22,
       "limitMiB": 1024,
-      "wallMs": 158
+      "shareOfLimit": 0.021,
+      "wallMs": 76,
+      "metThreshold": true
     },
     {
       "phase": "import:still-4096.webp",
@@ -131,7 +165,9 @@
       "code": 0,
       "peakMiB": 46,
       "limitMiB": 1024,
-      "wallMs": 531
+      "shareOfLimit": 0.044,
+      "wallMs": 173,
+      "metThreshold": true
     },
     {
       "phase": "import:tone-600s.wav",
@@ -139,7 +175,9 @@
       "code": 0,
       "peakMiB": 22,
       "limitMiB": 1024,
-      "wallMs": 230
+      "shareOfLimit": 0.021,
+      "wallMs": 147,
+      "metThreshold": true
     },
     {
       "phase": "import:tone-600s.mp3",
@@ -147,7 +185,9 @@
       "code": 0,
       "peakMiB": 21,
       "limitMiB": 1024,
-      "wallMs": 206
+      "shareOfLimit": 0.02,
+      "wallMs": 129,
+      "metThreshold": true
     },
     {
       "phase": "import:tone-600s.ogg",
@@ -155,7 +195,9 @@
       "code": 0,
       "peakMiB": 22,
       "limitMiB": 1024,
-      "wallMs": 172
+      "shareOfLimit": 0.021,
+      "wallMs": 80,
+      "metThreshold": true
     },
     {
       "phase": "import:vfr-1080p.mp4",
@@ -163,15 +205,19 @@
       "code": 0,
       "peakMiB": 28,
       "limitMiB": 1024,
-      "wallMs": 218
+      "shareOfLimit": 0.027,
+      "wallMs": 101,
+      "metThreshold": true
     },
     {
       "phase": "conversion:vfr-1080p",
       "executable": "ffmpeg.EXE",
       "code": 0,
-      "peakMiB": 677,
+      "peakMiB": 274,
       "limitMiB": 2048,
-      "wallMs": 11915
+      "shareOfLimit": 0.134,
+      "wallMs": 9832,
+      "metThreshold": true
     },
     {
       "phase": "conversion:vfr-1080p",
@@ -179,7 +225,9 @@
       "code": 0,
       "peakMiB": 28,
       "limitMiB": 1024,
-      "wallMs": 192
+      "shareOfLimit": 0.027,
+      "wallMs": 87,
+      "metThreshold": true
     },
     {
       "phase": "export:reference-720p",
@@ -187,7 +235,9 @@
       "code": 0,
       "peakMiB": 26,
       "limitMiB": 1024,
-      "wallMs": 183
+      "shareOfLimit": 0.025,
+      "wallMs": 108,
+      "metThreshold": true
     },
     {
       "phase": "export:reference-720p",
@@ -195,7 +245,9 @@
       "code": 0,
       "peakMiB": 32,
       "limitMiB": 2048,
-      "wallMs": 225
+      "shareOfLimit": 0.016,
+      "wallMs": 152,
+      "metThreshold": true
     },
     {
       "phase": "export:reference-720p",
@@ -203,7 +255,9 @@
       "code": 0,
       "peakMiB": 184,
       "limitMiB": 2048,
-      "wallMs": 4239
+      "shareOfLimit": 0.089,
+      "wallMs": 1489,
+      "metThreshold": true
     },
     {
       "phase": "export:reference-720p",
@@ -211,23 +265,69 @@
       "code": 0,
       "peakMiB": 25,
       "limitMiB": 1024,
-      "wallMs": 173
+      "shareOfLimit": 0.024,
+      "wallMs": 108,
+      "metThreshold": true
     },
     {
-      "phase": "export:heavy-decoders-1080p",
+      "phase": "export:heavy-decoders-1080p-1",
       "executable": "ffmpeg.EXE",
       "code": 0,
-      "peakMiB": 1522,
+      "peakMiB": 985,
       "limitMiB": 2048,
-      "wallMs": 10423
+      "shareOfLimit": 0.481,
+      "wallMs": 4618,
+      "metThreshold": true
     },
     {
-      "phase": "export:heavy-decoders-1080p",
+      "phase": "export:heavy-decoders-1080p-1",
       "executable": "ffprobe.EXE",
       "code": 0,
       "peakMiB": 28,
       "limitMiB": 1024,
-      "wallMs": 234
+      "shareOfLimit": 0.027,
+      "wallMs": 129,
+      "metThreshold": true
+    },
+    {
+      "phase": "export:heavy-decoders-1080p-2",
+      "executable": "ffmpeg.EXE",
+      "code": 0,
+      "peakMiB": 985,
+      "limitMiB": 2048,
+      "shareOfLimit": 0.481,
+      "wallMs": 4543,
+      "metThreshold": true
+    },
+    {
+      "phase": "export:heavy-decoders-1080p-2",
+      "executable": "ffprobe.EXE",
+      "code": 0,
+      "peakMiB": 28,
+      "limitMiB": 1024,
+      "shareOfLimit": 0.027,
+      "wallMs": 99,
+      "metThreshold": true
+    },
+    {
+      "phase": "export:heavy-decoders-1080p-3",
+      "executable": "ffmpeg.EXE",
+      "code": 0,
+      "peakMiB": 980,
+      "limitMiB": 2048,
+      "shareOfLimit": 0.478,
+      "wallMs": 4669,
+      "metThreshold": true
+    },
+    {
+      "phase": "export:heavy-decoders-1080p-3",
+      "executable": "ffprobe.EXE",
+      "code": 0,
+      "peakMiB": 28,
+      "limitMiB": 1024,
+      "shareOfLimit": 0.027,
+      "wallMs": 97,
+      "metThreshold": true
     },
     {
       "phase": "preview:frame",
@@ -235,7 +335,9 @@
       "code": 0,
       "peakMiB": 21,
       "limitMiB": 1024,
-      "wallMs": 135
+      "shareOfLimit": 0.02,
+      "wallMs": 76,
+      "metThreshold": true
     },
     {
       "phase": "preview:frame",
@@ -243,7 +345,9 @@
       "code": 0,
       "peakMiB": 32,
       "limitMiB": 2048,
-      "wallMs": 215
+      "shareOfLimit": 0.016,
+      "wallMs": 133,
+      "metThreshold": true
     },
     {
       "phase": "preview:frame",
@@ -251,7 +355,9 @@
       "code": 0,
       "peakMiB": 80,
       "limitMiB": 2048,
-      "wallMs": 420
+      "shareOfLimit": 0.039,
+      "wallMs": 185,
+      "metThreshold": true
     },
     {
       "phase": "preview:frame",
@@ -259,7 +365,9 @@
       "code": 0,
       "peakMiB": 24,
       "limitMiB": 1024,
-      "wallMs": 199
+      "shareOfLimit": 0.023,
+      "wallMs": 83,
+      "metThreshold": true
     },
     {
       "phase": "preview:frame",
@@ -267,7 +375,9 @@
       "code": 0,
       "peakMiB": 32,
       "limitMiB": 2048,
-      "wallMs": 220
+      "shareOfLimit": 0.016,
+      "wallMs": 128,
+      "metThreshold": true
     },
     {
       "phase": "preview:frame",
@@ -275,7 +385,9 @@
       "code": 0,
       "peakMiB": 83,
       "limitMiB": 2048,
-      "wallMs": 1205
+      "shareOfLimit": 0.04,
+      "wallMs": 578,
+      "metThreshold": true
     },
     {
       "phase": "preview:frame",
@@ -283,7 +395,9 @@
       "code": 0,
       "peakMiB": 24,
       "limitMiB": 1024,
-      "wallMs": 158
+      "shareOfLimit": 0.023,
+      "wallMs": 115,
+      "metThreshold": true
     },
     {
       "phase": "preview:frame",
@@ -291,7 +405,9 @@
       "code": 0,
       "peakMiB": 32,
       "limitMiB": 2048,
-      "wallMs": 215
+      "shareOfLimit": 0.016,
+      "wallMs": 117,
+      "metThreshold": true
     },
     {
       "phase": "preview:frame",
@@ -299,7 +415,9 @@
       "code": 0,
       "peakMiB": 81,
       "limitMiB": 2048,
-      "wallMs": 499
+      "shareOfLimit": 0.039,
+      "wallMs": 238,
+      "metThreshold": true
     },
     {
       "phase": "preview:frame",
@@ -307,7 +425,9 @@
       "code": 0,
       "peakMiB": 24,
       "limitMiB": 1024,
-      "wallMs": 166
+      "shareOfLimit": 0.023,
+      "wallMs": 99,
+      "metThreshold": true
     },
     {
       "phase": "preview:segment",
@@ -315,7 +435,9 @@
       "code": 0,
       "peakMiB": 32,
       "limitMiB": 2048,
-      "wallMs": 208
+      "shareOfLimit": 0.016,
+      "wallMs": 144,
+      "metThreshold": true
     },
     {
       "phase": "preview:segment",
@@ -323,7 +445,9 @@
       "code": 0,
       "peakMiB": 182,
       "limitMiB": 2048,
-      "wallMs": 1535
+      "shareOfLimit": 0.089,
+      "wallMs": 672,
+      "metThreshold": true
     },
     {
       "phase": "preview:segment",
@@ -331,44 +455,52 @@
       "code": 0,
       "peakMiB": 25,
       "limitMiB": 1024,
-      "wallMs": 156
+      "shareOfLimit": 0.024,
+      "wallMs": 115,
+      "metThreshold": true
     }
   ],
-  "thisProcessPeakRssMiB": 145,
+  "thisProcessPeakRssMiB": 162,
   "checks": [
     {
-      "check": "import worker peak (MiB)",
-      "measured": 73,
-      "threshold": 896,
+      "check": "workers with a measured peak within 87.5% of an enforced Job Object limit",
+      "measured": 40,
+      "threshold": 40,
       "metThreshold": true
     },
     {
-      "check": "conversion worker peak (MiB)",
-      "measured": 677,
-      "threshold": 1792,
+      "check": "import workers measured",
+      "measured": 15,
+      "threshold": 1,
       "metThreshold": true
     },
     {
-      "check": "export worker peak (MiB)",
-      "measured": 1522,
-      "threshold": 1792,
+      "check": "conversion workers measured",
+      "measured": 2,
+      "threshold": 1,
       "metThreshold": true
     },
     {
-      "check": "preview worker peak (MiB)",
-      "measured": 182,
-      "threshold": 1792,
+      "check": "export workers measured",
+      "measured": 10,
+      "threshold": 1,
+      "metThreshold": true
+    },
+    {
+      "check": "preview workers measured",
+      "measured": 13,
+      "threshold": 1,
       "metThreshold": true
     },
     {
       "check": "worst-case concurrent memory (MiB) within the budget share of RAM",
-      "measured": 6444,
+      "measured": 7468,
       "threshold": 8052,
       "metThreshold": true
     },
     {
       "check": "longest probe (ms) within probeWallSeconds",
-      "measured": 531,
+      "measured": 650,
       "threshold": 10000,
       "metThreshold": true
     }
