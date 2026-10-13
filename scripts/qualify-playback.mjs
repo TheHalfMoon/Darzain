@@ -351,21 +351,31 @@ try {
       });
       let state = job.state;
       while (!["COMPLETED", "FAILED", "CANCELLED"].includes(state)) {
+        if (Date.now() - started > 120_000)
+          throw new Error("A pressure export did not finish within 2 minutes.");
         await new Promise((r) => setTimeout(r, 100));
         state = (await call("yamakan.job.status", { jobId: job.id })).state;
       }
       exports.push({ started, ended: Date.now(), state });
     }
   })();
+  // A failure here is rethrown after playback, never left unhandled.
+  let exportError = null;
+  exporting.catch((e) => (exportError = e));
   // The first export is already rendering when counting starts.
   await new Promise((r) => setTimeout(r, 1000));
   const pressure = await playFor(0, 10);
   stopExports = true;
-  await exporting;
+  await exporting.catch(() => {});
+  if (exportError) throw exportError;
   const [w0, w1] = pressure.window;
+  // Only completed exports count as rendering during the window.
   let covered = 0;
-  for (const e of exports)
+  for (const e of exports.filter((x) => x.state === "COMPLETED"))
     covered += Math.max(0, Math.min(e.ended, w1) - Math.max(e.started, w0));
+  const exportStates = {};
+  for (const e of exports)
+    exportStates[e.state] = (exportStates[e.state] ?? 0) + 1;
   const exportCoverage = Math.round((covered / (w1 - w0)) * 1000) / 1000;
   // Negative control: the same play with the page's CPU throttled 20x must
   // measure below the threshold, or the sampler cannot see a slow preview.
@@ -392,7 +402,7 @@ try {
       gated: false,
     },
     {
-      check: `play while exports render back to back (they covered ${Math.round(exportCoverage * 100)}% of the window)`,
+      check: `play while exports render back to back (completed exports covered ${Math.round(exportCoverage * 100)}% of the window)`,
       measured: pressure.fps,
       threshold: MIN_FPS,
       metThreshold: pressure.fps >= MIN_FPS,
@@ -419,7 +429,7 @@ try {
       "18 s 1280x720 timeline: three 6 s testsrc2 H.264 clips (cuts at 6 s and 12 s), a 4 s upper-track clip from 9 s, an Arabic/Latin title from 2 s to 10 s, a tone; frames shown counted from canvas content changes and checked against a per-frame marker",
     sustained,
     seek,
-    pressure: { ...pressure, exports: exports.length, exportCoverage },
+    pressure: { ...pressure, exportStates, exportCoverage },
     negativeControl: {
       cpuThrottle: 20,
       ...throttled,
