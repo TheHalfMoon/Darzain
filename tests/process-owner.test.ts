@@ -278,7 +278,9 @@ test(
       let out = "";
       const result = await owner.run({
         ...node(
-          "const r = require('child_process').spawnSync(process.execPath, ['-e', '1']); process.stdout.write(String(r.error ? r.error.code : r.status))",
+          // No stdio pipes: the attempt meets the job limit, not pipe creation
+          // (Node's pipes stall inside an AppContainer).
+          "const r = require('child_process').spawnSync(process.execPath, ['-e', '1'], { stdio: 'ignore' }); process.stdout.write(String(r.error ? r.error.code : r.status))",
         ),
         onStdout: (b) => (out += b.toString("utf8")),
       });

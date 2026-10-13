@@ -86,6 +86,8 @@ export async function probe(file: string) {
         `file:${path.basename(file)}`,
       ],
       cwd: path.dirname(file),
+      // The probe may read only the file it probes.
+      readable: [file],
       memoryBytes: workerMemoryBytes,
       signal: controller.signal,
       onStdout: (b) => {

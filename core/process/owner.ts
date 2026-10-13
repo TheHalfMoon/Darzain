@@ -30,6 +30,11 @@ export type RunOptions = {
   // integrity, and these are labelled low while it runs). Absolute paths of
   // existing folders; at most 8. Anything else it can only read.
   writable?: string[];
+  // The only files and folders the worker may read besides its executable
+  // and system files (Windows: it runs in an AppContainer, and these are
+  // granted to its own capability while it runs). Absolute paths; folders
+  // include what is in them.
+  readable?: string[];
   signal?: AbortSignal;
   // Called with the worker's PID while it is still suspended (Windows).
   onCreated?: (pid: number) => void | Promise<void>;
@@ -306,6 +311,8 @@ export class ProcessOwner {
             String(options.memoryBytes ?? 0),
             String(options.writable?.length ?? 0),
             ...(options.writable ?? []).map((d) => hex(path.resolve(d))),
+            String(options.readable?.length ?? 0),
+            ...(options.readable ?? []).map((p) => hex(path.resolve(p))),
             String(options.args.length),
             ...options.args.map(hex),
           ].join("\t"),

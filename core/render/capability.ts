@@ -73,6 +73,7 @@ async function probeTitles(): Promise<TitleCapability> {
         "-",
       ],
       cwd: dir,
+      readable: [path.join(dir, "probe.ass")],
       memoryBytes: RESOURCE_POLICY.enforced.workerMemoryBytes,
       // A hung probe must not hold every title export.
       signal: AbortSignal.timeout(
