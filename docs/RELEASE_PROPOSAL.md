@@ -19,10 +19,10 @@ The launch and reopen targets are the plan's proposed ones. [E2E_ACCEPTANCE](E2E
 | Pinned fonts                                                                                                               | both IBM Plex Sans Arabic files match the ledger hashes                                                          | ✓                                    |
 | Earlier receipts                                                                                                           | ≥ 2 GiB import peak 154 MiB (T4b); reference preview: cold frame p95 410 ms, warm 2 ms, 2 s segment 894 ms (T8a) | ≤ 300 MiB ✓; ≤ 3 s / ≤ 1 s / ≤ 6 s ✓ |
 
-### Offline evidence (two checks, both sampled, network enabled)
+### Offline evidence (two checks, network enabled)
 
 - **Browser pages.** The E2E records every request any page of the journey makes and asserts that each one is to 127.0.0.1, in-page data (`blob:`, `data:`), or the browser's own built-in pages (`edge:`, for example its download panel). Result: 142 requests, 0 external. This covers fonts, previews and media loaded by the interface. The page's Content-Security-Policy (`default-src 'self'`, `connect-src 'self'`) restricts the same thing.
-- **Service process tree.** TCP connections and listeners of the service, procd and every FFmpeg/ffprobe worker, sampled during the E2E. Result: 9 samples about 1.1 s apart; 13 connection records; 0 to another machine; 0 listeners reachable from another machine.
+- **Service process tree.** TCP connections and listeners of the service, procd and every FFmpeg/ffprobe worker, sampled during the E2E. Result: 9 samples about 1.1 s apart; 13 connection records; in the samples taken, 0 to another machine and 0 listeners reachable from another machine.
   - **What it cannot see:** UDP (DNS), and connections shorter than the sample gap. Short-lived workers may not have been sampled at all. Their real egress control is FFmpeg's `-protocol_whitelist file` on every probe and render.
 - **Not done here:** the gate's "network disabled" run with a packet-level egress capture (for example `pktmon` or firewall auditing), which needs an administrator.
 
@@ -81,7 +81,12 @@ Status:
 - **Untested brokers.** Only the listed brokers were tested; Low integrity is not an AppContainer.
 - **Permanent grant.** `grant_owner_full` permanently adds a full-control entry for the user to a folder it labels, where that folder was not already private.
 
-**Ship-blocking candidate.** A write-restricted worker token, an AppContainer or restricting SIDs (brokering every input) would close the read, lockout and copy residuals. Recommendation: treat this as a ship-blocking candidate for the founder's decision, not as optional open work.
+**Ship-blocking candidate.**
+
+- **Reads** are closed only by an AppContainer, or by a fully restricted token (restricting SIDs on every access) with brokered inputs. A write-restricted token does **not** close them: it checks its restricting SIDs on writes only, and reads still go through the enabled user SID.
+- **Lockout** and copies left in a locked folder are closed by a write-restricted token (no WRITE_DAC on its folder) or by either stronger option.
+
+Recommendation: treat read containment as a ship-blocking candidate for the founder's decision, not as optional open work.
 
 ## What remains before a ship decision
 
@@ -104,8 +109,9 @@ Status:
    - hard kills during backup and VFR conversion (step 10);
    - a hostile media corpus with a sentinel file;
    - sharing-denial and AV-style held-handle runs.
-4. A worker sandbox that contains reads: a write-restricted token, an AppContainer or restricting SIDs. Recommended as ship-blocking.
-5. Open work recorded in the spec:
+4. A worker sandbox that contains reads: an AppContainer, or a fully restricted token with brokered inputs. A write-restricted token closes only the lockout. Recommended as ship-blocking.
+5. Harness hygiene: kill whole process trees when an aborted qualification run cleans up (taskkill /T), or make the service exit when its parent disconnects.
+6. Open work recorded in the spec:
    - backup and restore requests are not replay-safe by request ID;
    - no retry/discard command for `reconciliationRequired` jobs;
    - hidden retained VFR originals are never collected;
@@ -122,5 +128,5 @@ Status:
 3. A real second Windows account denied the workspace, and a restore on a second clean profile.
 4. Native Arabic review of the T7 title goldens and the T8b/T9 interface strings, including the choice of digits.
 5. Real constrained-volume disk-full runs.
-6. A decision on the worker read containment (above).
+6. A decision on worker read containment (an AppContainer or a fully restricted token; above).
 7. The artifact-bound ship decision, after an independent release review of the exact release commit.
