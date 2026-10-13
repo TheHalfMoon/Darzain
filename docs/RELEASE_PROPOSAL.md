@@ -89,20 +89,25 @@ Status:
 - Workers run with a restricted, low-integrity token. WMI process creation is denied to them, tested against a control that succeeds.
 - Published files carry only the main data stream, in files the service creates.
 
-**Residuals, from [`specs/CURRENT.md`](../specs/CURRENT.md) (T9c):**
+**Read containment (AppContainer, this change):**
 
-- **Reads.** A compromised worker (for example, FFmpeg exploited by a hostile media file) can read everything this account can: the client token and the launch secret, so it could take over the local API or a browser session; `workspace.sqlite`; and every project's media. It also has network access, so it could send all of that elsewhere. **Hostile media is therefore not contained.**
-- **Lockout.** It can lock its own folder against the owner. The run then fails, and the workspace needs an administrator reset before its next start. Until then, copies it left there (token, launch secret, media) can be read by another local account that knows the full path.
-- **Concurrent writes.** Other low-integrity programs of the account can write into a worker's output folder while it runs.
-- **Untested brokers.** Only the listed brokers were tested; Low integrity is not an AppContainer.
-- **Permanent grant.** `grant_owner_full` permanently adds a full-control entry for the user to a folder it labels, where that folder was not already private.
+- **Design.** procd starts every worker inside one AppContainer (`Yamakan.MediaWorker`) with no capabilities except one of its own: a capability SID derived from a name unique to that worker. The restricted low-integrity token and the Job Object are kept. An AppContainer process is denied every object whose access list does not name its container, a capability it holds, or ALL APPLICATION PACKAGES, and with no network capability it cannot open a connection. A worker can therefore read only:
+  - its executable, run from a byte-verified copy in a Yamakan tools folder that grants the container read and execute (`%LOCALAPPDATA%\Yamakan\worker-tools`);
+  - system files that Windows grants to all application packages;
+  - the files and folders its request names, granted to its own capability for its lifetime and revoked when it exits.
+- **Every product worker declares what it reads:** a probe reads its file; a render reads its inputs, `titles.ass` and the fonts folder; a conversion reads its source; the title-fit and capability checks read their script. Grants are written to the one object (`SetKernelObjectSecurity`), never re-propagated through a tree.
+- **Evidence** (`tests/containment.test.ts`): a stand-in hostile worker (Node running a script, as a compromised FFmpeg would run code), started through the real service's workspace, is **denied** a sentinel file outside the workspace, the service token, the launch link, `workspace.sqlite` and a second imported media object it was not given; listing the workspace and the user profile; writing to the workspace and beside the sentinel; a child process; and TCP connections to loopback and to this machine's network address. An uncontained control process does all of these. The worker **can** read its granted input and write its own folder. Afterwards no capability entry remains on the input, the folder or the current directory.
+- **Lockout closed:** a worker may modify its folder's contents but not its access list; the T9c test of a worker opening its folder to everyone is now refused ("unauthorized"), and the folder is still reset when it exits.
 
-**Release-blocking** (founder continuation directive, 2026-10-13; [decision record](FOUNDER_DECISION_RECORD.md#2026-10-13-continuation-to-verified-completion)). An AppContainer is preferred.
+**Residuals:**
 
-- **Reads** are closed only by an AppContainer, or by a fully restricted token (restricting SIDs on every access) with brokered inputs. A write-restricted token does **not** close them: it checks its restricting SIDs on writes only, and reads still go through the enabled user SID.
-- **Lockout** and copies left in a locked folder are closed by a write-restricted token (no WRITE_DAC on its folder) or by either stronger option.
+- **Hostile-media corpus not yet run** against the contained workers (malformed and adversarial files with a sentinel); the stand-in proves the boundary, not FFmpeg's behaviour on each input.
+- **Network isolation** relies on Windows' AppContainer network filtering (Windows Filtering Platform), tested here for TCP to loopback and the local network; UDP and other protocols are not separately tested.
+- **Same-account programs.** Other programs of the same account can still read what the account can, including the tools folder and the workspace; the container constrains workers, not the account.
+- **Crash leftovers.** If procd dies, capability entries stay on granted paths; they name a capability no later token holds, and the service's start-up tree reset removes those inside the workspace. Paths outside the workspace (a temporary current directory) keep the inert entry.
+- **Untested brokers / permanent grant** (from T9c): only the listed brokers were tested; `grant_owner_full` still adds a full-control entry for the user where it labels a folder that was not private.
 
-A write-restricted or integrity-restricted token alone does not satisfy the gate. If read containment cannot be shown, the affected worker feature stays disabled and the verdict stays NO-GO.
+**Release-blocking** (founder continuation directive, 2026-10-13; [decision record](FOUNDER_DECISION_RECORD.md#2026-10-13-continuation-to-verified-completion)): read containment is now implemented with an AppContainer and shown for the stand-in hostile worker; the hostile-media corpus remains before this gate can be called passed.
 
 ## What remains before a ship decision
 
@@ -125,7 +130,7 @@ A write-restricted or integrity-restricted token alone does not satisfy the gate
    - ~~hard kills during backup and VFR conversion~~ (#22); a mid-render kill with a window shorter than the render (step 10, in progress);
    - a hostile media corpus with a sentinel file;
    - sharing-denial and AV-style held-handle runs.
-4. A worker sandbox that contains reads: an AppContainer, or a fully restricted token with brokered inputs. A write-restricted token closes only the lockout. **Release-blocking** by the founder's continuation directive (2026-10-13).
+4. Worker read containment (**release-blocking**): implemented with an AppContainer and per-worker capabilities, and shown for a stand-in hostile worker (`tests/containment.test.ts`); the hostile-media corpus with a sentinel file remains.
 5. ~~A frozen resource policy~~: resource policy v2 (agent decision; receipts above).
 6. Harness hygiene: kill whole process trees when an aborted qualification run cleans up (taskkill /T), or make the service exit when its parent disconnects.
 7. Open work recorded in the spec:

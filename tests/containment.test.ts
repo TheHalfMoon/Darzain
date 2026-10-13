@@ -146,10 +146,20 @@ test(
         );
         assert.equal(r.status, 200);
       }
-      const objects = path.join(workspace, "projects", project.id, "objects");
-      const media = (await readdir(objects)).filter((n) => n.endsWith(".wav"));
+      // Content-addressed objects: objects/sha256/<prefix>/<digest>.
+      const objects = path.join(
+        workspace,
+        "projects",
+        project.id,
+        "objects",
+        "sha256",
+      );
+      const media: string[] = [];
+      for (const prefix of await readdir(objects))
+        for (const name of await readdir(path.join(objects, prefix)))
+          media.push(path.join(objects, prefix, name));
       assert.equal(media.length, 2);
-      const [granted, otherMedia] = media.map((n) => path.join(objects, n));
+      const [granted, otherMedia] = media;
 
       // A sentinel outside the workspace, and the worker's own folder.
       const sentinelDir = path.join(base, "elsewhere");

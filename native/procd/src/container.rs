@@ -96,7 +96,7 @@ extern "system" {
         name: *const u16,
         access: u32,
         share: u32,
-        security: *mut c_void,
+        security: *mut super::SecurityAttributes,
         disposition: u32,
         flags: u32,
         template: Handle,

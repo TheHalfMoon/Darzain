@@ -117,7 +117,11 @@ test(
       );
       assert.ok(!seen.keys.includes("YAMAKAN_TEST_SECRET"));
       assert.ok(
-        seen.keys.every((k: string) => /^(SystemRoot|TEMP|TMP)$/i.test(k)),
+        // The profile locations are needed to create an AppContainer process
+        // (paths the container cannot read); nothing else passes.
+        seen.keys.every((k: string) =>
+          /^(SystemRoot|TEMP|TMP|USERPROFILE|LOCALAPPDATA)$/i.test(k),
+        ),
         seen.keys.join(","),
       );
     } finally {
@@ -324,7 +328,8 @@ test(
       procd.stdin!.write("SPAWN\tbad2\tzz\t00\t0\t0\t0\n");
       await waitFor((l) => l.startsWith("ERROR\tbad2"));
       procd.stdin!.write(
-        `SPAWN\tok1\t${hex(process.execPath)}\t${hex(tmpdir())}\t0\t0\t0\n`,
+        // memory 0, no writable folders, no readable paths, no arguments
+        `SPAWN\tok1\t${hex(process.execPath)}\t${hex(tmpdir())}\t0\t0\t0\t0\n`,
       );
       await waitFor((l) => l.startsWith("CREATED\tok1"));
       procd.stdin!.write("KILL\tok1\n");

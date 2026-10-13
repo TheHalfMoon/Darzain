@@ -266,8 +266,10 @@ test(
       "powershell.exe",
     );
     const written = path.join(work, "render.partial.mp4");
-    // What a compromised worker can do: write its output, then grant
-    // Everyone full control of its folder, inherited by everything in it.
+    // What a compromised worker tries: write its output, then grant Everyone
+    // full control of its folder, inherited by everything in it. In its
+    // AppContainer it may modify the folder's contents but not its access
+    // list, so the second step is refused.
     const script = [
       "$ErrorActionPreference = 'Stop'",
       `Set-Content -LiteralPath '${written}' -Value 'video bytes'`,
@@ -285,11 +287,13 @@ test(
         writable: [work],
         stderrLimit: 8000,
       });
-      assert.equal(result.code, 0, result.stderr);
+      assert.notEqual(result.code, 0, "the worker could not change access");
+      assert.match(result.stderr, /unauthorized/i);
     } finally {
       owner.close();
     }
-    // procd reset the folder to plain inheritance when the worker exited.
+    // Its output was written; procd reset the folder to plain inheritance
+    // when the worker exited.
     assert.equal(await readableByOtherAccounts(work), false);
     assert.equal(await readableByOtherAccounts(written), false);
     // The service's copy is made outside the worker's folder.

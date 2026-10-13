@@ -189,7 +189,7 @@ T9 exceeds the plan's four-day bound, so it is split at its interface: **T9a** r
 3. MCP/REST parity replay (step 14): landed as `tests/parity.test.ts`; the row stays Partial (gaps listed in the release proposal's row 14). MCP tools now take an optional `requestId`, and a refused credential is a structured tool error.
 4. Export goldens with negative fixtures and the 10-minute audio-drift fixture (step 8).
 5. 720p playback measurement (step 7).
-6. Worker read containment (AppContainer preferred) and the hostile-media corpus with a sentinel file.
+6. Worker read containment: AppContainer with per-worker capabilities implemented; a stand-in hostile worker is denied the token, launch link, database, other media, a sentinel, writes outside its folder, child processes and loopback/LAN connections (`tests/containment.test.ts`). Remaining: the hostile-media corpus with a sentinel file.
 7. Backup/restore request replay safety; the open job/recovery defects listed below.
 8. Pinned distributable bundle and release evidence bundle.
 
