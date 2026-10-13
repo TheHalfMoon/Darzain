@@ -1,5 +1,6 @@
 // MVP journey step 8 (docs/E2E_ACCEPTANCE.md): an export matches its golden
-// intent: every edit boundary ±1 frame shows the expected source, the upper
+// intent: every picture edit boundary ±1 frame shows the expected source (sound
+// clip edges through the audio onset), the upper
 // track covers the lower, a display-rotated source is upright, a 10-bit
 // source is converted to 8-bit SDR, a 25 fps source is conformed, the
 // Arabic/Latin title appears and leaves on its exact frames with the
@@ -65,6 +66,7 @@ type Variant = {
   magentaTrack?: "upper" | "under";
   title?: { text: string; start: number } | null;
   lastClipFrames?: number;
+  blueSourceFrame?: number;
   clickFrame?: number;
 };
 
@@ -93,9 +95,13 @@ async function build() {
     "-c:v",
     "libx264",
   ]);
-  // A 25 fps source, conformed to the 30 fps timeline.
+  // A 25 fps source, conformed to the 30 fps timeline. Only its source
+  // frame 25 (1.00-1.04 s) carries a white box in the right probe region, so
+  // the timeline frame that shows it pins the conform mapping.
   make("blue-25.mp4", [
     ...colourSource("blue", 25),
+    "-vf",
+    "drawbox=x=440:y=10:w=160:h=80:color=white:t=fill:enable='eq(n\\,25)'",
     "-pix_fmt",
     "yuv420p",
     "-c:v",
@@ -194,20 +200,23 @@ async function exportVariant(
     startFrame: number,
     durationFrames: number,
     title: string | null = null,
+    sourceFrame = 0,
   ) => ({
     id: id(),
     trackId,
     assetId: asset ? assets[asset] : null,
     startFrame,
     durationFrames,
-    sourceFrame: 0,
+    sourceFrame,
     title,
   });
   const [first, second] = (v.order ?? ["red", "green"]).map((c) => `${c}.mp4`);
   const clips = [
     clip(main.id, first, 0, 60),
     clip(main.id, second, 60, 60),
-    clip(main.id, "blue-25.mp4", 120, 60),
+    // Starts 0.5 s into the source: source frame 25 (1.0 s) falls on
+    // timeline frame 120 + 15 = 135.
+    clip(main.id, "blue-25.mp4", 120, 60, null, v.blueSourceFrame ?? 15),
     clip(main.id, "rotated.mp4", 180, 60),
     clip(main.id, "yellow-10bit.mp4", 240, v.lastClipFrames ?? 60),
     clip(
@@ -249,7 +258,7 @@ async function exportVariant(
 test(
   "an export matches its golden intent, and every negative fixture fails it",
   { timeout: 600_000 },
-  async () => {
+  async (t) => {
     const ctx = await build();
     try {
       // The rotated source's upright picture, as FFmpeg itself displays it
@@ -262,8 +271,9 @@ test(
       // Reference stills of the golden project at the boundaries, the title
       // cue edges and evenly spaced frames (≥ 12).
       const referenceFrames = [
-        0, 15, 29, 30, 31, 45, 59, 60, 61, 74, 75, 89, 90, 104, 105, 119, 120,
-        121, 150, 179, 180, 181, 210, 239, 240, 241, 270, 299,
+        0, 15, 29, 30, 31, 45, 59, 60, 61, 74, 75, 76, 89, 90, 91, 104, 105,
+        106, 119, 120, 121, 133, 135, 138, 150, 179, 180, 181, 210, 239, 240,
+        241, 270, 299,
       ];
       const reference = new Map<number, ReturnType<typeof decodeStill>>();
       for (const n of referenceFrames) {
@@ -290,11 +300,16 @@ test(
           61: top("green"),
           89: top("green"),
           90: top("magenta"),
+          91: top("magenta"),
           104: top("magenta"),
           105: top("green"),
+          106: top("green"),
           119: top("green"),
           120: top("blue"),
           121: top("blue"),
+          133: { top: "blue", right: "blue" },
+          135: { top: "blue", right: "white" },
+          138: { top: "blue", right: "blue" },
           179: top("blue"),
           180: { left: "white", right: "black" },
           181: { left: "white", right: "black" },
@@ -306,13 +321,14 @@ test(
         title: {
           region: titleRegion,
           present: [30, 31, 74],
-          absent: [29, 75],
+          absent: [29, 75, 76],
           background: {
             29: "red",
             30: "red",
             31: "red",
             74: "green",
             75: "green",
+            76: "green",
           },
         },
         // The click is 0.5 s into a clip placed at frame 45 (1.5 s).
@@ -320,6 +336,8 @@ test(
         reference,
       };
       const passed = checkExport(golden.file, golden.bytes, expectation);
+      // The measured values, in the test output.
+      t.diagnostic(`golden metrics ${JSON.stringify(passed.metrics)}`);
       assert.deepEqual(passed.failures, [], passed.failures.join("\n"));
 
       const negatives: [string, Variant, RegExp][] = [
@@ -345,6 +363,11 @@ test(
           /frame 90 top: green, expected magenta/,
         ],
         ["cut short", { lastClipFrames: 45 }, /duration 285 frames/],
+        [
+          "25 fps source offset wrong",
+          { blueSourceFrame: 0 },
+          /frame 135 right: .*expected white/,
+        ],
         ["audio one frame late", { clickFrame: 46 }, /audio onset 20[34]\d/],
       ];
       for (const [name, variant, reason] of negatives) {

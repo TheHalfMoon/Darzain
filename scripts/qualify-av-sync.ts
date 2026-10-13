@@ -22,7 +22,7 @@ import path from "node:path";
 import { ProjectStore } from "../core/store.ts";
 import { JobSupervisor } from "../core/jobs.ts";
 import { closeWorkers, mediaTools } from "../core/process/workers.ts";
-import { clickTimes } from "../tests/fixtures/golden.ts";
+import { clickTimes, probe } from "../tests/fixtures/golden.ts";
 
 const LIMITS = Object.freeze({
   clickOffsetMs: 20,
@@ -37,6 +37,8 @@ const git = (...args: string[]) =>
 const dirty = git("status", "--porcelain", "--", ".", `:!${RECEIPT}`);
 if (dirty)
   throw new Error(`Commit or stash changes before qualifying:\n${dirty}`);
+// The commit measured, taken with the clean-tree check.
+const commit = git("rev-parse", "HEAD");
 
 const ffmpeg = (args: string[], maxBuffer = 256 * 1024 * 1024) =>
   execFileSync(
@@ -50,6 +52,8 @@ const sha256 = (b: Buffer) => createHash("sha256").update(b).digest("hex");
 // seconds (10 for the fixture, more for the negative control).
 async function measure(clickPeriod: number) {
   const root = await mkdtemp(path.join(tmpdir(), "yamakan-avsync-"));
+  // Closed on any failure, so the temporary workspace can be removed.
+  const open: { store?: ProjectStore; supervisor?: JobSupervisor } = {};
   try {
     // Picture and sound as separate media, as the timeline carries them: a
     // video clip's own sound is not rendered (sound comes from sound-track
@@ -82,9 +86,9 @@ async function measure(clickPeriod: number) {
     const videoBytes = await readFile(videoFile);
     const audioBytes = await readFile(soundFile);
 
-    const store = new ProjectStore(path.join(root, "workspace"));
+    const store = (open.store = new ProjectStore(path.join(root, "workspace")));
     await store.initialize();
-    const supervisor = new JobSupervisor(store);
+    const supervisor = (open.supervisor = new JobSupervisor(store));
     await supervisor.start();
     const created = await store.create("A/V sync");
     const picture = (
@@ -130,6 +134,8 @@ async function measure(clickPeriod: number) {
     const job = await supervisor.submit(created.id, "av-sync");
     let status = supervisor.status(job.id);
     while (!["COMPLETED", "FAILED", "CANCELLED"].includes(status.state)) {
+      if (performance.now() - started > 600_000)
+        throw new Error("The export did not finish within 10 minutes.");
       await new Promise((r) => setTimeout(r, 250));
       status = supervisor.status(job.id);
     }
@@ -138,8 +144,13 @@ async function measure(clickPeriod: number) {
       throw new Error(`Export ${status.state}: ${status.error}`);
     const file = await store.file(created.id, status.artifact!);
     const exported = await readFile(file);
+    const streams = probe(file).streams as {
+      codec_type: string;
+      start_time: string;
+    }[];
     await supervisor.close();
     store.close();
+    open.supervisor = open.store = undefined;
     closeWorkers();
 
     // Flash frames: mean luma per frame of a downscaled decode.
@@ -186,6 +197,15 @@ async function measure(clickPeriod: number) {
     const v = video as number[];
     const checks = [
       {
+        check: "both streams start at the beginning of the file",
+        measured: streams
+          .map((x) => `${x.codec_type} ${x.start_time}`)
+          .join(", "),
+        metThreshold:
+          streams.length === 2 &&
+          streams.every((x) => Math.abs(Number(x.start_time)) <= 0.001),
+      },
+      {
         check: "every mark has a click and a flash",
         measured: `${audio.filter((x) => x !== null).length}/${marks} clicks, ${video.filter((x) => x !== null).length}/${marks} flashes`,
         metThreshold: present(audio) && present(video) && marks === 60,
@@ -230,6 +250,10 @@ async function measure(clickPeriod: number) {
       passed: checks.every((c) => c.metThreshold),
     };
   } finally {
+    await open.supervisor?.close().catch(() => {});
+    try {
+      open.store?.close();
+    } catch {}
     closeWorkers();
     // Never hides the run's own error.
     await rm(root, { recursive: true, force: true }).catch(() => {});
@@ -238,9 +262,15 @@ async function measure(clickPeriod: number) {
 
 const fixture = await measure(10);
 const control = await measure(CONTROL_CLICK_PERIOD);
+// Caught for the right reason: the audio checks fail, everything else holds.
+const controlDetected = control.checks.every((c) =>
+  c.check.startsWith("every click") || c.check.startsWith("audio drift")
+    ? !c.metThreshold
+    : c.metThreshold,
+);
 const receipt = {
   receipt: "yamakan.av-sync-qualification/1",
-  commit: git("rev-parse", "HEAD"),
+  commit,
   measuredAt: new Date().toISOString(),
   environment: {
     cpu: cpus()[0]?.model,
@@ -257,9 +287,9 @@ const receipt = {
   negativeControl: {
     ...control.fixture,
     checks: control.checks,
-    detected: !control.passed,
+    detected: controlDetected,
   },
-  passed: fixture.passed && !control.passed,
+  passed: fixture.passed && controlDetected,
 };
 await writeFile(RECEIPT, `${JSON.stringify(receipt, null, 2)}\n`);
 console.log(

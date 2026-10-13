@@ -29,6 +29,12 @@ export const TOLERANCE = Object.freeze({
   audioOnsetMs: 20,
   // Duration: within one frame.
   durationFrames: 1,
+  // A probe region's mean colour must be within this of its palette colour
+  // on every channel (not merely nearest), so a range or matrix error in a
+  // conversion is caught.
+  colourChannel: 24,
+  // Both streams start at the beginning of the file (seconds).
+  startTime: 0.001,
 });
 
 // The palette colours fixtures use; a probe region "shows" the nearest one.
@@ -320,6 +326,9 @@ export function checkExport(file: string, bytes: Buffer, e: Expectation) {
   const frames = Math.round(Number(info.format.duration) * 30);
   if (Math.abs(frames - e.frames) > TOLERANCE.durationFrames)
     failures.push(`duration ${frames} frames, expected ${e.frames}`);
+  for (const s of [video, audio])
+    if (s && Math.abs(Number(s.start_time)) > TOLERANCE.startTime)
+      failures.push(`${s.codec_type} starts at ${s.start_time} s`);
   const boxes = topLevelBoxes(bytes);
   if (!(
     boxes.indexOf("moov") >= 0 && boxes.indexOf("moov") < boxes.indexOf("mdat")
@@ -340,9 +349,17 @@ export function checkExport(file: string, bytes: Buffer, e: Expectation) {
       continue;
     }
     for (const [name, colour] of Object.entries(regions)) {
-      const seen = nearestColour(meanColour(frame, e.regions[name]));
+      const mean = meanColour(frame, e.regions[name]);
+      const seen = nearestColour(mean);
+      const off = Math.max(
+        ...mean.map((c, i) => Math.abs(c - PALETTE[colour][i])),
+      );
       if (seen !== colour)
         failures.push(`frame ${n} ${name}: ${seen}, expected ${colour}`);
+      else if (off > TOLERANCE.colourChannel)
+        failures.push(
+          `frame ${n} ${name}: ${colour} off by ${off.toFixed(0)} on a channel`,
+        );
     }
   }
   for (const n of [...e.title.present, ...e.title.absent]) {
@@ -374,7 +391,10 @@ export function checkExport(file: string, bytes: Buffer, e: Expectation) {
   }
   for (const [n, ref] of e.reference) {
     const frame = decoded.get(n);
-    if (!frame) continue;
+    if (!frame) {
+      failures.push(`frame ${n} missing`);
+      continue;
+    }
     const s = ssim(frame, ref);
     metrics[`frame SSIM @${n}`] = Number(s.toFixed(4));
     if (s < TOLERANCE.frameSsim)
