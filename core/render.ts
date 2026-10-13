@@ -274,8 +274,6 @@ export async function renderPlan(
       "-hide_banner",
       "-nostdin",
       "-y",
-      "-threads",
-      String(RESOURCE_POLICY.enforced.renderThreads),
       "-filter_complex_threads",
       "1",
     ];
@@ -292,6 +290,11 @@ export async function renderPlan(
         extension: a.assetExtension,
       });
       args.push(
+        // `-threads` is an option of each input: every decoder gets the
+        // policy's thread count, so memory does not grow with the host's
+        // cores or the number of clips' decoders.
+        "-threads",
+        String(RESOURCE_POLICY.enforced.renderThreads),
         "-protocol_whitelist",
         "file",
         "-format_whitelist",
@@ -428,7 +431,7 @@ export async function renderPlan(
         "-c:v",
         "libx264",
         "-threads",
-        "2",
+        String(RESOURCE_POLICY.enforced.renderThreads),
         "-preset",
         "veryfast",
         "-crf",

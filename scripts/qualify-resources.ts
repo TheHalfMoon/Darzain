@@ -31,6 +31,16 @@ if (dirty && !process.env.YAMAKAN_QUALIFY_DIRTY)
 
 const MiB = 1024 * 1024;
 const Q = RESOURCE_POLICY.qualification;
+// The process owner measured is the one built from this tree (procd is a
+// git-ignored build output a clean tree cannot vouch for).
+execFileSync(
+  "cargo",
+  ["build", "--release", "--manifest-path", "native/procd/Cargo.toml"],
+  { stdio: "ignore", windowsHide: true },
+);
+const procdSha256 = createHash("sha256")
+  .update(await readFile("native/procd/target/release/yamakan-procd.exe"))
+  .digest("hex");
 const ffmpeg = (args: string[]) =>
   execFileSync(
     mediaTools().ffmpeg,
@@ -148,6 +158,19 @@ try {
     {
       name: "prores-1080p.mov",
       args: [...v("1920x1080", 30, 2), "-c:v", "prores_ks", "-profile:v", "3"],
+    },
+    {
+      // The largest accepted video: 4096 pixels on both sides.
+      name: "h264-4096x4096.mp4",
+      args: [
+        ...v("4096x4096", 30, 2),
+        "-pix_fmt",
+        "yuv420p",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+      ],
     },
     {
       name: "still-4096.png",
@@ -284,14 +307,18 @@ try {
     clip(audioTrack.id, asset("tone-600s.wav").id, 0, 300),
     clip(titles, null, 0, 300, "المشهد الأول · Opening scene"),
   ]);
-  await exportOf("heavy-decoders-1080p", 1920, 1080, [
-    clip(videoTrack.id, asset("hevc-4096x2160-10bit.mov").id, 0, 48),
-    clip(videoTrack.id, asset("hevc-2160p.mp4").id, 48, 60),
-    clip(videoTrack.id, asset("av1-1080p.webm").id, 108, 60),
-    clip(videoTrack.id, asset("prores-1080p.mov").id, 168, 60),
-    clip(videoTrack.id, asset("h264-2160p.mp4").id, 228, 60),
-    clip(audioTrack.id, asset("tone-600s.ogg").id, 0, 288),
-  ]);
+  // Three runs (separate revisions, so each renders): the spread between
+  // them is recorded with the receipt.
+  for (const run of [1, 2, 3])
+    await exportOf(`heavy-decoders-1080p-${run}`, 1920, 1080, [
+      clip(videoTrack.id, asset("hevc-4096x2160-10bit.mov").id, 0, 48),
+      clip(videoTrack.id, asset("hevc-2160p.mp4").id, 48, 60),
+      clip(videoTrack.id, asset("h264-4096x4096.mp4").id, 108, 60),
+      clip(videoTrack.id, asset("av1-1080p.webm").id, 168, 60),
+      clip(videoTrack.id, asset("prores-1080p.mov").id, 228, 60),
+      clip(videoTrack.id, asset("h264-2160p.mp4").id, 288, 60 + run),
+      clip(audioTrack.id, asset("tone-600s.ogg").id, 0, 348 + run),
+    ]);
 
   // Reference previews of the 720p timeline at its own revision.
   const latest = await store.load(project.id);
@@ -322,41 +349,91 @@ try {
   clearInterval(rssTimer);
   unsubscribe();
 
-  // Per phase family: the largest peak and the longest wall time.
+  // Every worker the corpus started, judged against the limit it ran under.
+  const share = Q.workerPeakShareOfLimit;
+  const limits = new Set([
+    RESOURCE_POLICY.enforced.workerMemoryBytes,
+    RESOURCE_POLICY.enforced.renderMemoryBytes,
+  ]);
+  const measured = reports.filter(
+    (r) => r.phase !== "fixture" && r.phase !== "setup",
+  );
+  const perWorker = measured.map((r) => ({
+    phase: r.phase,
+    executable: r.executable,
+    code: r.code,
+    peakMiB:
+      r.peakMemoryBytes === null ? null : Math.ceil(r.peakMemoryBytes / MiB),
+    limitMiB: Math.round(r.memoryLimitBytes / MiB),
+    shareOfLimit:
+      r.peakMemoryBytes === null || !r.memoryLimitBytes
+        ? null
+        : Math.round((r.peakMemoryBytes / r.memoryLimitBytes) * 1000) / 1000,
+    wallMs: Math.round(r.wallMs),
+    metThreshold:
+      r.peakMemoryBytes !== null &&
+      r.peakMemoryBytes > 0 &&
+      limits.has(r.memoryLimitBytes) &&
+      r.peakMemoryBytes <= share * r.memoryLimitBytes,
+  }));
+  // Per phase family, for reading: workers, the largest peak and its share
+  // of the limit, and the longest wall time.
   const family = (p: string) => p.split(":")[0];
   const byFamily: Record<
     string,
-    { workers: number; peakMiB: number; maxWallMs: number; limitMiB: number }
+    {
+      workers: number;
+      peakMiB: number;
+      maxShareOfLimit: number;
+      maxWallMs: number;
+    }
   > = {};
-  for (const r of reports.filter(
-    (r) => r.phase !== "fixture" && r.phase !== "setup",
-  )) {
-    const f = (byFamily[family(r.phase)] ??= {
+  for (const w of perWorker) {
+    const f = (byFamily[family(w.phase)] ??= {
       workers: 0,
       peakMiB: 0,
+      maxShareOfLimit: 0,
       maxWallMs: 0,
-      limitMiB: 0,
     });
     f.workers++;
-    f.peakMiB = Math.max(f.peakMiB, Math.ceil(r.peakMemoryBytes / MiB));
-    f.maxWallMs = Math.max(f.maxWallMs, Math.round(r.wallMs));
-    f.limitMiB = Math.max(f.limitMiB, Math.round(r.memoryLimitBytes / MiB));
+    f.peakMiB = Math.max(f.peakMiB, w.peakMiB ?? 0);
+    f.maxShareOfLimit = Math.max(f.maxShareOfLimit, w.shareOfLimit ?? 0);
+    f.maxWallMs = Math.max(f.maxWallMs, w.wallMs);
   }
-  const checks = Object.entries(Q.workerPeakMiB).map(([name, limit]) => {
-    const measured = byFamily[name]?.peakMiB ?? null;
-    return {
-      check: `${name} worker peak (MiB)`,
-      measured,
-      threshold: limit,
-      metThreshold: measured !== null && measured <= limit,
-    };
-  });
+  const heavy = perWorker
+    .filter(
+      (w) =>
+        w.phase.startsWith("export:heavy-") &&
+        w.limitMiB === RESOURCE_POLICY.enforced.renderMemoryBytes / MiB,
+    )
+    .map((w) => w.peakMiB ?? 0);
+  const checks: {
+    check: string;
+    measured: number | null;
+    threshold: number;
+    metThreshold: boolean;
+  }[] = [
+    {
+      check: `workers with a measured peak within ${share * 100}% of an enforced Job Object limit`,
+      measured: perWorker.filter((w) => w.metThreshold).length,
+      threshold: perWorker.length,
+      metThreshold:
+        perWorker.length > 0 && perWorker.every((w) => w.metThreshold),
+    },
+    ...["import", "conversion", "export", "preview"].map((name) => ({
+      check: `${name} workers measured`,
+      measured: byFamily[name]?.workers ?? 0,
+      threshold: 1,
+      metThreshold: (byFamily[name]?.workers ?? 0) >= 1,
+    })),
+  ];
   const budgetMiB = Math.round(
     (Q.budget.serviceMiB * MiB +
-      // One job worker and one preview renderer, both under the render
-      // limit, plus the concurrent import probes under the worker limit.
+      // One job worker and one preview renderer under the render limit;
+      // the concurrent import probes and one engine check under the worker
+      // limit.
       2 * RESOURCE_POLICY.enforced.renderMemoryBytes +
-      RESOURCE_POLICY.enforced.concurrentImports *
+      (RESOURCE_POLICY.enforced.concurrentImports + 1) *
         RESOURCE_POLICY.enforced.workerMemoryBytes) /
       MiB,
   );
@@ -366,18 +443,25 @@ try {
     threshold: Math.floor((totalmem() / MiB) * Q.budget.maxShareOfRam),
     metThreshold: budgetMiB <= (totalmem() / MiB) * Q.budget.maxShareOfRam,
   });
+  const longestProbe = Math.max(
+    0,
+    ...perWorker
+      .filter((w) => /^ffprobe/i.test(w.executable))
+      .map((w) => w.wallMs),
+  );
   checks.push({
     check: "longest probe (ms) within probeWallSeconds",
-    measured: byFamily.import?.maxWallMs ?? null,
+    measured: longestProbe || null,
     threshold: RESOURCE_POLICY.enforced.probeWallSeconds * 1000,
     metThreshold:
-      (byFamily.import?.maxWallMs ?? Infinity) <=
-      RESOURCE_POLICY.enforced.probeWallSeconds * 1000,
+      longestProbe > 0 &&
+      longestProbe <= RESOURCE_POLICY.enforced.probeWallSeconds * 1000,
   });
   Object.assign(results, {
-    receipt: "yamakan.resource-qualification/1",
+    receipt: "yamakan.resource-qualification/2",
     policy: RESOURCE_POLICY.policy,
     commit: git("rev-parse", "HEAD"),
+    cleanTree: !dirty,
     measuredAt: new Date().toISOString(),
     environment: {
       cpu: cpus()[0]?.model,
@@ -386,20 +470,17 @@ try {
       node: process.version,
       ffmpeg: execFileSync(mediaTools().ffmpeg, ["-version"], {
         encoding: "utf8",
-      }).split("\n")[0],
+      })
+        .split("\n")[0]
+        .trim(),
+      ffmpegSha256: sha256(await readFile(mediaTools().ffmpeg)),
+      ffprobeSha256: sha256(await readFile(mediaTools().ffprobe)),
+      procdSha256,
     },
     corpus: corpusHashes,
     byFamily,
-    workers: reports
-      .filter((r) => r.phase !== "fixture" && r.phase !== "setup")
-      .map((r) => ({
-        phase: r.phase,
-        executable: r.executable,
-        code: r.code,
-        peakMiB: Math.ceil(r.peakMemoryBytes / MiB),
-        limitMiB: Math.round(r.memoryLimitBytes / MiB),
-        wallMs: Math.round(r.wallMs),
-      })),
+    heavyExportRunsPeakMiB: heavy,
+    workers: perWorker,
     thisProcessPeakRssMiB: Math.ceil(rssPeak / MiB),
     checks,
     passed: checks.every((c) => c.metThreshold),

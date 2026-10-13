@@ -57,27 +57,25 @@ export const RESOURCE_POLICY = Object.freeze({
     importServicePeakMiB: 300,
     // Peak committed memory of each worker's Job Object, as procd reads it
     // when the worker exits (JOBOBJECT_EXTENDED_LIMIT_INFORMATION
-    // PeakJobMemoryUsed), over the qualify-resources corpus: every accepted
-    // container, 4096-pixel stills, 4K H.264, 4K and 4096x2160 10-bit HEVC,
-    // AV1, VP9, ProRes, ten-minute WAV/MP3/Ogg, a 60 s 1080p VFR conversion,
-    // a 720p reference export with an Arabic/Latin title, a 1080p export
-    // cutting between the heavy decoders, and reference frames and a segment.
-    // Each threshold is 87.5% of the Job Object limit that applies at run
-    // time (workerMemoryBytes for probes; renderMemoryBytes for renders,
-    // conversions and previews), so a supported codec keeps 12.5% headroom
-    // before the kernel limit fails its allocations. At the limit, a worker's
-    // allocations fail and it exits non-zero (a probe then reports
-    // MEDIA_INVALID; a job FAILED); its commit may overshoot by a few MiB
-    // (tests/resource-policy.test.ts).
-    workerPeakMiB: Object.freeze({
-      import: 896,
-      conversion: 1792,
-      export: 1792,
-      preview: 1792,
-    }),
+    // PeakJobMemoryUsed). Every worker the qualify-resources corpus starts
+    // must report a measured peak of at most this share of the Job Object
+    // limit it ran under, and that limit must be workerMemoryBytes (probes,
+    // capability checks) or renderMemoryBytes (renders, conversions,
+    // previews); an unmeasured peak or a run without a limit fails. The
+    // corpus: every accepted container; 4096x4096 stills and video; 4K
+    // H.264; 4K and 4096x2160 10-bit HEVC; AV1; VP9; ProRes; ten-minute WAV,
+    // MP3 and Ogg; a 60 s 1080p VFR conversion; a 720p reference export with
+    // an Arabic/Latin title; a 1080p export cutting between six heavy
+    // sources (three runs); reference frames and a segment. Every decoder
+    // and encoder runs with renderThreads threads, so memory does not grow
+    // with the host's cores. At the limit a worker's allocations fail and it
+    // exits non-zero (a probe then reports MEDIA_INVALID; a job FAILED); its
+    // commit may overshoot by a few MiB (tests/resource-policy.test.ts).
+    workerPeakShareOfLimit: 0.875,
     // Worst case at once: the service, one job worker (render or conversion,
-    // serial), one preview renderer and `concurrentImports` probes, each at
-    // its Job Object limit; it must fit in half of the machine's RAM.
+    // serial), one preview renderer, `concurrentImports` probes and one
+    // engine check, each at its Job Object limit; it must fit in half of the
+    // machine's RAM.
     budget: Object.freeze({ serviceMiB: 300, maxShareOfRam: 0.5 }),
   }),
   candidate: Object.freeze({

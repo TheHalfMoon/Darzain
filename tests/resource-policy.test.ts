@@ -74,20 +74,21 @@ test(
     const { ffmpeg } = mediaTools();
     const owner = new ProcessOwner([ffmpeg]);
     try {
-      const limit = 48 * MiB;
+      const limit = 64 * MiB;
       const result = await owner.run({
         executable: ffmpeg,
         args: encode,
         cwd: tmpdir(),
         memoryBytes: limit,
       });
-      assert.notEqual(result.code, 0, "the encode cannot succeed in 48 MiB");
+      assert.notEqual(result.code, 0, "the encode cannot succeed in 64 MiB");
       // The kernel fails the worker's allocations at the limit...
       assert.match(result.stderr, /malloc|alloc/i);
       // ...and its commit stops there, within the few MiB the job may
-      // overshoot (measured up to 4.5 MiB at limits of 32-192 MiB).
+      // overshoot (up to 7.5 MiB seen at limits of 32-192 MiB).
+      assert.ok(result.peakMemoryBytes! > 0);
       assert.ok(
-        result.peakMemoryBytes! <= limit + 8 * MiB,
+        result.peakMemoryBytes! <= limit + 16 * MiB,
         `${result.peakMemoryBytes}`,
       );
     } finally {
@@ -96,27 +97,24 @@ test(
   },
 );
 
-test("the frozen qualification thresholds sit inside the enforced limits", () => {
+test("the frozen qualification rule sits inside the enforced limits", () => {
   const { enforced, qualification } = RESOURCE_POLICY;
   assert.equal(RESOURCE_POLICY.policy, "yamakan.resource-policy/v2");
-  assert.ok(Object.isFrozen(qualification.workerPeakMiB));
-  const limitMiB = {
-    import: enforced.workerMemoryBytes / MiB,
-    conversion: enforced.renderMemoryBytes / MiB,
-    export: enforced.renderMemoryBytes / MiB,
-    preview: enforced.renderMemoryBytes / MiB,
-  };
-  for (const [family, threshold] of Object.entries(qualification.workerPeakMiB))
-    assert.equal(
-      threshold,
-      limitMiB[family as keyof typeof limitMiB] * 0.875,
-      family,
-    );
-  // The worst case at once fits in half of the qualification profile's 16 GiB.
+  assert.ok(Object.isFrozen(qualification));
+  assert.ok(
+    qualification.workerPeakShareOfLimit > 0 &&
+      qualification.workerPeakShareOfLimit < 1,
+  );
+  assert.ok(
+    qualification.importServicePeakMiB * MiB < enforced.workerMemoryBytes,
+  );
+  // The worst case at once (service, job worker, preview renderer, the
+  // concurrent probes and one engine check) fits in half of the
+  // qualification profile's 16 GiB.
   const worstMiB =
     qualification.budget.serviceMiB +
     (2 * enforced.renderMemoryBytes +
-      enforced.concurrentImports * enforced.workerMemoryBytes) /
+      (enforced.concurrentImports + 1) * enforced.workerMemoryBytes) /
       MiB;
   assert.ok(worstMiB <= 16 * 1024 * qualification.budget.maxShareOfRam);
 });

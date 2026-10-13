@@ -686,6 +686,9 @@ export class JobSupervisor {
           String(asset.durationFrames / 30),
           "-c:v",
           "libx264",
+          // The decoder's thread count is set before -i; the encoder's here.
+          "-threads",
+          String(RESOURCE_POLICY.enforced.renderThreads),
           "-preset",
           "veryfast",
           "-crf",

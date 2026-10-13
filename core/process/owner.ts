@@ -43,7 +43,7 @@ export type RunResult = {
   pid: number;
   stderr: string;
   // Peak committed memory of the worker's Job Object (Windows); null where
-  // no job measures it.
+  // no job measures it or procd could not read it.
   peakMemoryBytes: number | null;
 };
 // What every finished Windows worker reports to observers (qualification
@@ -51,7 +51,9 @@ export type RunResult = {
 export type WorkerReport = {
   executable: string;
   code: number;
-  peakMemoryBytes: number;
+  // null: not measured (procd could not read the job, or predates the field).
+  peakMemoryBytes: number | null;
+  // 0: the run set no Job Object memory limit.
   memoryLimitBytes: number;
   wallMs: number;
 };
@@ -101,7 +103,7 @@ type Pending = {
   stderr: (chunk: Buffer) => void;
   // `restored`: the worker's writable folders are back to their default
   // label and inherited access.
-  exited: (code: number, restored: boolean, peakBytes: number) => void;
+  exited: (code: number, restored: boolean, peakBytes: number | null) => void;
   failed: (message: string) => void;
 };
 
@@ -169,7 +171,13 @@ export class ProcessOwner {
         else if (kind === "ERR") p.stderr(Buffer.from(value ?? "", "hex"));
         else if (kind === "CREATED") p.created(Number(value));
         else if (kind === "EXITED")
-          p.exited(Number(value), extra !== "0", Number(peak ?? 0) || 0);
+          // A process that ran always committed memory: a missing or zero
+          // peak means it was not measured.
+          p.exited(
+            Number(value),
+            extra !== "0",
+            Number(peak) > 0 ? Number(peak) : null,
+          );
         else if (kind === "ERROR")
           p.failed(Buffer.from(value ?? "", "hex").toString("utf8"));
       });
@@ -227,7 +235,7 @@ export class ProcessOwner {
     const limit = options.stderrLimit ?? 64 * 1024;
     let stderr = "";
     let pid = 0;
-    let peakMemoryBytes = 0;
+    let peakMemoryBytes: number | null = null;
     const started = performance.now();
     try {
       const code = await new Promise<number>((resolve, reject) => {
@@ -367,9 +375,12 @@ export class ProcessOwner {
     return () => void this.#observers.delete(listener);
   }
   #report(report: WorkerReport) {
+    // An observer is diagnostics: its failure, synchronous or async, never
+    // affects the run it observes.
     for (const listener of this.#observers) {
       try {
-        listener(report);
+        const returned: unknown = listener(report);
+        if (returned instanceof Promise) returned.catch(() => {});
       } catch {}
     }
   }

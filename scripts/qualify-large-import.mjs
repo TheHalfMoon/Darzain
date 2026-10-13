@@ -27,6 +27,19 @@ const MIN_BYTES = 2 * 1024 * MiB;
 // The frozen ceiling (resource policy v2, qualification.importServicePeakMiB).
 const CEILING = RESOURCE_POLICY.qualification.importServicePeakMiB * MiB;
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// The committed receipt must describe committed code: a dirty tree writes
+// its receipt under work/ instead, and says so.
+const RECEIPT = path.join(
+  "docs",
+  "evidence",
+  "qualification",
+  "large-import.json",
+);
+const dirty = execFileSync(
+  "git",
+  ["status", "--porcelain", "--", ".", `:!${RECEIPT.replaceAll("\\", "/")}`],
+  { cwd: repo, encoding: "utf8" },
+).trim();
 const work = path.resolve(
   process.argv[2] || path.join(repo, "work", "qualification"),
 );
@@ -186,7 +199,8 @@ try {
 
   const peak = Math.max(...samples);
   const receipt = {
-    qualification: "T4 large import",
+    qualification: "large import (resource policy v2)",
+    cleanTree: !dirty,
     commit: execFileSync("git", ["rev-parse", "HEAD"], {
       cwd: repo,
       encoding: "utf8",
@@ -211,10 +225,11 @@ try {
   };
   console.log(JSON.stringify(receipt, null, 2));
   // Under resource policy v2; the T4 receipt (t4-large-import.json) is kept.
-  writeFileSync(
-    path.join(repo, "docs", "evidence", "qualification", "large-import.json"),
-    `${JSON.stringify(receipt, null, 2)}\n`,
-  );
+  const target = dirty
+    ? path.join(repo, "work", "qualification", "large-import.json")
+    : path.join(repo, RECEIPT);
+  mkdirSync(path.dirname(target), { recursive: true });
+  writeFileSync(target, `${JSON.stringify(receipt, null, 2)}\n`);
   if (!receipt.pass) process.exitCode = 1;
 } finally {
   sampler?.kill();

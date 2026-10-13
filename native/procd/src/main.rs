@@ -1031,6 +1031,10 @@ fn main() {
                             let mut peak = 0usize;
                             if let Some(worker) = &worker {
                                 let mut info = ExtendedLimitInformation::default();
+                                // SAFETY: the job handle is owned by `worker`, which is
+                                // still alive; `info` is a writable repr(C) buffer of
+                                // exactly the size passed (asserted at 144 bytes), and
+                                // the returned-length pointer may be null.
                                 let ok = unsafe {
                                     QueryInformationJobObject(
                                         worker.job.0,
