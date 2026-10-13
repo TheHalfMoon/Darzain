@@ -229,7 +229,8 @@ try {
   };
 } finally {
   closeWorkers();
-  await rm(root, { recursive: true, force: true });
+  // Never hides the run's own error.
+  await rm(root, { recursive: true, force: true }).catch(() => {});
 }
 await writeFile(RECEIPT, `${JSON.stringify(receipt, null, 2)}\n`);
 console.log(
