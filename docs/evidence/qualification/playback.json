@@ -1,0 +1,112 @@
+{
+  "receipt": "yamakan.playback-qualification/1",
+  "policy": "yamakan.qualification-policy/v1",
+  "commit": "84c9412df516ea58bc75e1d4501455d7283b829f",
+  "measuredAt": "2026-10-13T08:19:34.125Z",
+  "environment": {
+    "cpu": "13th Gen Intel(R) Core(TM) i5-13420H",
+    "logicalCores": 12,
+    "memoryGiB": 16,
+    "node": "v24.19.0",
+    "browser": "msedge 155.0.4283.45 (headless)",
+    "webglRenderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x0000A7A8) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "ffmpegSha256": "09948d4cdd0650da6ff5a87577469f2a218dc2615ae379f8f734d24c49de0f73"
+  },
+  "fixture": "18 s 1280x720 timeline: three 6 s testsrc2 H.264 clips (cuts at 6 s and 12 s), a 4 s upper-track clip from 9 s, an Arabic/Latin title from 2 s to 10 s, a tone; frames shown counted from canvas content changes and checked against a per-frame marker",
+  "sustained": {
+    "fromSeconds": 0,
+    "seconds": 15,
+    "animationFrames": 775,
+    "sampledSeconds": 15.33,
+    "framesShown": 436,
+    "changes": {
+      "next": 429,
+      "skipped": 4,
+      "framesSkipped": 4,
+      "black": 0,
+      "other": 3
+    },
+    "fps": 28.4,
+    "minOneSecondWindow": 17,
+    "droppedEstimate": 24
+  },
+  "seek": {
+    "fromSeconds": 4.5,
+    "seconds": 3,
+    "animationFrames": 179,
+    "sampledSeconds": 3.06,
+    "framesShown": 88,
+    "changes": {
+      "next": 87,
+      "skipped": 0,
+      "framesSkipped": 0,
+      "black": 1,
+      "other": 1
+    },
+    "fps": 28.8,
+    "minOneSecondWindow": 27,
+    "droppedEstimate": 4
+  },
+  "pressure": {
+    "fromSeconds": 0,
+    "seconds": 10,
+    "animationFrames": 590,
+    "sampledSeconds": 10.07,
+    "framesShown": 299,
+    "changes": {
+      "next": 297,
+      "skipped": 0,
+      "framesSkipped": 0,
+      "black": 1,
+      "other": 2
+    },
+    "fps": 29.7,
+    "minOneSecondWindow": 27,
+    "droppedEstimate": 3,
+    "exports": 3,
+    "exportCoverage": 1
+  },
+  "negativeControl": {
+    "cpuThrottle": 20,
+    "fromSeconds": 0,
+    "seconds": 5,
+    "animationFrames": 64,
+    "sampledSeconds": 8.62,
+    "framesShown": 20,
+    "changes": {
+      "next": 8,
+      "skipped": 6,
+      "framesSkipped": 8,
+      "black": 6,
+      "other": 6
+    },
+    "fps": 2.3,
+    "minOneSecondWindow": 0,
+    "droppedEstimate": 239,
+    "detected": true
+  },
+  "checks": [
+    {
+      "check": "sustained 720p playback (15 s, two cuts, overlay, title) at ≥ 24 fps",
+      "measured": 28.4,
+      "threshold": 24,
+      "metThreshold": true,
+      "gated": true
+    },
+    {
+      "check": "seek to 4.5 s, then play across the cut at 6 s (counted from the Play press)",
+      "measured": 28.8,
+      "threshold": 24,
+      "metThreshold": true,
+      "gated": false
+    },
+    {
+      "check": "play while exports render back to back (they covered 100% of the window)",
+      "measured": 29.7,
+      "threshold": 24,
+      "metThreshold": true,
+      "gated": false
+    }
+  ],
+  "passed": true
+}
