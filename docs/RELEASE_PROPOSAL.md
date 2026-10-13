@@ -83,12 +83,12 @@ Status:
 - **Untested brokers.** Only the listed brokers were tested; Low integrity is not an AppContainer.
 - **Permanent grant.** `grant_owner_full` permanently adds a full-control entry for the user to a folder it labels, where that folder was not already private.
 
-**Ship-blocking candidate.**
+**Release-blocking** (founder continuation directive, 2026-10-13; [decision record](FOUNDER_DECISION_RECORD.md#2026-10-13-continuation-to-verified-completion)). An AppContainer is preferred.
 
 - **Reads** are closed only by an AppContainer, or by a fully restricted token (restricting SIDs on every access) with brokered inputs. A write-restricted token does **not** close them: it checks its restricting SIDs on writes only, and reads still go through the enabled user SID.
 - **Lockout** and copies left in a locked folder are closed by a write-restricted token (no WRITE_DAC on its folder) or by either stronger option.
 
-Recommendation: treat read containment as a ship-blocking candidate for the founder's decision, not as optional open work.
+A write-restricted or integrity-restricted token alone does not satisfy the gate. If read containment cannot be shown, the affected worker feature stays disabled and the verdict stays NO-GO.
 
 ## What remains before a ship decision
 
