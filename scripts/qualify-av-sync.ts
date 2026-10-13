@@ -79,7 +79,8 @@ try {
   );
   const head = await store.load(created.id);
   const asset = imported.asset;
-  const [picture, sound] = head.tracks;
+  // A video clip carries its own sound; both edits are on the picture track.
+  const [picture] = head.tracks;
   const half = 9000;
   const total = Math.min(asset.durationFrames, 18000);
   const clip = (
@@ -103,8 +104,6 @@ try {
       clips: [
         clip(picture.id, 0, half),
         clip(picture.id, half, total - half),
-        clip(sound.id, 0, half),
-        clip(sound.id, half, total - half),
       ],
     },
     head.revision,
