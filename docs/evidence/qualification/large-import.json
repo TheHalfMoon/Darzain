@@ -1,0 +1,20 @@
+{
+  "qualification": "T4 large import",
+  "commit": "a78d77b4b636976333d727258c6458ee77990449",
+  "date": "2026-10-13T07:06:41.347Z",
+  "host": {
+    "platform": "win32",
+    "release": "10.0.26300",
+    "cpus": 12,
+    "memoryGiB": 16
+  },
+  "node": "v24.19.0",
+  "fixture": "FFmpeg testsrc2 1920x1080, 18 s rawvideo uyvy422 MOV (synthetic test pattern)",
+  "bytes": 2239490938,
+  "seconds": 58.4,
+  "samples": 266,
+  "peakServiceWorkingSetMiB": 157,
+  "policy": "yamakan.resource-policy/v2",
+  "ceilingMiB": 300,
+  "pass": true
+}
