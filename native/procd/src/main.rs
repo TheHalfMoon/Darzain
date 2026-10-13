@@ -23,7 +23,7 @@
 //!   RESUME id                   -> RESUMED id
 //!   KILL id                     -> (EXITED follows)
 //!   (worker output)             -> OUT id hexChunk | ERR id hexChunk
-//!   (process end, after output) -> EXITED id exitCode restored(1|0)
+//!   (process end, after output) -> EXITED id exitCode restored(1|0) peakJobBytes
 //!   errors                      -> ERROR id hexMessage
 //! Executables must be on the allowlist given as arguments at startup.
 
@@ -178,6 +178,7 @@ const _: () = {
 extern "system" {
     fn CreateJobObjectW(attributes: *mut c_void, name: *const u16) -> Handle;
     fn SetInformationJobObject(job: Handle, class: i32, info: *mut c_void, size: u32) -> Bool;
+    fn QueryInformationJobObject(job: Handle, class: i32, info: *mut c_void, size: u32, returned: *mut u32) -> Bool;
     fn TerminateJobObject(job: Handle, exit_code: u32) -> Bool;
     fn InitializeProcThreadAttributeList(list: *mut c_void, count: u32, flags: u32, size: *mut usize) -> Bool;
     fn UpdateProcThreadAttribute(
@@ -1025,6 +1026,28 @@ fn main() {
                             // return to the default label.
                             let worker = workers.lock().unwrap().remove(&id);
                             let mut restored = true;
+                            // The job's peak committed memory, read before the
+                            // job closes (0 if the query fails).
+                            let mut peak = 0usize;
+                            if let Some(worker) = &worker {
+                                let mut info = ExtendedLimitInformation::default();
+                                // SAFETY: the job handle is owned by `worker`, which is
+                                // still alive; `info` is a writable repr(C) buffer of
+                                // exactly the size passed (asserted at 144 bytes), and
+                                // the returned-length pointer may be null.
+                                let ok = unsafe {
+                                    QueryInformationJobObject(
+                                        worker.job.0,
+                                        JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS,
+                                        &mut info as *mut _ as *mut c_void,
+                                        std::mem::size_of::<ExtendedLimitInformation>() as u32,
+                                        std::ptr::null_mut(),
+                                    )
+                                };
+                                if ok != 0 {
+                                    peak = info.peak_job_memory_used;
+                                }
+                            }
                             if let Some(worker) = worker {
                                 let folders = worker.writable.clone();
                                 drop(worker);
@@ -1032,7 +1055,7 @@ fn main() {
                                     restored &= release_label(dir);
                                 }
                             }
-                            send(&out, &format!("EXITED\t{id}\t{code}\t{}", u8::from(restored)));
+                            send(&out, &format!("EXITED\t{id}\t{code}\t{}\t{peak}", u8::from(restored)));
                         });
                     }
                     Err(message) => send(&out, &format!("ERROR\t{id}\t{}", hex_encode(message.as_bytes()))),

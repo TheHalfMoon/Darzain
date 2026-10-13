@@ -20,11 +20,26 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
+import { RESOURCE_POLICY } from "../core/command/policy.ts";
 
 const MiB = 1024 * 1024;
 const MIN_BYTES = 2 * 1024 * MiB;
-const CEILING = 300 * MiB;
+// The frozen ceiling (resource policy v2, qualification.importServicePeakMiB).
+const CEILING = RESOURCE_POLICY.qualification.importServicePeakMiB * MiB;
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// The committed receipt must describe committed code: a dirty tree writes
+// its receipt under work/ instead, and says so.
+const RECEIPT = path.join(
+  "docs",
+  "evidence",
+  "qualification",
+  "large-import.json",
+);
+const dirty = execFileSync(
+  "git",
+  ["status", "--porcelain", "--", ".", `:!${RECEIPT.replaceAll("\\", "/")}`],
+  { cwd: repo, encoding: "utf8" },
+).trim();
 const work = path.resolve(
   process.argv[2] || path.join(repo, "work", "qualification"),
 );
@@ -158,6 +173,21 @@ try {
   });
   const seconds = (performance.now() - started) / 1000;
   sampler.kill();
+  // Windows keeps the exact lifetime peak, which samples can miss.
+  if (process.platform === "win32") {
+    const exact = Number(
+      execFileSync(
+        "powershell",
+        [
+          "-NoProfile",
+          "-Command",
+          `(Get-Process -Id ${server.pid}).PeakWorkingSet64`,
+        ],
+        { encoding: "utf8", windowsHide: true },
+      ).trim(),
+    );
+    if (exact > 0) samples.push(exact);
+  }
   assert.equal(response.status, 200, response.body);
   const imported = JSON.parse(response.body);
   assert.equal(imported.asset.bytes, bytes);
@@ -169,7 +199,8 @@ try {
 
   const peak = Math.max(...samples);
   const receipt = {
-    qualification: "T4 large import",
+    qualification: "large import (resource policy v2)",
+    cleanTree: !dirty,
     commit: execFileSync("git", ["rev-parse", "HEAD"], {
       cwd: repo,
       encoding: "utf8",
@@ -188,15 +219,17 @@ try {
     seconds: Math.round(seconds * 10) / 10,
     samples: samples.length,
     peakServiceWorkingSetMiB: Math.round(peak / MiB),
+    policy: RESOURCE_POLICY.policy,
     ceilingMiB: CEILING / MiB,
     pass: peak <= CEILING && samples.length > 0,
   };
   console.log(JSON.stringify(receipt, null, 2));
-  mkdirSync(path.join(repo, "work", "qualification"), { recursive: true });
-  writeFileSync(
-    path.join(repo, "work", "qualification", "large-import.json"),
-    `${JSON.stringify(receipt, null, 2)}\n`,
-  );
+  // Under resource policy v2; the T4 receipt (t4-large-import.json) is kept.
+  const target = dirty
+    ? path.join(repo, "work", "qualification", "large-import.json")
+    : path.join(repo, RECEIPT);
+  mkdirSync(path.dirname(target), { recursive: true });
+  writeFileSync(target, `${JSON.stringify(receipt, null, 2)}\n`);
   if (!receipt.pass) process.exitCode = 1;
 } finally {
   sampler?.kill();
