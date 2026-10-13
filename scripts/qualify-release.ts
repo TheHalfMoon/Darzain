@@ -1,15 +1,18 @@
 // T10 release qualification on this machine. Records, at a clean commit:
-// the environment and every pinned or built artifact by hash, cold-launch
-// and reopen times against the plan's targets (launch ≤ 5 s, reopen ≤ 2 s),
-// the full test suite, and the browser E2E with a capture of every TCP
-// connection the service's process tree opens (the offline gate: no
-// non-loopback endpoint). It never adjusts a target, and it records what
-// it cannot establish here (a clean Windows profile, a second account, a
-// pinned distributable bundle) rather than implying it.
+// the environment and every pinned or built artifact by hash (native helpers
+// are rebuilt first, so their hashes are the commit's), cold-launch and
+// reopen times against the plan's proposed targets (launch ≤ 5 s, reopen
+// ≤ 2 s), the full test suite, and the browser E2E with two offline checks:
+// every request the browser pages make (recorded by the E2E) and a sampled
+// capture of the TCP connections and listeners of the service's process
+// tree. It never adjusts a target, and it records what it cannot establish
+// here (a clean Windows profile, a second account, a pinned distributable
+// bundle) rather than implying it.
 import { execFileSync, fork, spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { cpus, release, tmpdir, totalmem, type, version } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,7 +32,9 @@ const firstLine = (exe: string) =>
   execFileSync(exe, ["-hide_banner", "-version"], {
     encoding: "utf8",
     windowsHide: true,
-  }).split("\n")[0];
+  })
+    .split("\n")[0]
+    .trim();
 const stats = (ms: number[]) => {
   const sorted = [...ms].sort((a, b) => a - b);
   const at = (q: number) =>
@@ -62,40 +67,80 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, "..");
 const server = path.join(repo, "server", "main.ts");
 const nativeDir = path.join(repo, "native", "procd", "target", "release");
+const npm = (...args: string[]) =>
+  execFileSync("npm", ["run", "-s", ...args], {
+    cwd: repo,
+    stdio: "ignore",
+    shell: true,
+  });
 
-console.log("Building the interface…");
-execFileSync("npm", ["run", "-s", "build"], {
-  cwd: repo,
-  stdio: "ignore",
-  shell: true,
-});
+console.log("Building the native helpers and the interface…");
+npm("build:native");
+npm("build");
+
+// The browser the E2E drives (its default channel, Microsoft Edge).
+function edge() {
+  const candidates = [
+    process.env["ProgramFiles(x86)"],
+    process.env.ProgramFiles,
+  ].map((base) =>
+    base
+      ? path.join(base, "Microsoft", "Edge", "Application", "msedge.exe")
+      : "",
+  );
+  const exe = candidates.find((c) => c && existsSync(c));
+  if (!exe) return null;
+  const versionText = execFileSync(
+    "powershell",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "(Get-Item -LiteralPath $env:YQ_EDGE).VersionInfo.ProductVersion",
+    ],
+    {
+      encoding: "utf8",
+      windowsHide: true,
+      env: { ...process.env, YQ_EDGE: exe },
+    },
+  ).trim();
+  return { version: versionText, sha256: sha256(exe) };
+}
 
 const tools = mediaTools();
 const fonts = JSON.parse(
   await readFile(path.join(repo, "docs/provenance/fonts.json"), "utf8"),
-);
+) as { files: { imported: string; sha256: string }[] }[];
 const environment = {
   commit: git("rev-parse", "HEAD"),
   os: `${type()} ${release()} (${version()})`,
   cpu: cpus()[0]?.model,
   logicalCores: cpus().length,
   memoryGiB: Math.round(totalmem() / 2 ** 30),
-  node: process.version,
+  node: { version: process.version, sha256: sha256(process.execPath) },
+  browser: edge(),
   ffmpeg: { version: firstLine(tools.ffmpeg), sha256: sha256(tools.ffmpeg) },
   ffprobe: { version: firstLine(tools.ffprobe), sha256: sha256(tools.ffprobe) },
   procd: sha256(path.join(nativeDir, "yamakan-procd.exe")),
   aclHelper: sha256(path.join(nativeDir, "yamakan-acl.exe")),
-  fonts: (fonts as { files: { imported: string; sha256: string }[] }[]).flatMap(
-    (family) =>
-      family.files.map((f) => ({
-        file: f.imported,
-        sha256: f.sha256,
-        verified: existsSync(path.join(repo, f.imported))
-          ? sha256(path.join(repo, f.imported)) === f.sha256
-          : false,
-      })),
+  fonts: fonts.flatMap((family) =>
+    family.files.map((f) => ({
+      file: f.imported,
+      sha256: f.sha256,
+      verified: existsSync(path.join(repo, f.imported))
+        ? sha256(path.join(repo, f.imported)) === f.sha256
+        : false,
+    })),
   ),
   interface: treeDigest(path.join(repo, "dist")),
+};
+
+// Every child this run starts, so a failure stops them all.
+const children = new Set<ChildProcess>();
+const track = (child: ChildProcess) => {
+  children.add(child);
+  child.once("exit", () => children.delete(child));
+  return child;
 };
 
 // Starts the service on a workspace and resolves when it is ready.
@@ -103,15 +148,17 @@ let nextPort = 24400;
 function startService(workspace: string) {
   const port = nextPort++;
   const started = performance.now();
-  const child = fork(server, [], {
-    env: {
-      ...process.env,
-      YAMAKAN_WORKSPACE: workspace,
-      YAMAKAN_PORT: String(port),
-    },
-    silent: true,
-    windowsHide: true,
-  });
+  const child = track(
+    fork(server, [], {
+      env: {
+        ...process.env,
+        YAMAKAN_WORKSPACE: workspace,
+        YAMAKAN_PORT: String(port),
+      },
+      silent: true,
+      windowsHide: true,
+    }),
+  );
   let errors = "";
   child.stderr?.on("data", (c) => (errors += String(c)));
   const ready = new Promise<number>((resolve, reject) => {
@@ -134,7 +181,9 @@ function startService(workspace: string) {
     if (child.exitCode !== null) return;
     const done = new Promise((r) => child.once("exit", r));
     child.send("shutdown");
+    const timer = setTimeout(() => child.kill(), 15000);
     await done;
+    clearTimeout(timer);
   };
   return { port, ready, stop };
 }
@@ -145,8 +194,11 @@ try {
   const launches: number[] = [];
   for (let i = 0; i < 5; i++) {
     const service = startService(path.join(scratch, `launch-${i}`));
-    launches.push(await service.ready);
-    await service.stop();
+    try {
+      launches.push(await service.ready);
+    } finally {
+      await service.stop();
+    }
   }
 
   console.log("Reopen…");
@@ -155,7 +207,6 @@ try {
   await store.initialize();
   const project = await store.create("Reopen qualification");
   const media = path.join(scratch, "media");
-  const { mkdir } = await import("node:fs/promises");
   await mkdir(media);
   execFileSync(
     tools.ffmpeg,
@@ -197,52 +248,56 @@ try {
   for (let i = 0; i < 5; i++) {
     const started = performance.now();
     const service = startService(workspace);
-    await service.ready;
-    const token = (
-      await readFile(path.join(workspace, "token"), "utf8")
-    ).trim();
-    const response = await fetch(
-      `http://127.0.0.1:${service.port}/api/v1/call`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+    try {
+      await service.ready;
+      const token = (
+        await readFile(path.join(workspace, "token"), "utf8")
+      ).trim();
+      const response = await fetch(
+        `http://127.0.0.1:${service.port}/api/v1/call`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            apiVersion: 1,
+            operation: "yamakan.project.open",
+            parameters: { projectId: project.id },
+          }),
         },
-        body: JSON.stringify({
-          apiVersion: 1,
-          operation: "yamakan.project.open",
-          parameters: { projectId: project.id },
-        }),
-      },
-    );
-    if (!response.ok) throw new Error(`Open failed: ${response.status}`);
-    reopens.push(performance.now() - started);
-    await service.stop();
+      );
+      if (!response.ok) throw new Error(`Open failed: ${response.status}`);
+      reopens.push(performance.now() - started);
+    } finally {
+      await service.stop();
+    }
   }
 
   console.log("Test suite…");
-  const suite = spawn("npm", ["test"], { cwd: repo, shell: true });
+  const suite = track(spawn("npm", ["test"], { cwd: repo, shell: true }));
   let suiteOut = "";
-  suite.stdout.on("data", (c) => (suiteOut += String(c)));
-  suite.stderr.on("data", (c) => (suiteOut += String(c)));
-  const suiteCode = await new Promise<number>((r) => suite.once("exit", r));
+  suite.stdout?.on("data", (c) => (suiteOut += String(c)));
+  suite.stderr?.on("data", (c) => (suiteOut += String(c)));
+  const suiteCode = await new Promise<number>((r) =>
+    suite.once("exit", (code) => r(code ?? 1)),
+  );
   const count = (key: string) =>
     Number(new RegExp(`ℹ ${key} (\\d+)`).exec(suiteOut)?.[1] ?? NaN);
 
   console.log("Browser E2E with connection capture…");
   const pidFile = path.join(scratch, "service.pid");
-  const e2e = spawn(
-    process.execPath,
-    [path.join(repo, "scripts/browser-e2e.mjs")],
-    {
+  const stopFile = path.join(scratch, "sampler.stop");
+  const e2e = track(
+    spawn(process.execPath, [path.join(repo, "scripts/browser-e2e.mjs")], {
       cwd: repo,
       env: { ...process.env, YAMAKAN_E2E_PID_FILE: pidFile },
-    },
+    }),
   );
   let e2eOut = "";
-  e2e.stdout.on("data", (c) => (e2eOut += String(c)));
-  e2e.stderr.on("data", (c) => (e2eOut += String(c)));
+  e2e.stdout?.on("data", (c) => (e2eOut += String(c)));
+  e2e.stderr?.on("data", (c) => (e2eOut += String(c)));
   let finished = false;
   const e2eCode = new Promise<number>((r) =>
     e2e.once("exit", (code) => {
@@ -250,41 +305,53 @@ try {
       r(code ?? 1);
     }),
   );
-  // Every TCP connection owned by the service and its descendants (procd,
-  // FFmpeg/ffprobe workers), sampled by one long-running sampler every
-  // 0.2 s until the E2E ends: each sample rebuilds the process tree, then
-  // lists the tree's TCP connections. A connection shorter than the sample
-  // gap can still be missed; the receipt states the sample count and gap.
-  const stopFile = path.join(scratch, "sampler.stop");
-  const sampler = spawn(
-    "powershell",
-    [
-      "-NoProfile",
-      "-NonInteractive",
-      "-Command",
+  // The service process and every descendant (procd, FFmpeg/ffprobe
+  // workers): their TCP connections and listeners, sampled by one
+  // long-running sampler. Each sample rebuilds the process tree (about a
+  // second on this machine), so a connection shorter than the gap can be
+  // missed; the receipt states the sample count and mean gap. Paths reach
+  // the sampler through its environment, never inside the command text.
+  // It also stops if this run ends, or after 30 minutes.
+  const sampler = track(
+    spawn(
+      "powershell",
       [
-        `$pidFile = '${pidFile}'; $stop = '${stopFile}'`,
-        "while (-not (Test-Path $stop)) {",
-        "  if (Test-Path $pidFile) {",
-        "    $root = [int](Get-Content $pidFile)",
-        "    $all = Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId",
-        "    $tree = @($root); $grew = $true",
-        "    while ($grew) { $grew = $false; foreach ($p in $all) { if ($tree -contains $p.ParentProcessId -and -not ($tree -contains $p.ProcessId)) { $tree += $p.ProcessId; $grew = $true } } }",
-        "    Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object { $tree -contains $_.OwningProcess } | ForEach-Object { 'E ' + $_.RemoteAddress + ' ' + $_.RemotePort }",
-        "    'S'",
-        "  }",
-        "  Start-Sleep -Milliseconds 200",
-        "}",
-      ].join("\n"),
-    ],
-    { windowsHide: true },
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        [
+          "$deadline = (Get-Date).AddMinutes(30)",
+          "while (-not (Test-Path -LiteralPath $env:YQ_STOP) -and (Get-Process -Id ([int]$env:YQ_PARENT) -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) {",
+          "  if (Test-Path -LiteralPath $env:YQ_PID) {",
+          "    $root = [int](Get-Content -LiteralPath $env:YQ_PID)",
+          "    $all = Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId",
+          "    $tree = @($root); $grew = $true",
+          "    while ($grew) { $grew = $false; foreach ($p in $all) { if ($tree -contains $p.ParentProcessId -and -not ($tree -contains $p.ProcessId)) { $tree += $p.ProcessId; $grew = $true } } }",
+          "    Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object { $tree -contains $_.OwningProcess } | ForEach-Object { 'E ' + $_.LocalAddress + ' ' + $_.RemoteAddress + ' ' + $_.RemotePort + ' ' + $_.State }",
+          "    'S'",
+          "  }",
+          "  Start-Sleep -Milliseconds 200",
+          "}",
+        ].join("\n"),
+      ],
+      {
+        windowsHide: true,
+        env: {
+          ...process.env,
+          YQ_PID: pidFile,
+          YQ_STOP: stopFile,
+          YQ_PARENT: String(process.pid),
+        },
+      },
+    ),
   );
-  const endpoints = new Set<string>();
+  type Seen = { local: string; remote: string; port: number; state: string };
+  const seen = new Map<string, Seen>();
   let samples = 0;
   let firstSample = 0;
   let lastSample = 0;
   let buffer = "";
-  sampler.stdout.on("data", (chunk) => {
+  sampler.stdout?.on("data", (chunk) => {
     buffer += String(chunk);
     const lines = buffer.split(/\r?\n/);
     buffer = lines.pop() ?? "";
@@ -293,32 +360,54 @@ try {
         samples++;
         lastSample = performance.now();
         firstSample ||= lastSample;
-      } else if (line.startsWith("E "))
-        endpoints.add(line.slice(2).split(" ").join(":"));
+      } else if (line.startsWith("E ")) {
+        const [local, remote, port, state] = line.slice(2).split(" ");
+        seen.set(line, { local, remote, port: Number(port), state });
+      }
     }
   });
   const samplerDone = new Promise((r) => sampler.once("exit", r));
   while (!finished) await new Promise((r) => setTimeout(r, 200));
   await writeFile(stopFile, "");
   await samplerDone;
+  const e2eExit = await e2eCode;
   const sampleGapMs =
     samples > 1 ? Math.round((lastSample - firstSample) / (samples - 1)) : null;
-  const e2eExit = await e2eCode;
-  const local = /^(127\.|::1|0\.0\.0\.0|::)/;
-  const external = [...endpoints].filter(
-    (e) => !local.test(e.split(":")[0] ?? ""),
+  const loopback = (a: string) => a === "::1" || a.startsWith("127.");
+  const unspecified = (a: string) => a === "0.0.0.0" || a === "::";
+  const connections = [...seen.values()];
+  // A connection to anything but this machine, and a listener reachable
+  // from anything but this machine.
+  const external = connections.filter(
+    (c) => !loopback(c.remote) && !unspecified(c.remote),
+  );
+  const exposedListeners = connections.filter(
+    (c) => c.state === "Listen" && !loopback(c.local),
   );
   const pageErrors = /pageErrors: \[\]/.test(e2eOut) ? 0 : null;
+  const pageRequests = Number(/pageRequests: (\d+)/.exec(e2eOut)?.[1] ?? NaN);
+  const externalPageRequests = Number(
+    /externalPageRequests: (\d+)/.exec(e2eOut)?.[1] ?? NaN,
+  );
 
   const receipt = {
-    receipt: "yamakan.release-qualification/1",
+    receipt: "yamakan.release-qualification/2",
     measuredAt: new Date().toISOString(),
     environment,
-    targets: { coldLaunchMs: 5000, reopenMs: 2000 },
-    coldLaunch: { ...stats(launches), metTarget: stats(launches).p95 <= 5000 },
+    targets: {
+      note: "Proposed targets from the plan; they are not yet a frozen, founder-approved hardware/fixture policy",
+      coldLaunchMs: 5000,
+      reopenMs: 2000,
+    },
+    coldLaunch: {
+      method:
+        "service start to its ready line on a fresh workspace, 5 runs; the OS file cache is warm after the build (fresh workspace, not a cold OS cache); with 5 runs p95 is the maximum",
+      ...stats(launches),
+      metTarget: stats(launches).p95 <= 5000,
+    },
     reopen: {
       fixture:
-        "one 10 s 1280x720 H.264/AAC clip, 200 saved revisions; service start to project open over the authenticated API",
+        "one 10 s 1280x720 H.264/AAC clip, 200 saved revisions; service start to project open over the authenticated API, 5 runs",
       ...stats(reopens),
       metTarget: stats(reopens).p95 <= 2000,
     },
@@ -331,28 +420,48 @@ try {
     },
     e2e: { exitCode: e2eExit, pageErrors },
     offline: {
-      method:
-        "Get-NetTCPConnection for the service process and every descendant, sampled continuously during the browser E2E (the browser itself is not the product and is not counted; UDP such as DNS lookups is not captured; a connection shorter than the sample gap can be missed)",
-      samples,
-      meanSampleGapMs: sampleGapMs,
-      endpoints: [...endpoints].sort(),
-      external,
-      passed: samples > 0 && external.length === 0,
+      browserPages: {
+        method:
+          "every request made by the journey's browser pages, recorded by the E2E (page.on('request')); allowed: 127.0.0.1, blob: and data:",
+        requests: pageRequests,
+        external: externalPageRequests,
+      },
+      serviceTree: {
+        method:
+          "Get-NetTCPConnection for the service process and every descendant, sampled during the browser E2E; UDP (DNS) is not captured, and a connection shorter than the sample gap can be missed",
+        samples,
+        meanSampleGapMs: sampleGapMs,
+        connections: connections.length,
+        external,
+        exposedListeners,
+      },
+      passed:
+        samples > 0 &&
+        external.length === 0 &&
+        exposedListeners.length === 0 &&
+        externalPageRequests === 0,
+      networkEnabled: true,
     },
     notEstablishedHere: [
       "Clean Windows Profile A (fresh user profile, nothing pre-installed): this run used the development profile",
+      "Network disabled with a packet-level egress capture: this run had the network enabled and sampled TCP only",
       "Second local Windows account denied: established by a restricted-token proxy in tests, not by a real second account",
-      "Pinned distributable bundle (runtime, FFmpeg, fonts, notices) with install, update, rollback and uninstall",
+      "Pinned distributable bundle (runtime, FFmpeg, fonts, notices, SBOM) with install, update, rollback and uninstall",
+      "Release evidence bundle at the release head: MP4 and canonical hashes, ffprobe JSON, sampled frames and title regions, audio report, UI+MCP transcript, process lifecycle reports",
       "Real constrained-volume disk-full runs on Windows and Linux",
       "Native Arabic review of title goldens and interface strings",
-      "10-minute audio-drift fixture and the full preview/export SSIM comparison harness",
+      "10-minute audio-drift fixture and the full preview/export comparison harness",
       "MCP/REST parity replay of journey steps 2-11 with canonical byte comparison",
     ],
   };
   await writeFile(RECEIPT, `${JSON.stringify(receipt, null, 2)}\n`);
   console.log(JSON.stringify(receipt, null, 2));
-  if (suiteCode !== 0 || e2eExit !== 0) process.exitCode = 1;
+  if (suiteCode !== 0 || e2eExit !== 0 || !receipt.offline.passed)
+    process.exitCode = 1;
 } finally {
+  for (const child of children) child.kill();
   closeWorkers();
-  await rm(scratch, { recursive: true, force: true }).catch(() => {});
+  await rm(scratch, { recursive: true, force: true }).catch((e) =>
+    console.error(`Scratch folder not removed: ${(e as Error).message}`),
+  );
 }

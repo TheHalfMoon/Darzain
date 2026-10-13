@@ -156,9 +156,17 @@ try {
   });
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  // Every request any page of the journey makes (the offline gate's
+  // browser side: fonts, previews, media): only loopback or in-page data.
+  const requests = [];
+  const offline = (u) =>
+    /^(blob|data):/.test(u) || new URL(u).hostname === "127.0.0.1";
+  const record = (c) => c.on("request", (r) => requests.push(r.url()));
+  record(context);
   // Without the launch link the page grants nothing: a fresh browser
   // context sees the locked notice and holds no session.
   const stranger = await browser.newContext();
+  record(stranger);
   const strangerPage = await stranger.newPage();
   await strangerPage.goto(url);
   await strangerPage
@@ -635,6 +643,8 @@ try {
   );
   assert.deepEqual(restoreReceipt.quarantined, []);
   assert.deepEqual(errors, []);
+  const external = requests.filter((u) => !offline(u));
+  assert.deepEqual(external, [], "every page request stays on this machine");
   const receipt = {
     runtime:
       process.env.YAMAKAN_BROWSER_CHANNEL ||
@@ -677,6 +687,8 @@ try {
     overlappingAudioOffsets: audioTimes,
     referencePlanHash,
     pageErrors: errors,
+    pageRequests: requests.length,
+    externalPageRequests: requests.filter((u) => !offline(u)).length,
     artifactBytes: bytes.length,
   };
   writeFileSync(join(output, "receipt.json"), JSON.stringify(receipt, null, 2));

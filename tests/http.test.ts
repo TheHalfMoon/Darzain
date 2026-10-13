@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { once } from "node:events";
+import { request } from "node:http";
 import { mediaTools } from "../core/process/workers.ts";
 import {
   describeAccess,
@@ -247,6 +248,28 @@ test("loopback API rejects unauthenticated and cross-site access; restart preser
       headers: { ...headers, Origin: "http://127.0.0.1:1" },
     });
     assert.equal((await badOrigin.json()).error.code, "FORBIDDEN_ORIGIN");
+    // DNS rebinding: a request naming any other host is refused, even with
+    // a valid credential; only the exact 127.0.0.1:<port> is served.
+    const withHost = (host: string) =>
+      new Promise<number>((resolve, reject) => {
+        const req = request(
+          {
+            host: "127.0.0.1",
+            port,
+            path: "/api/v1/tools",
+            headers: { Host: host, Authorization: headers.Authorization },
+          },
+          (res) => {
+            res.resume();
+            resolve(res.statusCode ?? 0);
+          },
+        );
+        req.on("error", reject);
+        req.end();
+      });
+    assert.equal(await withHost(`evil.test:${port}`), 403);
+    assert.equal(await withHost(`localhost:${port}`), 403);
+    assert.equal(await withHost(`127.0.0.1:${port}`), 200);
     const malformedName = await fetch(
       `${origin}/api/v1/projects/${crypto.randomUUID()}/assets`,
       {
