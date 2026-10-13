@@ -1,0 +1,32 @@
+{
+  "tool": "rea-agents 6.3.0 (local npm-cache install; repository morluto/rea)",
+  "command": "node <rea-agents>/scripts/rea.mjs analyze-javascript-application <worktree of main 951f4be5> --json",
+  "date": "2026-10-13",
+  "target": {
+    "commit": "951f4be5e6b5534f1de28d7d4ee3410263cdc244",
+    "rootArtifactSha256": "c9d5efcdc980e209cfffbec81f55c3afd1a5a3ba6ea08b77711b56fd03904cbb"
+  },
+  "evidenceId": "ev_3461efc2e2cc6f2bac96d97369cbce4ac342740c791cd90a3d9a136f267cc612",
+  "result": {
+    "nodes": 1381,
+    "nodeKinds": {
+      "javascript-module": 1159,
+      "artifact": 81,
+      "javascript-asset": 123,
+      "endpoint": 10,
+      "package": 1,
+      "storage": 6,
+      "electron-renderer": 1
+    },
+    "edges": 2539
+  },
+  "confidence": "derived",
+  "limitations": [
+    "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+    "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+    "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+    "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+    "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+  ],
+  "note": "Summary of the 196 MB JSON output, which is not kept. Static, inert parsing: it does not prove runtime behaviour. No native engine (Hopper, Ghidra, IDA) is installed, so native binary analysis was not run."
+}
