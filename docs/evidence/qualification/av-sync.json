@@ -1,0 +1,416 @@
+{
+  "receipt": "yamakan.av-sync-qualification/1",
+  "commit": "8b47b640bb98c3c848684a83a96788d42c132530",
+  "measuredAt": "2026-10-13T07:55:11.902Z",
+  "environment": {
+    "cpu": "13th Gen Intel(R) Core(TM) i5-13420H",
+    "logicalCores": 12,
+    "memoryGiB": 16,
+    "node": "v24.19.0",
+    "ffmpegSha256": "09948d4cdd0650da6ff5a87577469f2a218dc2615ae379f8f734d24c49de0f73"
+  },
+  "fixture": {
+    "description": "599.9 s of 640x360 30000/1001 fps H.264 (a white flash frame every 10 s) and 599.9 s of 44.1 kHz WAV (a 10 ms 1 kHz click at the same instants), each cut into two clips at 300 s on the picture and sound tracks; exported at 30 fps, 48 kHz",
+    "videoSha256": "1461f73487f039e45966ca667cbd1a2423c116dd1fb181e0afbf01ecf142d56c",
+    "audioSha256": "6d13458e847fc8c8f2f176349c6a7d54d7f5157bba88f9815294b75c5867baa0",
+    "exportSha256": "ff6ecaccd2253e5f3b28dd60949a83efcb25b695f56077881e554d188ae0e7ce",
+    "exportSeconds": 10,
+    "exportFrames": 17997
+  },
+  "limits": {
+    "clickOffsetMs": 20,
+    "audioDriftMs": 5,
+    "flashOffsetFrames": 1,
+    "videoDriftFrames": 1
+  },
+  "marks": [
+    {
+      "mark": 0,
+      "instantSeconds": 0,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 1,
+      "instantSeconds": 10,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 2,
+      "instantSeconds": 20,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 3,
+      "instantSeconds": 30,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 4,
+      "instantSeconds": 40,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 5,
+      "instantSeconds": 50,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 6,
+      "instantSeconds": 60,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 7,
+      "instantSeconds": 70,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 8,
+      "instantSeconds": 80,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 9,
+      "instantSeconds": 90,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 10,
+      "instantSeconds": 100,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 11,
+      "instantSeconds": 110,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 12,
+      "instantSeconds": 120,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 13,
+      "instantSeconds": 130,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 14,
+      "instantSeconds": 140,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 15,
+      "instantSeconds": 150,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 16,
+      "instantSeconds": 160,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 17,
+      "instantSeconds": 170,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 18,
+      "instantSeconds": 180,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 19,
+      "instantSeconds": 190,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 20,
+      "instantSeconds": 200,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 21,
+      "instantSeconds": 210,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 22,
+      "instantSeconds": 220,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 23,
+      "instantSeconds": 230,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 24,
+      "instantSeconds": 240,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 25,
+      "instantSeconds": 250,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 26,
+      "instantSeconds": 260,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 27,
+      "instantSeconds": 270,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 28,
+      "instantSeconds": 280,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 29,
+      "instantSeconds": 290,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 30,
+      "instantSeconds": 300,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 31,
+      "instantSeconds": 310,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 32,
+      "instantSeconds": 320,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 33,
+      "instantSeconds": 330,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 34,
+      "instantSeconds": 340,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 35,
+      "instantSeconds": 350,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 36,
+      "instantSeconds": 360,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 37,
+      "instantSeconds": 370,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 38,
+      "instantSeconds": 380,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 39,
+      "instantSeconds": 390,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 40,
+      "instantSeconds": 400,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 41,
+      "instantSeconds": 410,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 42,
+      "instantSeconds": 420,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 43,
+      "instantSeconds": 430,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 44,
+      "instantSeconds": 440,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 45,
+      "instantSeconds": 450,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 46,
+      "instantSeconds": 460,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 47,
+      "instantSeconds": 470,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 48,
+      "instantSeconds": 480,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 49,
+      "instantSeconds": 490,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 50,
+      "instantSeconds": 500,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 51,
+      "instantSeconds": 510,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 52,
+      "instantSeconds": 520,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 53,
+      "instantSeconds": 530,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 54,
+      "instantSeconds": 540,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 55,
+      "instantSeconds": 550,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 56,
+      "instantSeconds": 560,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    },
+    {
+      "mark": 57,
+      "instantSeconds": 570,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 58,
+      "instantSeconds": 580,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 0
+    },
+    {
+      "mark": 59,
+      "instantSeconds": 590,
+      "clickOffsetMs": 5.02,
+      "flashOffsetFrames": 1
+    }
+  ],
+  "checks": [
+    {
+      "check": "every mark has a click and a flash",
+      "measured": "60/60 clicks, 60/60 flashes",
+      "metThreshold": true
+    },
+    {
+      "check": "every click within 20 ms of its instant",
+      "measured": 5.02,
+      "metThreshold": true
+    },
+    {
+      "check": "audio drift (last minus first offset) within 5 ms",
+      "measured": 0,
+      "metThreshold": true
+    },
+    {
+      "check": "every flash within 1 frame of its instant",
+      "measured": 1,
+      "metThreshold": true
+    },
+    {
+      "check": "video drift (last minus first offset) within 1 frame",
+      "measured": 1,
+      "metThreshold": true
+    }
+  ],
+  "passed": true
+}

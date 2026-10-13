@@ -6,8 +6,10 @@
 // continuing the source), exported at 30 fps / 48 kHz, and every flash and
 // click is located in the export. Each click must sit within 20 ms of its
 // instant and each flash within one frame of it, at the start, every
-// intermediate mark and the end; the spread between the first and last
-// offsets (accumulated drift) must stay within 5 ms of audio and one frame
+// intermediate mark and the end; accumulated drift (the mean offset of the
+// last ten marks minus that of the first ten, so that a 29.97 fps source's
+// cycling one-frame phase is not mistaken for drift) must stay within 5 ms
+// of audio and one frame
 // of video. Thresholds are locked here; a breach fails the run. It runs only
 // on a clean tree, so the recorded commit is the code measured.
 import { execFileSync } from "node:child_process";
@@ -180,6 +182,8 @@ try {
   const audio = rows.map((r) => r.clickOffsetMs);
   const video = rows.map((r) => r.flashOffsetFrames);
   const present = (xs: (number | null)[]) => xs.every((x) => x !== null);
+  const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+  const drift = (xs: number[]) => mean(xs.slice(-10)) - mean(xs.slice(0, 10));
   const a = audio as number[];
   const v = video as number[];
   const checks = [
@@ -195,10 +199,9 @@ try {
         present(audio) && a.every((x) => Math.abs(x) <= LIMITS.clickOffsetMs),
     },
     {
-      check: `audio drift (last minus first offset) within ${LIMITS.audioDriftMs} ms`,
-      measured: present(audio) ? Number((a.at(-1)! - a[0]).toFixed(2)) : null,
-      metThreshold:
-        present(audio) && Math.abs(a.at(-1)! - a[0]) <= LIMITS.audioDriftMs,
+      check: `audio drift (mean of the last ten offsets minus the first ten) within ${LIMITS.audioDriftMs} ms`,
+      measured: present(audio) ? Number(drift(a).toFixed(2)) : null,
+      metThreshold: present(audio) && Math.abs(drift(a)) <= LIMITS.audioDriftMs,
     },
     {
       check: `every flash within ${LIMITS.flashOffsetFrames} frame of its instant`,
@@ -208,10 +211,10 @@ try {
         v.every((x) => Math.abs(x) <= LIMITS.flashOffsetFrames),
     },
     {
-      check: `video drift (last minus first offset) within ${LIMITS.videoDriftFrames} frame`,
-      measured: present(video) ? v.at(-1)! - v[0] : null,
+      check: `video drift (mean of the last ten offsets minus the first ten) within ${LIMITS.videoDriftFrames} frame`,
+      measured: present(video) ? Number(drift(v).toFixed(2)) : null,
       metThreshold:
-        present(video) && Math.abs(v.at(-1)! - v[0]) <= LIMITS.videoDriftFrames,
+        present(video) && Math.abs(drift(v)) <= LIMITS.videoDriftFrames,
     },
   ];
   receipt = {
