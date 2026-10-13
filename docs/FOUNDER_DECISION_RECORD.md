@@ -55,9 +55,14 @@ Approval line in the packet's format:
 ## 2026-10-13: continuation to verified completion
 
 - **Source and form:** chat instruction only, in the same interactive session, titled "YAMAKAN — AUTONOMOUS CONTINUATION TO VERIFIED PROJECT COMPLETION". There is no signed approval and no founder GitHub review; none is claimed.
-- **Scope, as stated by the founder:**
-  - continue autonomously through the remaining MVP gates and then the approved roadmap, without routine approval;
-  - treat hostile-media worker **read containment as release-blocking**: an AppContainer is preferred, otherwise a fully restricted token with brokered inputs. A write- or integrity-restricted token alone does not satisfy it. If containment cannot be shown, the affected worker feature stays disabled and the verdict stays NO-GO;
-  - the agent chooses and freezes the **resource and memory policy** (import RSS, decoder/probe memory and time, render memory, disk admission and reserve, job budgets), with scope, fixtures, enforcement and failure behaviour.
+- **Key sentences, verbatim:**
+  - "Treat hostile-media read containment as release-blocking."
+  - "Prefer a correctly implemented Windows AppContainer when feasible. Otherwise use a fully restricted token with restricting SIDs on every relevant access and brokered inputs."
+  - "A write-restricted or low-integrity token alone does not satisfy read containment."
+  - "If containment cannot be demonstrated, leave the affected worker feature disabled and retain NO-GO for release."
+  - "Choose and freeze a measurable resource policy", covering import-service peak RSS, decoder/probe memory and runtime, render memory, disk admission and reserve, and active job/resource budgets.
+  - "Do not falsely attribute an agent-selected policy to an earlier founder decision."
+  - "Do not publish a public release, deploy paid infrastructure, enable paid AI providers, or incur charges without the corresponding explicit authorization."
+- **Scope, summarized by the agent:** continue autonomously through the remaining MVP gates and then the roadmap approved with the plan ([ROADMAP.md](ROADMAP.md) and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), plan `edbaba6c`), without routine approval; the engineering order is the agent's.
 - **Attribution:** values the agent chooses under this delegation are recorded as agent decisions, with their rationale, and are not attributed to approval I or any earlier founder decision.
-- **Not authorized:** purchases, paid services or inference, cloud spend, and a public release. Human- and administrator-only gates stay open until they genuinely run: native Arabic review, clean profiles, a second account, packet capture and disk-full runs.
+- **Not authorized without a further explicit authorization:** purchases, paid services or inference, cloud spend, and a public release. Human- and administrator-only gates stay open until they genuinely run: native Arabic review, clean profiles, a second account, packet capture and disk-full runs.
