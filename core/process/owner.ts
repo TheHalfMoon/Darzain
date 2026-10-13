@@ -26,6 +26,10 @@ export type RunOptions = {
   cwd: string;
   // Upper bound for the whole job's committed memory, in bytes (0 = none).
   memoryBytes?: number;
+  // The only folders the worker may write to (Windows: it runs at low
+  // integrity, and these are labelled low while it runs). Absolute paths of
+  // existing folders; at most 8. Anything else it can only read.
+  writable?: string[];
   signal?: AbortSignal;
   // Called with the worker's PID while it is still suspended (Windows).
   onCreated?: (pid: number) => void | Promise<void>;
@@ -79,7 +83,9 @@ type Pending = {
   created: (pid: number) => void;
   stdout: (chunk: Buffer) => void;
   stderr: (chunk: Buffer) => void;
-  exited: (code: number) => void;
+  // `restored`: the worker's writable folders are back to their default
+  // label and inherited access.
+  exited: (code: number, restored: boolean) => void;
   failed: (message: string) => void;
 };
 
@@ -138,14 +144,14 @@ export class ProcessOwner {
     this.#ready = new Promise<void>((resolve, reject) => {
       const lines = createInterface({ input: child.stdout! });
       lines.on("line", (line) => {
-        const [kind, id, value] = line.split("\t");
+        const [kind, id, value, extra] = line.split("\t");
         if (kind === "READY") return resolve();
         const p = this.#pending.get(id);
         if (!p) return;
         if (kind === "OUT") p.stdout(Buffer.from(value ?? "", "hex"));
         else if (kind === "ERR") p.stderr(Buffer.from(value ?? "", "hex"));
         else if (kind === "CREATED") p.created(Number(value));
-        else if (kind === "EXITED") p.exited(Number(value));
+        else if (kind === "EXITED") p.exited(Number(value), extra !== "0");
         else if (kind === "ERROR")
           p.failed(Buffer.from(value ?? "", "hex").toString("utf8"));
       });
@@ -230,9 +236,18 @@ export class ProcessOwner {
             options.onStderr?.(chunk);
             stderr = (stderr + chunk.toString("utf8")).slice(-limit);
           },
-          exited: (exitCode) => {
+          exited: (exitCode, restored) => {
             settle();
-            resolve(exitCode);
+            // A folder the worker left in a state procd could not undo is
+            // reported, never ignored: the run fails with the reason.
+            if (restored) resolve(exitCode);
+            else
+              reject(
+                new CommandError(
+                  "RECOVERY_REQUIRED",
+                  "A worker's folder could not be restored to the workspace's access after it ran.",
+                ),
+              );
           },
           failed: (message) => {
             settle();
@@ -253,6 +268,8 @@ export class ProcessOwner {
             hex(executable),
             hex(path.resolve(options.cwd)),
             String(options.memoryBytes ?? 0),
+            String(options.writable?.length ?? 0),
+            ...(options.writable ?? []).map((d) => hex(path.resolve(d))),
             String(options.args.length),
             ...options.args.map(hex),
           ].join("\t"),

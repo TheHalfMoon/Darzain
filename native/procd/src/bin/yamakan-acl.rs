@@ -38,6 +38,7 @@ type Psid = *mut c_void;
 const SE_FILE_OBJECT: i32 = 1;
 const OWNER_SECURITY_INFORMATION: u32 = 0x0000_0001;
 const DACL_SECURITY_INFORMATION: u32 = 0x0000_0004;
+const LABEL_SECURITY_INFORMATION: u32 = 0x0000_0010;
 const PROTECTED_DACL_SECURITY_INFORMATION: u32 = 0x8000_0000;
 const SE_DACL_PROTECTED: u16 = 0x1000;
 const ACL_REVISION: u32 = 2;
@@ -465,6 +466,32 @@ fn secure(kind: &str, path: &str) {
     }
     if !take_ownership(Path::new(path), &mut sids[0]) {
         fail("could not take ownership", ERROR_ACCESS_DENIED);
+    }
+    if kind == "dir" {
+        // Integrity labels a worker run left behind (procd ended without
+        // restoring them) are cleared throughout: back to the default.
+        let mut empty = vec![0u64; 2];
+        if unsafe { InitializeAcl(empty.as_mut_ptr() as *mut c_void, 16, ACL_REVISION) } == 0 {
+            fail("InitializeAcl", unsafe { GetLastError() });
+        }
+        let code = unsafe {
+            TreeResetNamedSecurityInfoW(
+                name.as_mut_ptr(),
+                SE_FILE_OBJECT,
+                LABEL_SECURITY_INFORMATION,
+                null_mut(),
+                null_mut(),
+                null_mut(),
+                empty.as_mut_ptr() as *mut c_void,
+                0,
+                null_mut(),
+                PROGRESS_INVOKE_NEVER,
+                null_mut(),
+            )
+        };
+        if code != 0 {
+            fail("clearing integrity labels", code);
+        }
     }
     // The reset can report success without reaching every object: check.
     let root = read_security(Path::new(path)).unwrap_or_else(|code| fail("GetNamedSecurityInfo", code));

@@ -130,7 +130,11 @@ test("project import, scene, timeline, title, audio, render and reopen preserve 
   assert.equal(plan.revision, saved.revision);
   assert.ok(plan.titles, "the title is compiled into the plan");
   assert.equal(progress, 1);
-  assert.match(output, /render\.partial\.mp4$/);
+  // The service's copy of what the worker wrote; the worker's file is gone.
+  assert.match(output, /render\.mp4$/);
+  await assert.rejects(
+    access(path.join(path.dirname(output), "worker", "render.partial.mp4")),
+  );
   const out = await readFile(output);
   assert.ok(out.length > 1000);
   const second = new ProjectStore(root);
@@ -294,6 +298,7 @@ test("cancellation during rendering leaves no partial output", async () => {
         "exports",
         jobId,
         "attempt-1",
+        "worker",
         "render.partial.mp4",
       ),
     ),

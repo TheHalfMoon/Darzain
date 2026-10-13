@@ -156,3 +156,17 @@ test(
     assert.equal((await describeAccess(object)).aces.length, 3);
   },
 );
+
+test(
+  "integrity labels left below a workspace are cleared when it is made private again",
+  { skip: process.platform !== "win32" && "Windows labels" },
+  async () => {
+    const { workspace } = await folder();
+    const leftover = path.join(workspace, "projects", "sub");
+    await restrictToOwner(workspace, "dir");
+    icacls(leftover, "/setintegritylevel", "(OI)(CI)low");
+    assert.match(icacls(leftover).toString(), /Low Mandatory Level/);
+    await restrictToOwner(workspace, "dir");
+    assert.doesNotMatch(icacls(leftover).toString(), /Mandatory Level/);
+  },
+);
