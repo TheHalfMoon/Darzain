@@ -19,6 +19,8 @@ await backupWorkspace(
     backupDatabase: async (destination: string) => {
       await store.backupDatabase(destination);
       process.send?.("copied");
+      // Stay alive, mid-backup, until killed.
+      setInterval(() => {}, 1000);
       await new Promise(() => {});
     },
   },
