@@ -8,7 +8,8 @@
 // within 20 ms, and the file is H.264/AAC, 30/1, faststart, the right
 // length. Negative fixtures — the same timeline with the title dropped,
 // moved or reworded, clips reordered, layers swapped, the timeline cut short
-// or the audio late — must each fail the same expectation.
+// or the audio late, or a 25 fps source at the wrong offset — must each
+// fail the same expectation.
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
