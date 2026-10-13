@@ -157,10 +157,12 @@ try {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   // Every request any page of the journey makes (the offline gate's
-  // browser side: fonts, previews, media): only loopback or in-page data.
+  // browser side: fonts, previews, media): only loopback, in-page data, or
+  // the browser's own built-in pages (its download panel, for example).
   const requests = [];
   const offline = (u) =>
-    /^(blob|data):/.test(u) || new URL(u).hostname === "127.0.0.1";
+    /^(blob|data|about|edge|chrome):/.test(u) ||
+    new URL(u).hostname === "127.0.0.1";
   const record = (c) => c.on("request", (r) => requests.push(r.url()));
   record(context);
   // Without the launch link the page grants nothing: a fresh browser

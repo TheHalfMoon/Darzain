@@ -422,7 +422,7 @@ try {
     offline: {
       browserPages: {
         method:
-          "every request made by the journey's browser pages, recorded by the E2E (page.on('request')); allowed: 127.0.0.1, blob: and data:",
+          "every request made by the journey's browser pages, recorded by the E2E (page.on('request')); allowed: 127.0.0.1, blob:, data:, and the browser's own built-in pages (about:, edge:, chrome:, such as its download panel), which are not network requests",
         requests: pageRequests,
         external: externalPageRequests,
       },
