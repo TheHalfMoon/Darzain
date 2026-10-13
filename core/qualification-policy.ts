@@ -4,9 +4,9 @@
 // Approved by the founder on 2026-10-13 (approval I; scope and source in
 // docs/FOUNDER_DECISION_RECORD.md): the plan's proposed performance
 // targets, frozen as hard thresholds on the stated hardware profile and
-// fixtures. It freezes no memory or resource ceiling. Qualification scripts read their thresholds from here; a
-// threshold is never adjusted to pass. A change needs a new policy version
-// and a new approval.
+// fixtures. It freezes no memory or resource ceiling. Qualification scripts
+// read their thresholds from here; a threshold is never adjusted to pass. A
+// change needs a new policy version and a new approval.
 export const QUALIFICATION_POLICY = Object.freeze({
   policy: "yamakan.qualification-policy/v1",
   approved: "2026-10-13, founder (approval I)",
