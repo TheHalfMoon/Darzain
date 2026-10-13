@@ -1,8 +1,8 @@
 // A/V synchronisation over a ten-minute export (docs/E2E_ACCEPTANCE.md step
 // 8: "audio onset within 20 ms and no accumulating drift on a 10-minute
-// fixture"). The source is 600 s of 29.97 fps (30000/1001) video with
-// 44.1 kHz audio: every 10 s one white flash frame and a 10 ms click mark
-// the same instant. It is imported, cut into two clips at 300 s (the second
+// fixture"). The sources are 600 s of 29.97 fps (30000/1001) video and
+// 600 s of 44.1 kHz audio: every 10 s a white flash frame and a 10 ms click
+// mark the same instant. Both are imported and cut into two clips at 300 s (the second
 // continuing the source), exported at 30 fps / 48 kHz, and every flash and
 // click is located in the export. Each click must sit within 20 ms of its
 // instant and each flash within one frame of it, at the start, every
@@ -44,53 +44,59 @@ const sha256 = (b: Buffer) => createHash("sha256").update(b).digest("hex");
 const root = await mkdtemp(path.join(tmpdir(), "yamakan-avsync-"));
 let receipt: Record<string, unknown>;
 try {
-  const source = path.join(root, "sync-600s.mp4");
+  // Picture and sound as separate media, as the timeline carries them: a
+  // video clip's own sound is not rendered (sound comes from sound-track
+  // clips of audio assets).
+  const video = path.join(root, "flash-600s.mp4");
   ffmpeg([
     "-f",
     "lavfi",
     "-i",
     "color=c=0x202020:s=640x360:r=30000/1001:d=600,drawbox=x=0:y=0:w=640:h=360:color=white:t=fill:enable='lt(mod(t\\,10)\\,0.03)'",
-    "-f",
-    "lavfi",
-    "-i",
-    "aevalsrc='if(lt(mod(t\\,10)\\,0.01)\\,0.8*sin(2*PI*1000*t)\\,0)':s=44100:d=600",
     "-pix_fmt",
     "yuv420p",
     "-c:v",
     "libx264",
     "-preset",
     "ultrafast",
-    "-c:a",
-    "aac",
-    "-shortest",
-    source,
+    video,
   ]);
-  const sourceBytes = await readFile(source);
+  const sound = path.join(root, "click-600s.wav");
+  ffmpeg([
+    "-f",
+    "lavfi",
+    "-i",
+    "aevalsrc='if(lt(mod(t\\,10)\\,0.01)\\,0.8*sin(2*PI*1000*t)\\,0)':s=44100:d=600",
+    sound,
+  ]);
+  const videoBytes = await readFile(video);
+  const audioBytes = await readFile(sound);
 
   const store = new ProjectStore(path.join(root, "workspace"));
   await store.initialize();
   const supervisor = new JobSupervisor(store);
   await supervisor.start();
   const created = await store.create("A/V sync");
-  const imported = await store.importAsset(
-    created.id,
-    "sync-600s.mp4",
-    sourceBytes,
-  );
+  const picture = (
+    await store.importAsset(created.id, "flash-600s.mp4", videoBytes)
+  ).asset;
+  const click = (
+    await store.importAsset(created.id, "click-600s.wav", audioBytes)
+  ).asset;
   const head = await store.load(created.id);
-  const asset = imported.asset;
-  // A video clip carries its own sound; both edits are on the picture track.
-  const [picture] = head.tracks;
+  const [pictureTrack, soundTrack] = head.tracks;
   const half = 9000;
-  const total = Math.min(asset.durationFrames, 18000);
+  const total = Math.min(picture.durationFrames, click.durationFrames, 18000);
+  // Two clips per track, cut at 300 s, the second continuing the source.
   const clip = (
     trackId: string,
+    assetId: string,
     startFrame: number,
     durationFrames: number,
   ) => ({
     id: crypto.randomUUID(),
     trackId,
-    assetId: asset.id,
+    assetId,
     startFrame,
     durationFrames,
     sourceFrame: startFrame,
@@ -102,8 +108,10 @@ try {
       width: 640,
       height: 360,
       clips: [
-        clip(picture.id, 0, half),
-        clip(picture.id, half, total - half),
+        clip(pictureTrack.id, picture.id, 0, half),
+        clip(pictureTrack.id, picture.id, half, total - half),
+        clip(soundTrack.id, click.id, 0, half),
+        clip(soundTrack.id, click.id, half, total - half),
       ],
     },
     head.revision,
@@ -215,8 +223,9 @@ try {
     },
     fixture: {
       description:
-        "600 s, 640x360, 30000/1001 fps H.264 with 44.1 kHz AAC; a white flash frame and a 10 ms 1 kHz click every 10 s; cut into two clips at 300 s; exported at 30 fps, 48 kHz",
-      sourceSha256: sha256(sourceBytes),
+        "600 s of 640x360 30000/1001 fps H.264 (a white flash frame every 10 s) and 600 s of 44.1 kHz WAV (a 10 ms 1 kHz click at the same instants), each cut into two clips at 300 s on the picture and sound tracks; exported at 30 fps, 48 kHz",
+      videoSha256: sha256(videoBytes),
+      audioSha256: sha256(audioBytes),
       exportSha256: sha256(exported),
       exportSeconds: Math.round(exportSeconds * 10) / 10,
       exportFrames: frameCount,
