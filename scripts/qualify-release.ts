@@ -251,32 +251,58 @@ try {
     }),
   );
   // Every TCP connection owned by the service and its descendants (procd,
-  // FFmpeg/ffprobe workers), sampled until the E2E ends.
-  const probe = (pid: number) =>
-    execFileSync(
-      "powershell",
+  // FFmpeg/ffprobe workers), sampled by one long-running sampler every
+  // 0.2 s until the E2E ends: each sample rebuilds the process tree, then
+  // lists the tree's TCP connections. A connection shorter than the sample
+  // gap can still be missed; the receipt states the sample count and gap.
+  const stopFile = path.join(scratch, "sampler.stop");
+  const sampler = spawn(
+    "powershell",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
       [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        `$all = Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId; $tree = @(${pid}); $grew = $true; while ($grew) { $grew = $false; foreach ($p in $all) { if ($tree -contains $p.ParentProcessId -and -not ($tree -contains $p.ProcessId)) { $tree += $p.ProcessId; $grew = $true } } }; Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object { $tree -contains $_.OwningProcess } | ForEach-Object { "$($_.RemoteAddress) $($_.RemotePort) $($_.State)" }`,
-      ],
-      { encoding: "utf8", windowsHide: true },
-    );
+        `$pidFile = '${pidFile}'; $stop = '${stopFile}'`,
+        "while (-not (Test-Path $stop)) {",
+        "  if (Test-Path $pidFile) {",
+        "    $root = [int](Get-Content $pidFile)",
+        "    $all = Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId",
+        "    $tree = @($root); $grew = $true",
+        "    while ($grew) { $grew = $false; foreach ($p in $all) { if ($tree -contains $p.ParentProcessId -and -not ($tree -contains $p.ProcessId)) { $tree += $p.ProcessId; $grew = $true } } }",
+        "    Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object { $tree -contains $_.OwningProcess } | ForEach-Object { 'E ' + $_.RemoteAddress + ' ' + $_.RemotePort }",
+        "    'S'",
+        "  }",
+        "  Start-Sleep -Milliseconds 200",
+        "}",
+      ].join("\n"),
+    ],
+    { windowsHide: true },
+  );
   const endpoints = new Set<string>();
   let samples = 0;
-  while (!finished) {
-    await new Promise((r) => setTimeout(r, 500));
-    if (!existsSync(pidFile)) continue;
-    const pid = Number(readFileSync(pidFile, "utf8"));
-    try {
-      for (const line of probe(pid).split(/\r?\n/).filter(Boolean))
-        endpoints.add(line.split(" ").slice(0, 2).join(":"));
-      samples++;
-    } catch {
-      // The tree is gone between listing and querying; the next sample counts.
+  let firstSample = 0;
+  let lastSample = 0;
+  let buffer = "";
+  sampler.stdout.on("data", (chunk) => {
+    buffer += String(chunk);
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (line === "S") {
+        samples++;
+        lastSample = performance.now();
+        firstSample ||= lastSample;
+      } else if (line.startsWith("E "))
+        endpoints.add(line.slice(2).split(" ").join(":"));
     }
-  }
+  });
+  const samplerDone = new Promise((r) => sampler.once("exit", r));
+  while (!finished) await new Promise((r) => setTimeout(r, 200));
+  await writeFile(stopFile, "");
+  await samplerDone;
+  const sampleGapMs =
+    samples > 1 ? Math.round((lastSample - firstSample) / (samples - 1)) : null;
   const e2eExit = await e2eCode;
   const local = /^(127\.|::1|0\.0\.0\.0|::)/;
   const external = [...endpoints].filter(
@@ -306,8 +332,9 @@ try {
     e2e: { exitCode: e2eExit, pageErrors },
     offline: {
       method:
-        "Get-NetTCPConnection for the service process and every descendant, sampled every 0.5 s during the browser E2E (the browser itself is not the product and is not counted)",
+        "Get-NetTCPConnection for the service process and every descendant, sampled continuously during the browser E2E (the browser itself is not the product and is not counted; UDP such as DNS lookups is not captured; a connection shorter than the sample gap can be missed)",
       samples,
+      meanSampleGapMs: sampleGapMs,
       endpoints: [...endpoints].sort(),
       external,
       passed: samples > 0 && external.length === 0,
