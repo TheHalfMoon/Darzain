@@ -46,8 +46,8 @@ Approval line in the packet's format:
 
   The approval also covers the hardware profile and the fixtures stated in that file.
 
-- **Not approved:**
+- **Offered but not selected** in the founder's answer, so not approved:
   - treating worker read containment as ship-blocking;
-  - the proposed engineering order;
-  - any memory or resource ceiling. The 300 MiB large-import ceiling in `scripts/qualify-large-import.mjs` is a proposed value, not part of policy v1.
+  - the proposed engineering order.
+- **Not covered** by the question or the answer: any memory or resource ceiling. The 300 MiB large-import ceiling in `scripts/qualify-large-import.mjs` is a proposed value, not part of policy v1.
 - **Change rule:** a threshold is never adjusted to pass. A change needs a new policy version and a new founder approval.

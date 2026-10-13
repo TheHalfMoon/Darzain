@@ -1,6 +1,6 @@
 # Yamakan offline MVP — release proposal (T10)
 
-**Verdict: NO-GO for release.** T1–T9 are merged with independent review and exact-head CI, and every gate measured on this machine passes its proposed target. But the [MVP acceptance](E2E_ACCEPTANCE.md) requires every row to pass on the exact release commit **and artifact hashes, on clean Windows Profile A**. Several rows need a pinned distributable bundle, a clean profile, a second account, a native Arabic reviewer, harnesses that do not exist yet, or founder approval of a frozen performance policy. This document is the gate-by-gate account, for the founder's ship decision.
+**Verdict: NO-GO for release.** T1–T9 are merged with independent review and exact-head CI, and every gate measured on this machine passes its threshold (frozen for performance; proposed for memory). But the [MVP acceptance](E2E_ACCEPTANCE.md) requires every row to pass on the exact release commit **and artifact hashes, on clean Windows Profile A**. Several rows need a pinned distributable bundle, a clean profile, a second account, a native Arabic reviewer, harnesses that do not exist yet, or founder approval of a frozen performance policy. This document is the gate-by-gate account, for the founder's ship decision.
 
 **Measured at commit `df3b11c1`:** receipt [`docs/evidence/qualification/t10-release.json`](evidence/qualification/t10-release.json), produced by `npm run qualify:release` on a clean tree. The run rebuilds the native helpers and the interface before hashing. The release run must be repeated at the exact release head.
 
@@ -38,7 +38,7 @@ Status:
 | --------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1 launch        | Partial   | Launch time, offline evidence above; OS, Node, Edge, FFmpeg, ffprobe, native helpers, fonts and interface recorded by version and hash. Missing: a fresh Windows profile, a run with the network disabled plus packet capture, and a pinned local bundle (FFmpeg is the host's winget install) |
 | 2 create        | Met (dev) | English and Arabic interface E2E; one command registry behind REST, CLI, MCP and the SDK (`tests/command.test.ts`, `tests/mcp.test.ts`, the CLI in `tests/http.test.ts`)                                                                                                                       |
-| 3 import        | Partial   | Image, CFR video, VFR video (original retained, CFR derivative with provenance), WAV, and the 2.24 GB import within the memory bound. Missing: an MP3 fixture, and a separately measured decoder bound                                                                                         |
+| 3 import        | Partial   | Image, CFR video, VFR video (original retained, CFR derivative with provenance), WAV, and the 2.24 GB import within the proposed 300 MiB ceiling (not frozen; founder item 2). Missing: an MP3 fixture, and a separately measured decoder bound                                                |
 | 4 scenes        | Partial   | Scene and camera edits in the E2E; camera metadata labelled as intent. Missing: a three-scene ordered fixture that is reopened (the fixtures use one scene)                                                                                                                                    |
 | 5 edit          | Met (dev) | The ten-operation fixture with canonical byte parity between the UI path and commands; failed batch commits nothing; stale undo conflicts; per-writer undo (T6); overlapping audio in the E2E                                                                                                  |
 | 6 Arabic        | Partial   | Typography goldens and ASS-injection tests (T7); bidi isolation and Arabic-Indic digits (T8b). Missing: **native Arabic review** of the goldens and interface strings                                                                                                                          |
@@ -123,10 +123,11 @@ Recommendation: treat read containment as a ship-blocking candidate for the foun
 
 **Founder or administrator only:**
 
-1. ~~Approval of a frozen hardware/fixture/threshold policy~~: approved 2026-10-13 and recorded in `core/qualification-policy.ts`.
-2. A clean Windows Profile A run of the whole journey with the bundle and the network disabled, plus a packet-level egress capture (administrator).
-3. A real second Windows account denied the workspace, and a restore on a second clean profile.
-4. Native Arabic review of the T7 title goldens and the T8b/T9 interface strings, including the choice of digits.
-5. Real constrained-volume disk-full runs.
-6. A decision on worker read containment (an AppContainer or a fully restricted token; above).
-7. The artifact-bound ship decision, after an independent release review of the exact release commit.
+1. ~~Approval of a frozen hardware/fixture/threshold policy~~: approved 2026-10-13 for the performance targets, in `core/qualification-policy.ts` and the [founder decision record](FOUNDER_DECISION_RECORD.md#2026-10-13-performance-targets-frozen-approval-i).
+2. Freezing a resource policy: the import RSS ceiling (proposed 300 MiB) and a decoder memory bound. Approval I did not cover it, so the step 3 row cannot pass until it is frozen.
+3. A clean Windows Profile A run of the whole journey with the bundle and the network disabled, plus a packet-level egress capture (administrator).
+4. A real second Windows account denied the workspace, and a restore on a second clean profile.
+5. Native Arabic review of the T7 title goldens and the T8b/T9 interface strings, including the choice of digits.
+6. Real constrained-volume disk-full runs.
+7. A decision on worker read containment (an AppContainer or a fully restricted token; above).
+8. The artifact-bound ship decision, after an independent release review of the exact release commit.
