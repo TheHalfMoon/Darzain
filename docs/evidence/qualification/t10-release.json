@@ -1,0 +1,98 @@
+{
+  "receipt": "yamakan.release-qualification/1",
+  "measuredAt": "2026-10-13T03:28:45.428Z",
+  "environment": {
+    "commit": "80896701271b2ba51dc4d18d8d90e3f675e7fafd",
+    "os": "Windows_NT 10.0.26300 (Windows 11 Home)",
+    "cpu": "13th Gen Intel(R) Core(TM) i5-13420H",
+    "logicalCores": 12,
+    "memoryGiB": 16,
+    "node": "v24.19.0",
+    "ffmpeg": {
+      "version": "ffmpeg version 8.1.1-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers\r",
+      "sha256": "09948d4cdd0650da6ff5a87577469f2a218dc2615ae379f8f734d24c49de0f73"
+    },
+    "ffprobe": {
+      "version": "ffprobe version 8.1.1-full_build-www.gyan.dev Copyright (c) 2007-2026 the FFmpeg developers\r",
+      "sha256": "a6618e99bb58869ded3c6f37b53aa1a8d701c3591dbb7b5b317d47369c112be2"
+    },
+    "procd": "b9b2ff2e2a9de961faf086bdadff5091f35542b89a9ecfcc03423d8e42733b44",
+    "aclHelper": "c108b2357dc7c6e174b9de9e20653392708df31f863718e472226c89bb052c69",
+    "fonts": [
+      {
+        "file": "assets/fonts/IBMPlexSansArabic-Regular.ttf",
+        "sha256": "93ac94c4b3174176d410381b86c19891086a091c3c8da940ca65d85aa6a4f8a4",
+        "verified": true
+      },
+      {
+        "file": "assets/fonts/IBMPlexSansArabic-Bold.ttf",
+        "sha256": "44f73c1db689f2aac357cae39ef439d0705bd700b7d02e8d3f0079cda5a95e5f",
+        "verified": true
+      }
+    ],
+    "interface": {
+      "files": 3,
+      "sha256": "cb15efac18d70c6ce7fb0b0c6f3385fbda99965b79a7ca40cdf096bbb44cdc0a"
+    }
+  },
+  "targets": {
+    "coldLaunchMs": 5000,
+    "reopenMs": 2000
+  },
+  "coldLaunch": {
+    "runs": 5,
+    "p50": 537,
+    "p95": 637,
+    "max": 637,
+    "metTarget": true
+  },
+  "reopen": {
+    "fixture": "one 10 s 1280x720 H.264/AAC clip, 200 saved revisions; service start to project open over the authenticated API",
+    "runs": 5,
+    "p50": 508,
+    "p95": 544,
+    "max": 544,
+    "metTarget": true
+  },
+  "tests": {
+    "exitCode": 0,
+    "total": 203,
+    "pass": 201,
+    "fail": 0,
+    "skipped": 2
+  },
+  "e2e": {
+    "exitCode": 0,
+    "pageErrors": 0
+  },
+  "offline": {
+    "method": "Get-NetTCPConnection for the service process and every descendant, sampled continuously during the browser E2E (the browser itself is not the product and is not counted; UDP such as DNS lookups is not captured; a connection shorter than the sample gap can be missed)",
+    "samples": 10,
+    "meanSampleGapMs": 1167,
+    "endpoints": [
+      "0.0.0.0:0",
+      "127.0.0.1:13696",
+      "127.0.0.1:20872",
+      "127.0.0.1:29457",
+      "127.0.0.1:31111",
+      "127.0.0.1:39868",
+      "127.0.0.1:47148",
+      "127.0.0.1:48016",
+      "127.0.0.1:51288",
+      "127.0.0.1:57555",
+      "127.0.0.1:57557",
+      "127.0.0.1:8867"
+    ],
+    "external": [],
+    "passed": true
+  },
+  "notEstablishedHere": [
+    "Clean Windows Profile A (fresh user profile, nothing pre-installed): this run used the development profile",
+    "Second local Windows account denied: established by a restricted-token proxy in tests, not by a real second account",
+    "Pinned distributable bundle (runtime, FFmpeg, fonts, notices) with install, update, rollback and uninstall",
+    "Real constrained-volume disk-full runs on Windows and Linux",
+    "Native Arabic review of title goldens and interface strings",
+    "10-minute audio-drift fixture and the full preview/export SSIM comparison harness",
+    "MCP/REST parity replay of journey steps 2-11 with canonical byte comparison"
+  ]
+}
