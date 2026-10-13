@@ -2,8 +2,9 @@
 // the environment and every pinned or built artifact by hash (native helpers
 // are rebuilt first, so their hashes are the commit's), cold-launch and
 // reopen times against the frozen qualification policy
-// (core/qualification-policy.ts), the full test suite, and the browser E2E with two offline checks:
-// every request the browser pages make (recorded by the E2E) and a sampled
+// (core/qualification-policy.ts), the full test suite, and the browser E2E
+// with two offline checks: every request the browser pages make (recorded
+// by the E2E) and a sampled
 // capture of the TCP connections and listeners of the service's process
 // tree. It never adjusts a target, and it records what it cannot establish
 // here (a clean Windows profile, a second account, a pinned distributable
@@ -394,7 +395,7 @@ try {
   );
 
   const receipt = {
-    receipt: "yamakan.release-qualification/2",
+    receipt: "yamakan.release-qualification/3",
     measuredAt: new Date().toISOString(),
     environment,
     policy: {
@@ -403,18 +404,22 @@ try {
       hardware: QUALIFICATION_POLICY.hardware,
       coldLaunchP95Ms: LIMITS.coldLaunch.p95Ms,
       reopenP95Ms: LIMITS.reopen.p95Ms,
+      // The measuring machine against the policy's hardware profile.
+      hardwareMatches:
+        environment.memoryGiB === QUALIFICATION_POLICY.hardware.memoryGiB &&
+        String(environment.cpu).includes("i5-13420H"),
     },
     coldLaunch: {
       method:
         "service start to its ready line on a fresh workspace, 5 runs; the OS file cache is warm after the build (fresh workspace, not a cold OS cache); with 5 runs p95 is the maximum",
       ...stats(launches),
-      passed: stats(launches).p95 <= LIMITS.coldLaunch.p95Ms,
+      metThreshold: stats(launches).p95 <= LIMITS.coldLaunch.p95Ms,
     },
     reopen: {
       fixture:
         "one 10 s 1280x720 H.264/AAC clip, 200 saved revisions; service start to project open over the authenticated API, 5 runs",
       ...stats(reopens),
-      passed: stats(reopens).p95 <= LIMITS.reopen.p95Ms,
+      metThreshold: stats(reopens).p95 <= LIMITS.reopen.p95Ms,
     },
     tests: {
       exitCode: suiteCode,
@@ -461,7 +466,14 @@ try {
   };
   await writeFile(RECEIPT, `${JSON.stringify(receipt, null, 2)}\n`);
   console.log(JSON.stringify(receipt, null, 2));
-  if (suiteCode !== 0 || e2eExit !== 0 || !receipt.offline.passed)
+  // A breached threshold fails the run, like a failed test.
+  if (
+    suiteCode !== 0 ||
+    e2eExit !== 0 ||
+    !receipt.offline.passed ||
+    !receipt.coldLaunch.metThreshold ||
+    !receipt.reopen.metThreshold
+  )
     process.exitCode = 1;
 } finally {
   for (const child of children) child.kill();

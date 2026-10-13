@@ -182,13 +182,17 @@ try {
     targets: Object.fromEntries(
       Object.entries(targets).map(([k, t]) => [
         k,
-        { ...t, met: t.measured <= t.target },
+        { ...t, metThreshold: t.measured <= t.target },
       ]),
     ),
-    note: "Targets are the plan's proposed values, measured on this host only; Profile A qualification (T10) repeats this on the reference hardware.",
+    policy: QUALIFICATION_POLICY.policy,
+    note: "Thresholds from the frozen qualification policy (core/qualification-policy.ts), measured on this host; a clean-profile release run repeats this.",
   };
   await writeFile(RECEIPT, `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify({ results, targets: report.targets }, null, 2));
+  // A breached threshold fails the run.
+  if (Object.values(targets).some((t) => t.measured > t.target))
+    process.exitCode = 1;
   store.close();
 } finally {
   closeWorkers();

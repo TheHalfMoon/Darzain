@@ -9,15 +9,17 @@
 export const QUALIFICATION_POLICY = Object.freeze({
   policy: "yamakan.qualification-policy/v1",
   approved: "2026-10-13, founder (approval I)",
-  // Profile A as qualified: the machine every receipt names; a release run
-  // on other hardware must state its own profile against these thresholds.
+  // The qualification hardware profile (the machine the receipts were
+  // measured on; not Profile A, which is a clean Windows user profile). A run
+  // on other hardware is flagged as a mismatch and must state its own.
   hardware: Object.freeze({
     os: "Windows 11 (10.0.26300)",
     cpu: "13th Gen Intel Core i5-13420H, 12 logical cores",
     memoryGiB: 16,
     storage: "512 GB NVMe SSD (WD PC SN740)",
   }),
-  // Each threshold is a p95 over the stated runs of the stated fixture.
+  // Each threshold applies to the p95 (the policy's reading of the plan's
+  // targets) over the stated runs of the stated fixture.
   thresholds: Object.freeze({
     coldLaunch: Object.freeze({
       p95Ms: 5000,
@@ -32,15 +34,17 @@ export const QUALIFICATION_POLICY = Object.freeze({
     referenceStillWarm: Object.freeze({
       p95Ms: 1000,
       fixture:
-        "cached reference frame of a 30 s 1280x720 timeline with video, audio and an Arabic/Latin title (scripts/qualify-preview.ts)",
+        "cached reference frame of a 30 s 1280x720 timeline with video, audio and an Arabic/Latin title; 10 runs, frames 30, 120, 210, 300, 390, 510, 600, 690, 780, 870 (scripts/qualify-preview.ts)",
     }),
     referenceStillCold: Object.freeze({
       p95Ms: 3000,
-      fixture: "uncached reference frame of the same timeline",
+      fixture:
+        "uncached reference frame of the same timeline; 10 runs, the same frames, after one first frame at 450",
     }),
     referenceSegmentCold: Object.freeze({
       p95Ms: 6000,
-      fixture: "uncached 2 s reference segment of the same timeline",
+      fixture:
+        "uncached 2 s (60-frame) reference segment of the same timeline; 5 runs, starting at frames 0, 180, 360, 540, 720",
     }),
     playback720p: Object.freeze({
       minFps: 24,
