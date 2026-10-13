@@ -21,6 +21,18 @@ const client = async () =>
     token: (await readFile(path.join(root, "token"), "utf8")).trim(),
   });
 
+// A mutation retried with the same request ID returns its original result,
+// as over REST (the envelope's requestId). MCP has no envelope, so each tool
+// takes an optional `requestId` argument that is removed before the
+// command's own strict input is validated.
+const REQUEST_ID = {
+  type: "string",
+  minLength: 1,
+  maxLength: 128,
+  pattern: "^[A-Za-z0-9._:-]+$",
+  description:
+    "Optional. Retrying a mutation with the same requestId returns the original result instead of applying it again; reusing it with different arguments fails with IDEMPOTENCY_MISMATCH.",
+};
 // MCP clients commonly restrict tool names to [A-Za-z0-9_-].
 const toolName = (operation: string) => operation.replaceAll(".", "_");
 
@@ -41,13 +53,23 @@ let operations: Map<string, Operation> | null = null;
 async function tools() {
   const catalog = await (await client()).catalog();
   operations = new Map(catalog.tools.map((t) => [toolName(t.name), t.name]));
-  return catalog.tools.map((t) => ({
-    name: toolName(t.name),
-    title: t.name,
-    description: `${t.summary} Requires scope ${t.scope}.`,
-    inputSchema: t.inputSchema,
-    annotations: { readOnlyHint: !t.mutation },
-  }));
+  return catalog.tools.map((t) => {
+    const schema = t.inputSchema as {
+      properties?: Record<string, unknown>;
+    };
+    if (schema.properties && "requestId" in schema.properties)
+      throw new Error(`${t.name} already defines requestId.`);
+    return {
+      name: toolName(t.name),
+      title: t.name,
+      description: `${t.summary} Requires scope ${t.scope}.`,
+      inputSchema: {
+        ...schema,
+        properties: { ...schema.properties, requestId: REQUEST_ID },
+      },
+      annotations: { readOnlyHint: !t.mutation },
+    };
+  });
 }
 
 async function handle(message: Message) {
@@ -76,20 +98,10 @@ async function handle(message: Message) {
     case "tools/list":
       return reply(id, { tools: await tools() });
     case "tools/call": {
-      if (!operations) await tools();
-      const operation = operations!.get(String(params.name));
-      if (!operation) return error(id, -32602, "Unknown tool.");
-      try {
-        const result = await (
-          await client()
-        ).call(operation, (params.arguments ?? {}) as never);
-        return reply(id, {
-          content: [{ type: "text", text: JSON.stringify(result) }],
-        });
-      } catch (e) {
-        if (!(e instanceof YamakanError)) throw e;
-        // Tool failures are results the model can read, not protocol errors.
-        return reply(id, {
+      // Tool failures are results the model can read, not protocol errors;
+      // that includes a refused credential while loading the tool list.
+      const toolError = (e: YamakanError) =>
+        reply(id, {
           isError: true,
           content: [
             {
@@ -102,6 +114,48 @@ async function handle(message: Message) {
             },
           ],
         });
+      try {
+        if (!operations) await tools();
+      } catch (e) {
+        if (e instanceof YamakanError) return toolError(e);
+        throw e;
+      }
+      const operation = operations!.get(String(params.name));
+      if (!operation) return error(id, -32602, "Unknown tool.");
+      const args =
+        params.arguments && typeof params.arguments === "object"
+          ? { ...(params.arguments as Record<string, unknown>) }
+          : {};
+      const requestId = args.requestId;
+      delete args.requestId;
+      // Malformed IDs are refused as over REST, never silently dropped.
+      const valid =
+        requestId === undefined ||
+        (typeof requestId === "string" &&
+          new RegExp(REQUEST_ID.pattern).test(requestId) &&
+          requestId.length <= REQUEST_ID.maxLength);
+      try {
+        if (!valid)
+          throw new YamakanError(
+            "VALIDATION",
+            "Invalid requestId.",
+            false,
+            null,
+          );
+        const result = await (
+          await client()
+        ).call(
+          operation,
+          args as never,
+          // The service validates it like the REST envelope's requestId.
+          requestId === undefined ? undefined : (requestId as string),
+        );
+        return reply(id, {
+          content: [{ type: "text", text: JSON.stringify(result) }],
+        });
+      } catch (e) {
+        if (!(e instanceof YamakanError)) throw e;
+        return toolError(e);
       }
     }
     default:
