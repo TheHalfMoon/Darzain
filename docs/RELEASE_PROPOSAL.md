@@ -1,0 +1,132 @@
+# Yamakan offline MVP — release proposal (T10)
+
+**Verdict: NO-GO for release.** T1–T9 are merged with independent review and exact-head CI, and every gate measured on this machine passes its proposed target. But the [MVP acceptance](E2E_ACCEPTANCE.md) requires every row to pass on the exact release commit **and artifact hashes, on clean Windows Profile A**. Several rows need a pinned distributable bundle, a clean profile, a second account, a native Arabic reviewer, harnesses that do not exist yet, or founder approval of a frozen performance policy. This document is the gate-by-gate account, for the founder's ship decision.
+
+**Measured at commit `df3b11c1`:** receipt [`docs/evidence/qualification/t10-release.json`](evidence/qualification/t10-release.json), produced by `npm run qualify:release` on a clean tree. The run rebuilds the native helpers and the interface before hashing. The release run must be repeated at the exact release head.
+
+## Measured on this machine (development profile, network enabled)
+
+**Machine:** Windows 11 Home 10.0.26300, Node 24.19 and Microsoft Edge 155.0.4283.45 (both recorded by hash), FFmpeg 8.1.1 (gyan.dev full build); all hashes are in the receipt.
+
+The launch and reopen targets are the plan's proposed ones. [E2E_ACCEPTANCE](E2E_ACCEPTANCE.md) requires a frozen hardware/fixture/threshold policy before a row can pass, and freezing it is a founder approval (approval I). Until then the ✓ below means "met the proposed target", not "passed the gate".
+
+| Measure                                                                                                                    | Result                                                                                                           | Proposed target                      |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Cold launch: service start to ready on a fresh workspace, 5 runs (warm OS file cache; with 5 runs p95 is the maximum)      | p50 394 ms, p95 460 ms                                                                                           | ≤ 5 s ✓                              |
+| Reopen: service start to project open over the API; one 10 s 720p clip, 200 revisions; 5 runs                              | p50 456 ms, p95 492 ms                                                                                           | ≤ 2 s ✓                              |
+| Test suite                                                                                                                 | 203 tests: 201 pass, 2 POSIX-only skips                                                                          | all pass ✓                           |
+| Browser E2E (Edge): full journey, Arabic interface, keyboard backup, launch-link session, other-port refusal, tool catalog | passes, 0 page errors                                                                                            | 0 ✓                                  |
+| Pinned fonts                                                                                                               | both IBM Plex Sans Arabic files match the ledger hashes                                                          | ✓                                    |
+| Earlier receipts                                                                                                           | ≥ 2 GiB import peak 154 MiB (T4b); reference preview: cold frame p95 410 ms, warm 2 ms, 2 s segment 894 ms (T8a) | ≤ 300 MiB ✓; ≤ 3 s / ≤ 1 s / ≤ 6 s ✓ |
+
+### Offline evidence (two checks, network enabled)
+
+- **Browser pages.** The E2E records every request any page of the journey makes and asserts that each one is to 127.0.0.1, in-page data (`blob:`, `data:`), or the browser's own built-in pages (`edge:`, for example its download panel). Result: 142 requests, 0 external. This covers fonts, previews and media loaded by the interface. The page's Content-Security-Policy (`default-src 'self'`, `connect-src 'self'`) restricts the same thing.
+- **Service process tree.** TCP connections and listeners of the service, procd and every FFmpeg/ffprobe worker, sampled during the E2E. Result: 9 samples about 1.1 s apart; 13 connection records; in the samples taken, 0 to another machine and 0 listeners reachable from another machine.
+  - **What it cannot see:** UDP (DNS), and connections shorter than the sample gap. Short-lived workers may not have been sampled at all. Their real egress control is FFmpeg's `-protocol_whitelist file` on every probe and render.
+- **Not done here:** the gate's "network disabled" run with a packet-level egress capture (for example `pktmon` or firewall auditing), which needs an administrator.
+
+## Journey (E2E_ACCEPTANCE §Complete human and agent journey)
+
+Status:
+
+- **Met (dev):** passes with evidence on this machine's development profile.
+- **Partial:** part of the row has evidence; what is missing is named.
+- **Open:** no evidence yet.
+
+| Step            | Status    | Evidence / what is missing                                                                                                                                                                                                                                                                     |
+| --------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 launch        | Partial   | Launch time, offline evidence above; OS, Node, Edge, FFmpeg, ffprobe, native helpers, fonts and interface recorded by version and hash. Missing: a fresh Windows profile, a run with the network disabled plus packet capture, and a pinned local bundle (FFmpeg is the host's winget install) |
+| 2 create        | Met (dev) | English and Arabic interface E2E; one command registry behind REST, CLI, MCP and the SDK (`tests/command.test.ts`, `tests/mcp.test.ts`, the CLI in `tests/http.test.ts`)                                                                                                                       |
+| 3 import        | Partial   | Image, CFR video, VFR video (original retained, CFR derivative with provenance), WAV, and the 2.24 GB import within the memory bound. Missing: an MP3 fixture, and a separately measured decoder bound                                                                                         |
+| 4 scenes        | Partial   | Scene and camera edits in the E2E; camera metadata labelled as intent. Missing: a three-scene ordered fixture that is reopened (the fixtures use one scene)                                                                                                                                    |
+| 5 edit          | Met (dev) | The ten-operation fixture with canonical byte parity between the UI path and commands; failed batch commits nothing; stale undo conflicts; per-writer undo (T6); overlapping audio in the E2E                                                                                                  |
+| 6 Arabic        | Partial   | Typography goldens and ASS-injection tests (T7); bidi isolation and Arabic-Indic digits (T8b). Missing: **native Arabic review** of the goldens and interface strings                                                                                                                          |
+| 7 preview       | Partial   | Plan-compiled reference preview, stale-revision notice, bounded cache and queue, latency receipt (T8a). Missing: a measurement of 720p playback ≥ 24 fps                                                                                                                                       |
+| 8 export        | Partial   | ffprobe receipt (dimensions, rate, duration, H.264/AAC, faststart) and frame parity with preview (T7/T8a). Missing: the full golden boundary/title-range harness with negative fixtures, and the 10-minute audio-drift fixture                                                                 |
+| 9 cancel        | Partial   | Cancel and completion race; no publication after a winning cancel; owned FFmpeg ends (T5). Missing: a timed assertion of the ≤ 1 s exit target (tests wait up to 5 s), and tests that partial cleanup failures are surfaced and retried                                                        |
+| 10 interruption | Partial   | Hard kills during DB commit, render and every native launch seam leave no orphan; fencing; commit-or-absent; replay returns the original receipt (T2/T4a/T5). Missing: a hard kill during backup, and during VFR conversion (only a graceful stop is tested)                                   |
+| 11 reopen       | Met (dev) | Canonical hash and history survive restart; reopen time above                                                                                                                                                                                                                                  |
+| 12 recovery     | Met (dev) | Damaged database and write-ahead log diagnosed and refused with bytes preserved; damaged media quarantined; job payload quarantine; unsaved draft download; restore to a new root (T5/T9a)                                                                                                     |
+| 13 backup       | Partial   | Online backup during concurrent import/edit/GC restores identical snapshots and media hashes to a new root (T9a). Missing: a restore on a second clean profile                                                                                                                                 |
+| 14 parity       | Open      | MCP covers create, list and error cases on the shared command path. Missing: a replay of steps 2–11 over MCP and REST with canonical byte comparison                                                                                                                                           |
+
+## Negative and fault matrix
+
+| Area                      | Status    | Evidence / what is missing                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Concurrency and replay    | Met (dev) | Two-process CAS, IDEMPOTENCY_MISMATCH, retry after commit (T2)                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Windows publication       | Partial   | One test: a reader holds an object open (without denying sharing) during a deduplicated import (T4b). Missing: sharing-denial and AV-style held handles during staging, save and backup                                                                                                                                                                                                                                                                                            |
+| Disk full                 | Partial   | Injected ENOSPC at import, export and publication seams (T4b/T5); free-space checks for backup and restore (T9a). Missing: real constrained-volume runs on Windows and Linux                                                                                                                                                                                                                                                                                                       |
+| Jobs and GC               | Met (dev) | >10,000-job history with the admission cap, payload quarantine, fencing (T5); GC paused by backup holds (T9a)                                                                                                                                                                                                                                                                                                                                                                      |
+| Media                     | Partial   | Playlist and concat subresources denied, format and protocol whitelists, bounded probes (T4). **Not contained:** see the worker sandbox residuals below. Missing: a hostile corpus (polyglot, image bomb, timestamp discontinuities) with a sentinel file outside the granted inputs                                                                                                                                                                                               |
+| Loopback and auth         | Met (dev) | Session only through the launch link, no cookie; a page on another loopback port is refused in a real browser even holding the real secrets, and its server never receives them; Origin and Fetch Metadata checks; a request naming any other Host is refused even with a valid credential (`tests/http.test.ts`) (T9b). Trust model: any program of the same account, including a compromised worker, can read the `token` and `launch` files                                     |
+| ACL and paths             | Partial   | Owner-only workspace, denied to a restricted token that stands in for another standard account; junctions, links and folders owned by another account refused (T9b). Missing: a **real second Windows account**. Residuals: an elevated administrator can always read; handles another account opened before the first restriction stay open; files below the root owned by another account are taken over; a worker that locks its folder can leave readable copies there (below) |
+| Unknown versions          | Met (dev) | Newer formats inspected, never written (T3)                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Offline and accessibility | Partial   | Offline evidence above; keyboard journey in English and Arabic; localized interface. Missing: network-disabled packet capture, a contrast audit, and localized service errors                                                                                                                                                                                                                                                                                                      |
+| Release and update        | Open      | No bundle, SBOM, installer, update, rollback or uninstall yet                                                                                                                                                                                                                                                                                                                                                                                                                      |
+
+## Worker sandbox (release blocker from T4a) and its residuals
+
+**Resolved in T9c:**
+
+- Workers run with a restricted, low-integrity token. WMI process creation is denied to them, tested against a control that succeeds.
+- Published files carry only the main data stream, in files the service creates.
+
+**Residuals, from [`specs/CURRENT.md`](../specs/CURRENT.md) (T9c):**
+
+- **Reads.** A compromised worker (for example, FFmpeg exploited by a hostile media file) can read everything this account can: the client token and the launch secret, so it could take over the local API or a browser session; `workspace.sqlite`; and every project's media. It also has network access, so it could send all of that elsewhere. **Hostile media is therefore not contained.**
+- **Lockout.** It can lock its own folder against the owner. The run then fails, and the workspace needs an administrator reset before its next start. Until then, copies it left there (token, launch secret, media) can be read by another local account that knows the full path.
+- **Concurrent writes.** Other low-integrity programs of the account can write into a worker's output folder while it runs.
+- **Untested brokers.** Only the listed brokers were tested; Low integrity is not an AppContainer.
+- **Permanent grant.** `grant_owner_full` permanently adds a full-control entry for the user to a folder it labels, where that folder was not already private.
+
+**Ship-blocking candidate.**
+
+- **Reads** are closed only by an AppContainer, or by a fully restricted token (restricting SIDs on every access) with brokered inputs. A write-restricted token does **not** close them: it checks its restricting SIDs on writes only, and reads still go through the enabled user SID.
+- **Lockout** and copies left in a locked folder are closed by a write-restricted token (no WRITE_DAC on its folder) or by either stronger option.
+
+Recommendation: treat read containment as a ship-blocking candidate for the founder's decision, not as optional open work.
+
+## What remains before a ship decision
+
+**Engineering (can be done without the founder):**
+
+1. A pinned distributable bundle with Node runtime, FFmpeg and ffprobe, fonts, notices, an SBOM and artifact hashes, plus install, update, rollback and uninstall.
+2. The release evidence bundle produced at the release head:
+   - MP4 and canonical hashes;
+   - ffprobe JSON;
+   - sampled frames and title regions;
+   - an audio report;
+   - a UI and MCP transcript;
+   - process lifecycle reports.
+3. Harnesses and tests:
+   - MCP/REST parity replay (step 14);
+   - the export golden boundary/title-range comparison with negative fixtures, and the 10-minute audio-drift fixture (step 8);
+   - 720p playback rate (step 7);
+   - an MP3 and three-scene fixture (steps 3–4);
+   - a timed cancel exit and surfaced/retried cleanup failures (step 9);
+   - hard kills during backup and VFR conversion (step 10);
+   - a hostile media corpus with a sentinel file;
+   - sharing-denial and AV-style held-handle runs.
+4. A worker sandbox that contains reads: an AppContainer, or a fully restricted token with brokered inputs. A write-restricted token closes only the lockout. Recommended as ship-blocking.
+5. Harness hygiene: kill whole process trees when an aborted qualification run cleans up (taskkill /T), or make the service exit when its parent disconnects.
+6. Open work recorded in the spec:
+   - backup and restore requests are not replay-safe by request ID;
+   - no retry/discard command for `reconciliationRequired` jobs;
+   - hidden retained VFR originals are never collected;
+   - track overlap is enforced by reducers, not canonical validation;
+   - the CLI and all MCP agents share the `local-client` principal (per-agent identities, which matters for parity and per-writer undo);
+   - undo snapshots consume the revision budget;
+   - no repair path for quarantined media;
+   - the start-up tree check costs about 3.8 s on a 40,000-file workspace.
+
+**Founder or administrator only:**
+
+1. Approval of a frozen hardware/fixture/threshold policy for launch, reopen, preview and playback (approval I). Until then those rows cannot pass.
+2. A clean Windows Profile A run of the whole journey with the bundle and the network disabled, plus a packet-level egress capture (administrator).
+3. A real second Windows account denied the workspace, and a restore on a second clean profile.
+4. Native Arabic review of the T7 title goldens and the T8b/T9 interface strings, including the choice of digits.
+5. Real constrained-volume disk-full runs.
+6. A decision on worker read containment (an AppContainer or a fully restricted token; above).
+7. The artifact-bound ship decision, after an independent release review of the exact release commit.

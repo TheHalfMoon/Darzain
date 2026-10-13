@@ -26,7 +26,8 @@
     "build:native": "cargo build --release --manifest-path native/procd/Cargo.toml",
     "qualify:large-import": "node scripts/qualify-large-import.mjs",
     "qualify:typography": "node scripts/qualify-typography.ts",
-    "qualify:preview": "node scripts/qualify-preview.ts"
+    "qualify:preview": "node scripts/qualify-preview.ts",
+    "qualify:release": "node scripts/qualify-release.ts"
   },
   "dependencies": {
     "react": "18.3.1",
