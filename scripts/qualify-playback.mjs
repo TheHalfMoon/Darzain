@@ -1,0 +1,468 @@
+// 720p playback qualification (frozen policy threshold playback720p:
+// "interactive editor playback of a 720p timeline", ≥ 24 fps). Builds an
+// 18 s 1280x720 timeline (three moving-picture clips with two cuts, an
+// overlapping upper-track clip, a title, a sound clip), opens it in the real
+// editor in Microsoft Edge, presses Play and counts the frames the preview
+// canvas actually shows: on every animation frame the page samples a 16x16
+// block of the canvas and counts content changes (the sources change on
+// every frame). Scenarios: sustained play from the start for 15 s (gated by
+// the threshold); a seek to 5.5 s then 3 s of play across the cut at 6 s; and
+// 10 s of play while an export renders (resource pressure). The seek and
+// pressure scenarios are measured and reported, not gated. A negative
+// control (the same play with the CPU throttled 20x) must measure below the
+// threshold, or the run fails. The receipt also
+// records the WebGL renderer the browser reports, since headless Edge may
+// composite in software. It runs only on a clean tree.
+import { chromium } from "playwright-core";
+import { execFileSync, fork } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpus, tmpdir, totalmem } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { once } from "node:events";
+import { QUALIFICATION_POLICY } from "../core/qualification-policy.ts";
+import { mediaTools } from "../core/process/workers.ts";
+
+const RECEIPT = "docs/evidence/qualification/playback.json";
+const git = (...args) => execFileSync("git", args, { encoding: "utf8" }).trim();
+const dirty = git("status", "--porcelain", "--", ".", `:!${RECEIPT}`);
+if (dirty)
+  throw new Error(`Commit or stash changes before qualifying:\n${dirty}`);
+const MIN_FPS = QUALIFICATION_POLICY.thresholds.playback720p.minFps;
+
+const root = mkdtempSync(join(tmpdir(), "yamakan-playback-"));
+const { ffmpeg } = mediaTools();
+const make = (name, args) => {
+  const file = join(root, name);
+  execFileSync(
+    ffmpeg,
+    ["-hide_banner", "-loglevel", "error", "-y", ...args, file],
+    {
+      windowsHide: true,
+    },
+  );
+  return file;
+};
+// A moving test pattern with a frame marker: an 80x80 box centred at
+// (640, 240), where the sampler reads, whose brightness changes on every
+// frame (the pattern alone does not change everywhere on every frame).
+const moving = (seconds, size = "1280x720") => [
+  "-f",
+  "lavfi",
+  "-i",
+  `testsrc2=size=${size}:rate=30:duration=${seconds}`,
+  "-f",
+  "lavfi",
+  "-i",
+  `color=c=black:s=80x80:r=30:d=${seconds},geq=lum='mod(N*67\\,200)+28':cb=128:cr=128`,
+  "-filter_complex",
+  "[0:v][1:v]overlay=600:200",
+  "-pix_fmt",
+  "yuv420p",
+  "-c:v",
+  "libx264",
+  "-preset",
+  "veryfast",
+  "-g",
+  "60",
+];
+let media;
+try {
+  media = {
+    "a.mp4": make("a.mp4", moving(6)),
+    "b.mp4": make("b.mp4", moving(6)),
+    "c.mp4": make("c.mp4", moving(6)),
+    "overlay.mp4": make("overlay.mp4", moving(4)),
+    "tone.wav": make("tone.wav", [
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=330:duration=18",
+    ]),
+  };
+} catch (e) {
+  rmSync(root, { recursive: true, force: true, maxRetries: 5 });
+  throw e;
+}
+
+const port = 24345;
+const url = `http://127.0.0.1:${port}`;
+const server = fork(
+  fileURLToPath(new URL("../server/main.ts", import.meta.url)),
+  [],
+  {
+    env: {
+      ...Object.fromEntries(
+        Object.entries(process.env).filter(
+          ([k]) => !/^(YAMAKAN|DARZAIN)_/.test(k),
+        ),
+      ),
+      YAMAKAN_WORKSPACE: join(root, "workspace"),
+      YAMAKAN_PORT: String(port),
+    },
+    silent: true,
+    windowsHide: true,
+  },
+);
+let serverError = "";
+server.stderr.on("data", (c) => (serverError += c));
+let browser;
+let receipt;
+try {
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`startup: ${serverError}`)),
+      15000,
+    );
+    server.stdout.on(
+      "data",
+      (c) =>
+        String(c).includes("Yamakan is running") &&
+        (clearTimeout(timer), resolve()),
+    );
+    server.once("exit", (code) =>
+      reject(new Error(`server exited ${code}: ${serverError}`)),
+    );
+  });
+  const token = readFileSync(join(root, "workspace", "token"), "utf8").trim();
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+  const call = async (operation, parameters) => {
+    const r = await fetch(`${url}/api/v1/call`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ apiVersion: 1, operation, parameters }),
+    });
+    const v = await r.json();
+    if (!r.ok) throw new Error(`${operation}: ${JSON.stringify(v.error)}`);
+    return v.result;
+  };
+  const project = await call("yamakan.project.create", {
+    name: "Playback 720p",
+  });
+  const assets = {};
+  for (const [name, file] of Object.entries(media)) {
+    const r = await fetch(`${url}/api/v1/projects/${project.id}/assets`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "X-Asset-Name": name },
+      body: readFileSync(file),
+    });
+    if (!r.ok) throw new Error(`import ${name}: ${await r.text()}`);
+    assets[name] = (await r.json()).asset.id;
+  }
+  const head = await call("yamakan.project.open", { projectId: project.id });
+  const id = () => crypto.randomUUID();
+  const [picture, sound] = head.tracks;
+  const upper = {
+    id: id(),
+    name: "Upper",
+    kind: "video",
+    muted: false,
+    locked: false,
+  };
+  const titles = {
+    id: id(),
+    name: "Titles",
+    kind: "video",
+    muted: false,
+    locked: false,
+  };
+  const clip = (trackId, asset, startFrame, durationFrames, title = null) => ({
+    id: id(),
+    trackId,
+    assetId: asset ? assets[asset] : null,
+    startFrame,
+    durationFrames,
+    sourceFrame: 0,
+    title,
+  });
+  await call("yamakan.project.save", {
+    expectedRevision: head.revision,
+    project: {
+      ...head,
+      width: 1280,
+      height: 720,
+      tracks: [picture, upper, titles, sound],
+      clips: [
+        clip(picture.id, "a.mp4", 0, 180),
+        clip(picture.id, "b.mp4", 180, 180),
+        clip(picture.id, "c.mp4", 360, 180),
+        clip(upper.id, "overlay.mp4", 270, 120),
+        clip(titles.id, null, 60, 240, "المشهد الأول · Opening scene"),
+        clip(sound.id, "tone.wav", 0, 540),
+      ],
+    },
+  });
+
+  browser = await chromium.launch({
+    channel: process.env.YAMAKAN_BROWSER_CHANNEL || "msedge",
+    headless: true,
+  });
+  const page = await (
+    await browser.newContext({ viewport: { width: 1600, height: 1100 } })
+  ).newPage();
+  const launch = readFileSync(join(root, "workspace", "launch"), "utf8").trim();
+  await page.goto(launch);
+  await page.waitForFunction(() => location.hash === "");
+  await page.getByRole("button", { name: "Playback 720p" }).click();
+  await page
+    .getByRole("heading", { name: "Playback 720p", exact: true })
+    .waitFor();
+  const canvas = page.locator("section.preview canvas");
+  await canvas.waitFor();
+  const size = await canvas.evaluate((c) => [c.width, c.height]);
+  if (size[0] !== 1280 || size[1] !== 720)
+    throw new Error(`preview canvas is ${size}`);
+  const renderer = await page.evaluate(() => {
+    const gl = document.createElement("canvas").getContext("webgl");
+    const ext = gl?.getExtension("WEBGL_debug_renderer_info");
+    return ext
+      ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)
+      : gl
+        ? gl.getParameter(gl.RENDERER)
+        : "none";
+  });
+
+  // Records every canvas content change, with the marker's brightness, on
+  // every animation frame until stopped.
+  const startSampler = () =>
+    page.evaluate(() => {
+      const c = document.querySelector("section.preview canvas");
+      const ctx = c.getContext("2d");
+      const state = {
+        changes: [],
+        frames: 0,
+        running: true,
+        last: -1,
+        started: performance.now(),
+      };
+      window.__sampler = state;
+      const tick = (now) => {
+        if (!state.running) return;
+        state.frames++;
+        const d = ctx.getImageData(
+          c.width / 2 - 8,
+          c.height / 3 - 8,
+          16,
+          16,
+        ).data;
+        let h = 0;
+        let red = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          h = (h * 31 + d[i] + d[i + 1] * 3 + d[i + 2] * 7) >>> 0;
+          red += d[i];
+        }
+        if (h !== state.last) state.changes.push([now, red / 256]);
+        state.last = h;
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+  const stopSampler = () =>
+    page.evaluate(() => {
+      window.__sampler.running = false;
+      return {
+        changes: window.__sampler.changes,
+        frames: window.__sampler.frames,
+        started: window.__sampler.started,
+        stopped: performance.now(),
+      };
+    });
+  // The marker's luma is 28 + (67 x frame number mod 200); a change that
+  // shows the next source frame (or one a few frames on) is a frame shown, a
+  // black canvas is not, and anything else (a cut, an overlay starting or
+  // ending) is a new picture but cannot be checked.
+  const luma = (red) => red / 1.164 + 16;
+  const classify = (changes) => {
+    const kinds = { next: 0, skipped: 0, framesSkipped: 0, black: 0, other: 0 };
+    for (let i = 1; i < changes.length; i++) {
+      const now = luma(changes[i][1]);
+      if (now < 22) {
+        kinds.black++;
+        continue;
+      }
+      const before = luma(changes[i - 1][1]) - 28;
+      let step = 0;
+      for (let k = 1; k <= 4 && !step; k++) {
+        const expected = 28 + ((((before + 67 * k) % 200) + 200) % 200);
+        if (Math.abs(now - expected) <= 6) step = k;
+      }
+      if (step === 1) kinds.next++;
+      else if (step > 1) {
+        kinds.skipped++;
+        kinds.framesSkipped += step - 1;
+      } else kinds.other++;
+    }
+    return kinds;
+  };
+  // Seeks (sets the playhead while paused), starts counting, presses Play and
+  // counts for the whole window: play-start latency and any freeze count
+  // against the rate.
+  const playFor = async (from, seconds) => {
+    await page.getByLabel("Playhead").fill(String(from));
+    await page.waitForTimeout(400);
+    const nodeStart = Date.now();
+    await startSampler();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await page.waitForTimeout(seconds * 1000);
+    const sample = await stopSampler();
+    const nodeEnd = Date.now();
+    await page.getByRole("button", { name: "Pause", exact: true }).click();
+    await page.waitForTimeout(300);
+    const t = sample.changes.slice(1).map((c) => c[0]);
+    const kinds = classify(sample.changes);
+    const elapsed = (sample.stopped - sample.started) / 1000;
+    // New pictures shown: every change but a black canvas.
+    const shown = t.length - kinds.black;
+    const fps = shown / elapsed;
+    const windows = [];
+    for (let s = sample.started; s + 1000 <= sample.stopped; s += 1000)
+      windows.push(t.filter((x) => x >= s && x < s + 1000).length);
+    return {
+      fromSeconds: from,
+      seconds,
+      animationFrames: sample.frames,
+      sampledSeconds: Math.round(elapsed * 100) / 100,
+      framesShown: shown,
+      changes: kinds,
+      fps: Math.round(fps * 10) / 10,
+      minOneSecondWindow: Math.min(...windows),
+      // A 30 fps timeline shows 30 new frames a second when nothing drops.
+      droppedEstimate: Math.max(0, Math.round(elapsed * 30 - shown)),
+      window: [nodeStart, nodeEnd],
+    };
+  };
+  const sustained = await playFor(0, 15);
+  // Across the cut at 6 s, counted from the Play press after a seek.
+  const seek = await playFor(4.5, 3);
+  // Resource pressure: exports render back to back for the whole window,
+  // and the receipt records how much of the window they covered.
+  const exports = [];
+  let stopExports = false;
+  const exporting = (async () => {
+    for (let i = 0; !stopExports; i++) {
+      const started = Date.now();
+      const job = await call("yamakan.export.video", {
+        projectId: project.id,
+        idempotencyKey: `pressure-${i}`,
+      });
+      let state = job.state;
+      while (!["COMPLETED", "FAILED", "CANCELLED"].includes(state)) {
+        if (Date.now() - started > 120_000)
+          throw new Error("A pressure export did not finish within 2 minutes.");
+        await new Promise((r) => setTimeout(r, 100));
+        state = (await call("yamakan.job.status", { jobId: job.id })).state;
+      }
+      exports.push({ started, ended: Date.now(), state });
+    }
+  })();
+  // A failure here is rethrown after playback, never left unhandled.
+  let exportError = null;
+  exporting.catch((e) => (exportError = e));
+  // The first export is already rendering when counting starts.
+  await new Promise((r) => setTimeout(r, 1000));
+  const pressure = await playFor(0, 10);
+  stopExports = true;
+  await exporting.catch(() => {});
+  if (exportError) throw exportError;
+  const [w0, w1] = pressure.window;
+  // Only completed exports count as rendering during the window.
+  let covered = 0;
+  for (const e of exports.filter((x) => x.state === "COMPLETED"))
+    covered += Math.max(0, Math.min(e.ended, w1) - Math.max(e.started, w0));
+  const exportStates = {};
+  for (const e of exports)
+    exportStates[e.state] = (exportStates[e.state] ?? 0) + 1;
+  const exportCoverage = Math.round((covered / (w1 - w0)) * 1000) / 1000;
+  // Negative control: the same play with the page's CPU throttled 20x must
+  // measure below the threshold, or the sampler cannot see a slow preview.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 20 });
+  const throttled = await playFor(0, 5);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
+  for (const r of [sustained, seek, pressure, throttled]) delete r.window;
+
+  const checks = [
+    {
+      check: `sustained 720p playback (15 s, two cuts, overlay, title) at ≥ ${MIN_FPS} fps`,
+      measured: sustained.fps,
+      threshold: MIN_FPS,
+      metThreshold: sustained.fps >= MIN_FPS,
+      gated: true,
+    },
+    {
+      check:
+        "seek to 4.5 s, then play across the cut at 6 s (counted from the Play press)",
+      measured: seek.fps,
+      threshold: MIN_FPS,
+      metThreshold: seek.fps >= MIN_FPS,
+      gated: false,
+    },
+    {
+      check: `play while exports render back to back (completed exports covered ${Math.round(exportCoverage * 100)}% of the window)`,
+      measured: pressure.fps,
+      threshold: MIN_FPS,
+      metThreshold: pressure.fps >= MIN_FPS,
+      gated: false,
+    },
+  ];
+  receipt = {
+    receipt: "yamakan.playback-qualification/1",
+    policy: QUALIFICATION_POLICY.policy,
+    commit: git("rev-parse", "HEAD"),
+    measuredAt: new Date().toISOString(),
+    environment: {
+      cpu: cpus()[0]?.model,
+      logicalCores: cpus().length,
+      memoryGiB: Math.round(totalmem() / 1024 ** 3),
+      node: process.version,
+      browser: `${process.env.YAMAKAN_BROWSER_CHANNEL || "msedge"} ${browser.version()} (headless)`,
+      webglRenderer: renderer,
+      ffmpegSha256: createHash("sha256")
+        .update(readFileSync(ffmpeg))
+        .digest("hex"),
+    },
+    fixture:
+      "18 s 1280x720 timeline: three 6 s testsrc2 H.264 clips (cuts at 6 s and 12 s), a 4 s upper-track clip from 9 s, an Arabic/Latin title from 2 s to 10 s, a tone; frames shown counted from canvas content changes and checked against a per-frame marker",
+    sustained,
+    seek,
+    pressure: { ...pressure, exportStates, exportCoverage },
+    negativeControl: {
+      cpuThrottle: 20,
+      ...throttled,
+      detected: throttled.fps < MIN_FPS,
+    },
+    checks,
+    passed:
+      checks.filter((c) => c.gated).every((c) => c.metThreshold) &&
+      throttled.fps < MIN_FPS,
+  };
+} finally {
+  await browser?.close().catch(() => {});
+  if (server.exitCode === null) {
+    const done = once(server, "exit");
+    server.send("shutdown");
+    // A stalled shutdown never hangs the run.
+    const timer = setTimeout(() => server.kill(), 15000);
+    await done;
+    clearTimeout(timer);
+  }
+  rmSync(root, { recursive: true, force: true, maxRetries: 5 });
+}
+writeFileSync(RECEIPT, `${JSON.stringify(receipt, null, 2)}\n`);
+console.log(
+  JSON.stringify(
+    {
+      sustained: receipt.sustained,
+      seek: receipt.seek,
+      pressure: receipt.pressure,
+      passed: receipt.passed,
+    },
+    null,
+    2,
+  ),
+);
+if (!receipt.passed) process.exitCode = 1;
