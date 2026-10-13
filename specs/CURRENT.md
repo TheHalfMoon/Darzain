@@ -188,7 +188,7 @@ T9 exceeds the plan's four-day bound, so it is split at its interface: **T9a** r
 2. ~~Resource policy~~: v2 frozen as an agent decision ([record](../docs/AGENT_DECISION_RECORD.md)); `npm run qualify:resources` and `qualify:large-import` fail on a breach.
 3. MCP/REST parity replay (step 14): landed as `tests/parity.test.ts`; the row stays Partial (gaps listed in the release proposal's row 14). MCP tools now take an optional `requestId`, and a refused credential is a structured tool error.
 4. Export goldens with negative fixtures and the 10-minute audio-drift fixture (step 8).
-5. 720p playback measurement (step 7).
+5. 720p playback measurement (step 7): landed (`npm run qualify:playback`; 29.0 fps sustained against the frozen ≥ 24 fps; the row stays Partial).
 6. Worker read containment (AppContainer preferred) and the hostile-media corpus with a sentinel file.
 7. Backup/restore request replay safety; the open job/recovery defects listed below.
 8. Pinned distributable bundle and release evidence bundle.
