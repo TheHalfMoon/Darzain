@@ -47,7 +47,7 @@ try {
   // Picture and sound as separate media, as the timeline carries them: a
   // video clip's own sound is not rendered (sound comes from sound-track
   // clips of audio assets).
-  const video = path.join(root, "flash-600s.mp4");
+  const videoFile = path.join(root, "flash-600s.mp4");
   ffmpeg([
     "-f",
     "lavfi",
@@ -59,18 +59,18 @@ try {
     "libx264",
     "-preset",
     "ultrafast",
-    video,
+    videoFile,
   ]);
-  const sound = path.join(root, "click-600s.wav");
+  const soundFile = path.join(root, "click-600s.wav");
   ffmpeg([
     "-f",
     "lavfi",
     "-i",
     "aevalsrc='if(lt(mod(t\\,10)\\,0.01)\\,0.8*sin(2*PI*1000*t)\\,0)':s=44100:d=600",
-    sound,
+    soundFile,
   ]);
-  const videoBytes = await readFile(video);
-  const audioBytes = await readFile(sound);
+  const videoBytes = await readFile(videoFile);
+  const audioBytes = await readFile(soundFile);
 
   const store = new ProjectStore(path.join(root, "workspace"));
   await store.initialize();
