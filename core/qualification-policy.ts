@@ -1,8 +1,8 @@
 // Frozen performance qualification policy (E2E_ACCEPTANCE: "T4/T8 must
 // freeze a versioned hardware/fixture/resource policy and hard thresholds
 // before qualification ... A row with an unspecified policy cannot pass").
-// Approved by the founder on 2026-10-13 (approval I): the plan's proposed
-// targets, frozen as hard thresholds on the stated hardware profile and
+// Approved by the founder on 2026-10-13 (approval I; scope and source in
+// docs/FOUNDER_DECISION_RECORD.md): the plan's proposed performance targets, frozen as hard thresholds on the stated hardware profile and
 // fixtures. Qualification scripts read their thresholds from here; a
 // threshold is never adjusted to pass. A change needs a new policy version
 // and a new approval.
@@ -24,7 +24,7 @@ export const QUALIFICATION_POLICY = Object.freeze({
     coldLaunch: Object.freeze({
       p95Ms: 5000,
       fixture:
-        "service start to its ready line on a fresh workspace; 5 runs (scripts/qualify-release.ts)",
+        "service start to its ready line on a fresh workspace, OS file cache warm; 5 runs (scripts/qualify-release.ts)",
     }),
     reopen: Object.freeze({
       p95Ms: 2000,
