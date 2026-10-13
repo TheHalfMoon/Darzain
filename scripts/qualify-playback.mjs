@@ -42,11 +42,20 @@ const make = (name, args) => {
   );
   return file;
 };
+// A moving test pattern with a frame marker: an 80x80 box centred at
+// (640, 240), where the sampler reads, whose brightness changes on every
+// frame (the pattern alone does not change everywhere on every frame).
 const moving = (seconds, size = "1280x720") => [
   "-f",
   "lavfi",
   "-i",
   `testsrc2=size=${size}:rate=30:duration=${seconds}`,
+  "-f",
+  "lavfi",
+  "-i",
+  `color=c=black:s=80x80:r=30:d=${seconds},geq=lum='mod(N*67\\,200)+28':cb=128:cr=128`,
+  "-filter_complex",
+  "[0:v][1:v]overlay=600:200",
   "-pix_fmt",
   "yuv420p",
   "-c:v",
